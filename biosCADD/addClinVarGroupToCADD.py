@@ -1,10 +1,11 @@
-#!/bin/bash
+# !/usr/bin/env python3
+# -*- coding: utf-8 -*-
 ################################################################################
-#   File Name  : addClinVarAnno.sh
+#   File Name  : addClinVarGroupToCADD.py
 ##  Author     : zhzhang
 ### E-mail     : zhzhang2015@sina.com
-##  Created on : Fri 09 Nov 2018 03:43:17 PM CET
-#   Version    : unknown
+### Created on : Sun 11 Nov 2018 05:54:41 PM CET
+##  Version    : v0.0.1
+#   License    : MIT
 ################################################################################
-#SBATCH --time=0:9:0
-#SBATCH --=0:9:0
+
