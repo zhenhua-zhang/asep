@@ -43,4 +43,5 @@ bcftools query \
     -f ${opFm} \
     -i ${incEx} \
     -T ${caddIpFile} \
-    -o ${uOpFile}
+    -o ${uOpFile} \
+    ${cvIpFile}
