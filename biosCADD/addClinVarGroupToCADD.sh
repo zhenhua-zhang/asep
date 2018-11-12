@@ -34,7 +34,7 @@ cvIpDir=${cvIpDir}
 cvIpFile=${cvIpDir}/clinvar_20180401.vcf.gz
 
 uOpDir='/apps/data/ClinVar'
-uOpFile=${uOpFile}/
+uOpFile=${uOpFile}/biosCaddClinvar.tvs.tmp
 
 opFm='%CHROM\t%POS\t%ID\t%REF\t%ALT\t%INFO/AF_EXAC\t%INFO/CLNSIG\n'   # Output format
 incEx='TYPE="snp"'  # Including sites
