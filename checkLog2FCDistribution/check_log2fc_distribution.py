@@ -61,7 +61,7 @@ for index, (gn, g) in enumerate(RAW_BENIGN_DF_GROUP):
 for index, (gn, g) in enumerate(RAW_POPULATION_DF_GROUP):
     gl, _ = g.shape
     indexs = [index for x in range(gl)]
-    POPULATION_AX.scatter(g.log2FC, indexs, c='g', marker='x')
+    POPULATION_AX.scatter(g.log2FC, indexs, s=0.2, c='g', marker='x')
     POPULATION_AX.axhline(index, c='g', alpha=0.2)
     POPULATION_AX.axvline(1, alpha=0.1, linestyle='dotted')
     POPULATION_AX.axvline(-1, alpha=0.1, linestyle='dotted')
@@ -69,7 +69,7 @@ for index, (gn, g) in enumerate(RAW_POPULATION_DF_GROUP):
 for index, (gn, g) in enumerate(RAW_PATHOGENIC_DF_GROUP):
     gl, _ = g.shape
     indexs = [index for x in range(gl)]
-    PATHOGENIC_AX.scatter(g.log2FC, indexs, c='b', marker='o')
+    PATHOGENIC_AX.scatter(g.log2FC, indexs, s=0.2, c='b', marker='o')
     PATHOGENIC_AX.axhline(index, c='b', alpha=0.2)
     PATHOGENIC_AX.axvline(1, alpha=0.1, linestyle='dotted')
     PATHOGENIC_AX.axvline(-1, alpha=0.1, linestyle='dotted')
@@ -79,6 +79,6 @@ POPULATION_AX.set_title('Distribution of POPULATION')
 PATHOGENIC_AX.set_title('Distribution of PATHOGENIC')
 
 FIG.set_figwidth(25)
-FIG.set_figheight(15)
+FIG.set_figheight(30)
 FIG.set_dpi(150)
 FIG.savefig('log2FC_distribution.png')
