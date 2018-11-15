@@ -11,6 +11,8 @@
 
 from os.path import join
 import pandas as pd
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 # input files
@@ -61,16 +63,16 @@ for index, (gn, g) in enumerate(RAW_POPULATION_DF_GROUP):
     indexs = [index for x in range(gl)]
     POPULATION_AX.scatter(g.log2FC, indexs, c='g', marker='x')
     POPULATION_AX.axhline(index, c='g', alpha=0.2)
-    POPULATION_AX.axvline(1, alpha=0.5, linestyle='dotted')
-    POPULATION_AX.axvline(-1, alpha=0.5, linestyle='dotted')
+    POPULATION_AX.axvline(1, alpha=0.1, linestyle='dotted')
+    POPULATION_AX.axvline(-1, alpha=0.1, linestyle='dotted')
 
 for index, (gn, g) in enumerate(RAW_PATHOGENIC_DF_GROUP):
     gl, _ = g.shape
     indexs = [index for x in range(gl)]
     PATHOGENIC_AX.scatter(g.log2FC, indexs, c='b', marker='o')
     PATHOGENIC_AX.axhline(index, c='b', alpha=0.2)
-    PATHOGENIC_AX.axvline(1, alpha=0.5, linestyle='dotted')
-    PATHOGENIC_AX.axvline(-1, alpha=0.5, linestyle='dotted')
+    PATHOGENIC_AX.axvline(1, alpha=0.1, linestyle='dotted')
+    PATHOGENIC_AX.axvline(-1, alpha=0.1, linestyle='dotted')
 
 BENIGN_AX.set_title('Distribution of BENIGN')
 POPULATION_AX.set_title('Distribution of POPULATION')
@@ -78,4 +80,5 @@ PATHOGENIC_AX.set_title('Distribution of PATHOGENIC')
 
 FIG.set_figwidth(25)
 FIG.set_figheight(15)
-FIG.savefig('Test.png')
+FIG.set_dpi(150)
+FIG.savefig('log2FC_distribution.png')
