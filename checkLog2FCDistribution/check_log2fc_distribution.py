@@ -59,8 +59,9 @@ for index, (gn, g) in enumerate(RAW_BENIGN_DF_GROUP):
 
 BENIGN_AX.set_title('Distribution of BENIGN')
 BENIGN_FIG.set_figwidth(25)
-BENIGN_FIG.set_figheight(60)
-BENIGN_FIG.savefig('log2FC_distribution_BENIGN.svg')
+BENIGN_FIG.set_figheight(90)
+BENIGN_FIG.set_dpi(150)
+BENIGN_FIG.savefig('log2FC_distribution_BENIGN.pdf')
 BENIGN_FIG.savefig('log2FC_distribution_BENIGN.png')
 
 for index, (gn, g) in enumerate(RAW_POPULATION_DF_GROUP):
@@ -73,8 +74,9 @@ for index, (gn, g) in enumerate(RAW_POPULATION_DF_GROUP):
 
 POPULATION_AX.set_title('Distribution of POPULATION')
 POPULATION_FIG.set_figwidth(25)
-POPULATION_FIG.set_figheight(30)
-POPULATION_FIG.savefig('log2FC_distribution_POPULATION.svg')
+POPULATION_FIG.set_figheight(60)
+POPULATION_FIG.set_dpi(150)
+POPULATION_FIG.savefig('log2FC_distribution_POPULATION.pdf')
 POPULATION_FIG.savefig('log2FC_distribution_POPULATION.png')
 
 for index, (gn, g) in enumerate(RAW_PATHOGENIC_DF_GROUP):
@@ -87,6 +89,7 @@ for index, (gn, g) in enumerate(RAW_PATHOGENIC_DF_GROUP):
 
 PATHOGENIC_AX.set_title('Distribution of PATHOGENIC')
 PATHOGENIC_FIG.set_figwidth(25)
-PATHOGENIC_FIG.set_figheight(30)
-PATHOGENIC_FIG.savefig('log2FC_distribution_PATHOGENIC.svg')
+PATHOGENIC_FIG.set_figheight(40)
+PATHOGENIC_FIG.set_dpi(150)
+PATHOGENIC_FIG.savefig('log2FC_distribution_PATHOGENIC.pdf')
 PATHOGENIC_FIG.savefig('log2FC_distribution_PATHOGENIC.png')
