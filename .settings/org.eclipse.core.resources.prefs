@@ -1,0 +1,5 @@
+eclipse.preferences.version=1
+encoding//bios_cadd_overlap/main.py=utf-8
+encoding//predictor_of_log2FC_variance/predictor_of_log2fc_variance.py=utf-8
+encoding//transform_log2FC_into_variance/transform_log2fc_into_variance.py=utf-8
+encoding/__main__.py=utf-8
