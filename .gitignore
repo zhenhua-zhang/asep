@@ -1,2 +1,8 @@
 /.settings
 /.pydevproject
+/predictor_of_log2FC_variance/.settings
+/predictor_of_log2FC_variance/.pydevproject
+/predictor_of_log2FC_variance/.project
+/transform_log2FC_into_variance/.settings
+/transform_log2FC_into_variance/.pydevproject
+/transform_log2FC_into_variance/.project
