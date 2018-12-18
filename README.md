@@ -2,24 +2,13 @@
 # Asep
 Allele-specific expression analysis
 
-## 
-biosCadd
-biosGavinOverlap
-distPathNonpathASE
-getGenotype
-LICENSE
-misc
-predictor
-README.md
-utls
+Here is a allele-specific expression predictor. Here is my
 
-
-##  checkLog2FCDistribution
-Type: directory  
-Comments: check the log2 fold change of different groups(BENIGN, POPULATION, PATHOGENIC)  
-
-### checkLog2FCDistribution/check_log2fc_distribution.py
-Type: python script  
-Comments: python script to check the log2 fold change of different groups(BENIGN, POPULATION, PATHOGENIC)  
-
-### 
+## For each files or directives
+### bios_cadd_overlap
+### bios_gavin_overlap
+### check_gavin_to_clinvar
+### check_logFC_distribution
+### distinguish_pathogenic_from_benign
+### get_genotype
+### gonl_bios_gavin_overlap
