@@ -1,14 +1,14 @@
 #!/path/to/python
 # -*- coding: utf-8 -*-
 
-import os
-import sys
+# import os
+# import sys
 import time
 from functools import wraps
 from sys import stderr
-from utls import FileReader
+# from utls import FileReader
 
-import numpy as np
+# import numpy as np
 import pandas as pd
 
 try:
@@ -18,6 +18,7 @@ except ImportWarning as w:
     import matplotlib as mpl
     mpl.use("Agg")
     import matplotlib.pyplot as plt
+
 
 def timmer(func):
     """Print the runtime of the decorated function
@@ -49,17 +50,19 @@ class Log2fcPredictor:
         """Method to debug the class
         """
         pass
-    
+
     def run(self):
         """Excute chosen methods
         """
-    
+
     def read_input_file(self):
         """Load input file
         """
         try:
             file_handler = open(self.input_file_name, 'r')
-        except PermissionError('Failed to read {}'.format(self.input_file_name)) as e:
+        except PermissionError(
+            'Failed to read {}'.format(self.input_file_name)
+                ) as e:
             print(e)
         else:
             with file_handler:
@@ -69,3 +72,9 @@ class Log2fcPredictor:
         """Return the name of input file
         """
         return self.input_file_name
+
+    def draw_figs(self):
+        """Draw figures
+        """
+        fig, ax = plt.subplots()
+        ax.plot()

@@ -1,6 +1,6 @@
 from sys import stderr
 
-import pandas as pd
+# import pandas as pd
 import pysam
 
 
@@ -12,15 +12,15 @@ class FileReader:
         """Initialization
         """
         self.file_name = fn
-    
+
     def read_file(self, method=None, mode=None, **kwargs):
         """Read file by default method
 
         Args:
-            method (None): 
+            method (None):
             mode (None):
             **kwargs:
-        
+
         Returns:
         """
 
@@ -35,13 +35,13 @@ class FileReader:
                 'Unknown method to read file: {} \n'.format(self.file_name)
                 + 'Available method in cluding {}\n'.format(method_pool)
                 )
-        
+
         if method == 'plain':
-            self.read_plain_file
+            self.read_plain_file()
         elif method == 'sam':
-            self.read_sam_file
+            self.read_sam_file()
         elif method == 'todf':
-            self.read_into_dataframe
+            self.read_into_dataframe()
 
     def read_plain_file(self):
         """Read file as a plain text file
@@ -54,12 +54,12 @@ class FileReader:
             raise e
         else:
             return self.file_handler
-            
 
     def read_binary_file(self):
         """Read file as a binary file
         """
-    
+        pass
+
     def read_tar_file(self, mode=None):
         """Read tar file
         """
@@ -75,6 +75,7 @@ class FileReader:
     def read_sam_file(self, mode=None):
         """Read file as sequnce alignment map file
         """
+
         try:
             self.file_handler = pysam.AlignmentFile(self.file_name, mode)
         except PermissionError('Permission denied') as e:
@@ -90,4 +91,6 @@ class FileReader:
 
 
 if __name__ == "__main__":
-    stderr.write("NOTE: please import it as module instead of executing it directly!\n")
+    stderr.write(
+        "NOTE: please import it as module instead of executing it directly!\n"
+        )
