@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env
 # -*- coding: utf-8 -*-
 #
 # File Name  : pythonScriptTemplement
