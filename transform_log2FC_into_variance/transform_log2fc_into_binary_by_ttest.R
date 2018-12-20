@@ -13,7 +13,7 @@ ipd <- ppaste(pjd, 'outputs', 'biosGavinOverlapCov10')
 ipf <- ppaste(ipd, 'biosGavinOlCv10AntUfltCst.tsv')
 
 opd <- ppaste(pjd, 'outputs', 'biosGavinOverlapCov10')
-opf <- ppaste(opd, 'biosGavinOlCv10AntUfltCstLog2FCBs.tsv')
+opf <- ppaste(opd, 'biosGavinOlCv10AntUfltCstLog2FCBin.tsv')
 
 add_binom_log2fc_chist <- function(rtb){
   # :prams: rtb (data.frame): input data.frame
@@ -47,7 +47,7 @@ trans_into_bin <- function(rtb, cr, pv=0.01){
       p_value=ifelse(
         length(log2FC)<=1, 
         ifelse(FDRPerVariant<=0.01 || abs(log2FC) >= 1, 0, 1), 
-        t.test(log2FC, mu=0)[[3]]
+        ifelse(max(log2FC)==min(log2FC), NA, t.test(log2FC, mu=0)$p.value)
       )
     ) %>%
     ungroup() %>%
