@@ -15,7 +15,26 @@ ipf <- ppaste(ipd, 'biosGavinOlCv10AntUfltCst.tsv')
 opd <- ppaste(pjd, 'outputs', 'biosGavinOverlapCov10')
 opf <- ppaste(opd, 'biosGavinOlCv10AntUfltCstLog2FCBs.tsv')
 
-transform <- function(rtb, cr, pv=0.01){
+add_binom_log2fc_chist <- function(rtb){
+  # :prams: rtb (data.frame): input data.frame
+  
+  df <- rtb %>%
+    mutate(
+      binom_p=binom.test(c(refAlleleBios, altAlleleBios), p=0.5),
+      log2FC=-log2(altAlleleBios/refAlleleBios)
+    ) %>%
+    group_by(chr, pos, ref, alt) %>%
+    mutate(
+      FDRPerVariant=p.adjust(binom_p),
+      varInsideChi2Pval=chisq.test(refAlleleBios, alrAlleleBios)
+    ) %>%
+    ungroup() %>%
+    as.data.frame()
+    
+  return(df)
+}
+
+trans_into_bin <- function(rtb, cr, pv=0.01){
   # :prams: rtb (data.frame): input data.frame
   # :prams: cr (vector): slelected rows
 
@@ -29,11 +48,10 @@ transform <- function(rtb, cr, pv=0.01){
         length(log2FC)<=1, 
         ifelse(FDRPerVariant<=0.01 || abs(log2FC) >= 1, 0, 1), 
         t.test(log2FC, mu=0)[[3]]
-      ),
-      FDRPerVariant=ifelse(length(log2FC)<=1, FDRPerVariant, NA)
+      )
     ) %>%
-    mutate(ASE=ifelse(p_value<=pv, ifelse(mean<0, -1, 1), 0)) %>%
     ungroup() %>%
+    mutate(ASE=ifelse(p_value<=pv, ifelse(mean<0, -1, 1), 0)) %>%
     select(rn) %>%
     arrange(chr, pos, ref, alt) %>%
     distinct() %>%
@@ -44,8 +62,8 @@ transform <- function(rtb, cr, pv=0.01){
 
 rtb <- read.csv(ipf, header = TRUE, sep='\t')
 rn <- colnames(rtb)[1:117]
-rn <- c(rn, 'var', 'mean', 'p_value', 'gp_size', 'FDRPerVariant', 'ASE')
+rn <- c(rn, 'var', 'mean', 'p_value', 'gp_size', 'ASE')
 
-odf <- transform(rtb, rn)
+odf <- trans_into_bin(rtb, rn)
 rm(rtb)
 write.table(odf, file=opf, quote=FALSE, sep="\t", row.names=FALSE)
