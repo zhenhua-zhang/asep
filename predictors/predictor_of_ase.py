@@ -2,19 +2,16 @@
 # -*- coding: utf-8 -*-
 
 # import os
-# import sys
+import sys
 import time
+from os.path import join
 from functools import wraps
-from sys import stderr
-# from utls import FileReader
-
-# import numpy as np
 import pandas as pd
 
 try:
     import matplotlib.pyplot as plt
 except ImportWarning as w:
-    print(w)
+    print(w, file=sys.stderr)
     import matplotlib as mpl
     mpl.use("Agg")
     import matplotlib.pyplot as plt
@@ -22,6 +19,9 @@ except ImportWarning as w:
 
 def timmer(func):
     """Print the runtime of the decorated function
+
+    :params func(callable): function to be timmed
+    :returns callable
     """
 
     @wraps(func)
@@ -30,20 +30,22 @@ def timmer(func):
         value = func(*args, **kwargs)
         fn = func.__name__
         rt = time.perf_counter() - start_time
-        #  st = time.perf_counter()
-        stderr.write('{} is done; elapsed: {:.5f} secs\n'.format(fn, rt))
+        sys.stderr.write('{} is done; elapsed: {:.5f} secs\n'.format(fn, rt))
         return value
 
     return wrapper_timmer
 
 
-class Log2fcPredictor:
-    """Predictor of log2FC
+class ASEPredictor:
+    """Predictor of ASE
     """
 
     def __init__(self, ifn):
         """Initialization
+
+        :params ifn(string): input file name
         """
+
         self.input_file_name = ifn
 
     def debug(self):
@@ -73,8 +75,36 @@ class Log2fcPredictor:
         """
         return self.input_file_name
 
+    def imputation(self):
+        """Imputation missing values
+
+        """
+
     def draw_figs(self):
         """Draw figures
         """
         fig, ax = plt.subplots()
         ax.plot()
+
+
+def main():
+    """Main function to run the module
+
+    :params None
+    :returns None
+    :Notes: None
+    """
+
+    FILE_PATH = [
+        '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
+        'outputs', 'biosGavinOverlapCov10', 
+        'biosGavinOlCv10AntUfltCstLog2FCVar.tsv'
+    ]
+
+    input_file = join(FILE_PATH)
+    ap = ASEPredictor(input_file)
+    ap.debug()
+
+
+if __name__ == '__main__':
+    main()
