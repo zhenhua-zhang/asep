@@ -47,6 +47,7 @@ class ASEPredictor:
         """
 
         self.input_file_name = ifn
+        self.raw_dataframe = None
 
     def debug(self):
         """Method to debug the class
@@ -57,9 +58,15 @@ class ASEPredictor:
         """Excute chosen methods
         """
 
-    def read_input_file(self):
+    def get_input_file_name(self):
+        """Return the name of input file
+        """
+        return self.input_file_name
+
+    def load_file_into_dataframe(self):
         """Load input file
         """
+
         try:
             file_handler = open(self.input_file_name, 'r')
         except PermissionError(
@@ -68,17 +75,13 @@ class ASEPredictor:
             print(e)
         else:
             with file_handler:
-                pd.read_table(self.input_file_name, header=0)
-
-    def get_input_file_name(self):
-        """Return the name of input file
-        """
-        return self.input_file_name
+                self.raw_dataframe = pd.read_table(file_handler, header=0)
 
     def imputation(self):
         """Imputation missing values
 
         """
+        pass
 
     def draw_figs(self):
         """Draw figures
@@ -92,7 +95,12 @@ def main():
 
     :params None
     :returns None
-    :Notes: None
+    :examples:
+
+    >>> imoprt ASEPredictor
+    >>> ipf = 'input.tsv'
+    >>> ap = ASEPredictor(ipf)
+    >>> ap.run()
     """
 
     FILE_PATH = [
