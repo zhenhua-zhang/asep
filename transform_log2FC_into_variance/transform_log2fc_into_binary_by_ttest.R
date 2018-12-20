@@ -1,7 +1,6 @@
 rm(list=ls())
 
 library('dplyr')
-wd <- getwd()
 
 ppaste <- function(...){
   paste(..., sep='/')
@@ -16,7 +15,7 @@ ipf <- ppaste(ipd, 'biosGavinOlCv10AntUfltCst.tsv')
 opd <- ppaste(pjd, 'outputs', 'biosGavinOverlapCov10')
 opf <- ppaste(opd, 'biosGavinOlCv10AntUfltCstLog2FCBs.tsv')
 
-transform <- function(rtb, cr){
+transform <- function(rtb, cr, pv=0.01){
   # :prams: rtb (data.frame): input data.frame
   # :prams: cr (vector): slelected rows
 
@@ -33,7 +32,7 @@ transform <- function(rtb, cr){
       ),
       FDRPerVariant=ifelse(length(log2FC)<=1, FDRPerVariant, NA)
     ) %>%
-    mutate(ASE=ifelse(p_value<=0.01, 1, 0)) %>%
+    mutate(ASE=ifelse(p_value<=pv, ifelse(mean<0, -1, 1), 0)) %>%
     ungroup() %>%
     select(rn) %>%
     arrange(chr, pos, ref, alt) %>%
@@ -48,4 +47,5 @@ rn <- colnames(rtb)[1:117]
 rn <- c(rn, 'var', 'mean', 'p_value', 'gp_size', 'FDRPerVariant', 'ASE')
 
 odf <- transform(rtb, rn)
+rm(rtb)
 write.table(odf, file=opf, quote=FALSE, sep="\t", row.names=FALSE)

@@ -1,5 +1,6 @@
 .vscode/
 *code-workspace
+*.Rproj*
 */__pycache__/
 */.ipynb_checkpoints/
 env/
