@@ -7,3 +7,4 @@ env/
 syntax_test/
 explore_log2FC/
 utls/toy.sam
+.Rhistory
