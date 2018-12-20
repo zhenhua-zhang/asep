@@ -1,7 +1,8 @@
-/.vscode
-/*code-workspace
-/env
-/*/__pycache__
-/*/.ipynb_checkpoints/
-/syntax_test
-/utls/toy.sam
+.vscode/
+*code-workspace
+*/__pycache__/
+*/.ipynb_checkpoints/
+env/
+syntax_test/
+explore_log2FC/
+utls/toy.sam
