@@ -1,4 +1,3 @@
-
 # Logging function
 lg.info <- function(m, ln='INFO'){ 
     timeStamp <- strftime(Sys.time(), "%Y-%m-%d,%H:%M:%S")

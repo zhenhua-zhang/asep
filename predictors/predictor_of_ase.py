@@ -26,31 +26,35 @@ from functools import wraps
 from os.path import join
 from sys import stderr
 
+# Third party modules
 import joblib
 import numpy as np
 import pandas as pd
 
+# scikit-learn modules
+from sklearn.feature_selection import mutual_info_classif
+from sklearn.feature_selection import SelectKBest
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import learning_curve
 from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
 from scipy.stats import spearmanr
 from pandas import DataFrame
 from numpy import dtype
 
-from config import estimators_list
-from config import grid_search_opt_params
-
 # from sklearn.feature_selection import SelectFromModel
 # from sklearn.preprocessing import RobustScaler
+# from sklearn.preprocessing import StandardScaler
 # from sklearn.preprocessing import Normalizer
 # from sklearn.pipeline import FeatureUnion
 # from sklearn.impute import MissingIndicator
 # from sklearn.impute import SimpleImputer
 
-# Visualization
+# maplotlib as visualization modules
 try:
     import matplotlib.pyplot as plt
 except ImportError:
@@ -81,8 +85,92 @@ def timmer(func):
     return wrapper_timmer
 
 
-class ASEPredictor:
+class Config:
+    """Config module for the ASEPredictor
+
+    Args:
+        extimators_list (list): compulsory, no default
+            A list of 2D-tuple, where tuple is (NAME, sklearn_estimator)
+        grid_search_opt_params (defaultdict): compulsory, default defaultdict()
+            A defaultdict from built-in
+    """
+
+    def __init__(self):
+        """
+        """
+
+        self.estimators_list = [
+            ('imputator', SimpleImputer()),
+            # ('standard_scaler', StandardScaler()),  # TODO: useful ???
+            # ('normalizer', Normalizer()),  # TODO: usefule ???
+            ('feature_selection', SelectKBest()),
+
+            # Random forest classifier
+            ('rfc', RandomForestClassifier(n_estimators=20))
+        ]
+
+        self.grid_search_opt_params = defaultdict(None)
+        self.grid_search_opt_params.update(
+            dict(
+                cv=5,
+                n_jobs=3,
+                refit='ra',
+                iid=False,
+                scoring=dict(  # model evaluation metrics
+                    ra='roc_auc',
+                    preci='precision',
+                    accu='accuracy'
+                ),
+                param_grid=[
+                    dict(
+                        imputator__strategy=['mean'],
+                        feature_selection__score_func=[mutual_info_classif],
+                        feature_selection__k=list(range(2, 20, 2)),
+                        rfc__min_samples_split=list(range(2, 10))
+                    ),
+                ],
+                return_train_score=True,
+            )
+        )
+
+        self.random_search_opt_params = defaultdict(None)
+        self.random_search_opt_params.update(
+            dict(
+                cv=5,
+                n_jobs=3,
+                refit='ev',
+                n_iters=10,
+                iid=False,  # To supress warnings
+                scoring=dict(  # model evaluation metrics
+                    ra='roc_auc',
+                    preci='precision',
+                    accu='accuracy'
+                ),
+                param_distribution=[
+                    dict(
+                        imputator__strategy=['mean'],
+                        feature_selection__score_func=[mutual_info_classif],
+                        feature_selection__k=list(range(2, 20, 2)),
+                        rfc__min_samples_split=list(range(2, 10))
+                    ),
+                ],
+                return_train_score=True,  # to supress a warning
+            )
+        )
+
+    def set_estimators_list(self, **kwargs):
+        """Set estimators
+        """
+
+
+class ASEPredictor():
     """A class implementing prediction of ASE variance of a variant
+
+    Example:
+        >>> imoprt ASEPredictor
+        >>> ipf = 'input.tsv'
+        >>> ap = ASEPredictor(ipf)
+        >>> ap.run()
     """
 
     def __init__(self, file_name, verbose=False, save_model=False):
@@ -94,12 +182,18 @@ class ASEPredictor:
 
         self.input_file_name = file_name
 
+        config = Config()
+        self.estimators_list = config.estimators_list
+        self.grid_search_opt_params = config.grid_search_opt_params
+
         self.raw_df = None
+        self.raw_df_info = dict(shape=None, rows=[], cols=[])
         self.raw_df_shape = None
         self.raw_df_rows = None
         self.raw_df_cols = None
 
         self.work_df = None
+        self.work_df_info = dict(shape=None, rows=[], cols=[])
         self.work_df_shape = None
         self.work_df_cols = None
         self.work_df_rows = None
@@ -139,6 +233,11 @@ class ASEPredictor:
         self.rsf_best_index = None
         self.rsf_y_pred = None
 
+    def __str__(self):
+        """
+        """
+        return "ASEPredictor"
+
     @timmer
     def run(self):
         """Execute a pre-designed construct pipeline
@@ -164,14 +263,15 @@ class ASEPredictor:
 
         # flt = 'log2FCVar>0'
         flt = None
-        self.slice_data_frame(flt=flt)
+        cols_discarded = ['var', 'mean', 'p_value', 'gp_size']
+        self.slice_data_frame(flt=flt, cols=cols_discarded, keep=False)
 
         self.label_encoder(encode=False)
         self.setup_xy()
         self.train_test_slicer()
 
-        self.setup_pipeline(estimators=estimators_list)
-        self.grid_search_opt(self.pipeline, **grid_search_opt_params)
+        self.setup_pipeline(estimators=self.estimators_list)
+        self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
         self.draw_learning_curve()
 
     @staticmethod
@@ -226,10 +326,7 @@ class ASEPredictor:
 
         Args:
             df (str): the data frame to be checked
-
-        Returns:
-            None
-
+        Returns: none
         Raises:
             TypeError:
             ValueError:
@@ -273,22 +370,46 @@ class ASEPredictor:
         self.setup_raw_dataframe_info()
         self.update_work_dataframe_info()
 
-    def slice_data_frame(self, rows=None, cols=None, flt=None):
+    def slice_data_frame(self, rows=None, cols=None, keep=False,
+                         fltout=None, ax=1):
         """Slice the DataFrame base on rows and cols
 
         Args:
-            rows ():
-            cols ():
-            flt ():
+            rows (list, tuple, None): optional, default None
+                Rows retained for the downstream. If it's None, all rows will
+                be retained.
+            cols (list, tuple, None): optional, default None
+                Columns retained for the downstream. If it's None, all columns
+                will be retained.
+            keep (bool): optional, default `True`
+                Whether the values of `rows` or `cols` will be kept or
+                discarded. If True, cells coorderated by `rows` and `cols` will
+                be keep and the exclusive will be discarded, otherwise the way
+                around.
+            fltout (callable, str, None): optional, default None
+                A filter to screen dataframe. If the fltout is callable,
+                `apply` method of DataFrame will be used; if it's a `str`
+                object, `query` method will be called; otherwise, if it's
+                `None`, no filter will be applied.
+            ax (0, 1): optional, default 1
+                Axis along which the flt is applied. 0 for rows, 1 for column.
         Returns: none
         Raises: none
         """
         self.check_df()
 
-        if isinstance(flt, str):
-            self.work_df = self.work_df.query(flt)
-        elif callable(flt):
-            self.work_df = self.work_df[self.work_df.apply(flt, axis=1)]
+        if not isinstance(keep, bool):
+            raise TypeError('keep should be bool')
+
+        if not keep and (rows is None or cols is None):
+            raise TypeError(
+                'if keep is False, niether rows nor cols can be None'
+            )
+
+        if isinstance(fltout, str):
+            self.work_df = self.work_df.query(fltout)
+        elif callable(fltout):
+            self.work_df = self.work_df[self.work_df.apply(fltout, axis=1)]
 
         if rows is None and cols is None:
             rows = self.work_df.index
@@ -298,7 +419,11 @@ class ASEPredictor:
         elif cols is None:
             cols = self.work_df.columns
 
-        self.work_df = self.work_df.loc[rows, cols]
+        if keep:
+            self.work_df = self.work_df.loc[rows, cols]
+        else:
+            self.work_df = self.work_df.drop(index=rows, columns=cols)
+
         self.update_work_dataframe_info()
 
     def label_encoder(self, target_cols=None, skip=None, remove=True):
@@ -355,9 +480,7 @@ class ASEPredictor:
         Args:
             x_cols(list, tuple, None):
             y_col(string, None):
-
         Returns: none
-
         Raise:
             ValueError:
         """
@@ -507,13 +630,12 @@ class ASEPredictor:
         elif estimator == 'rscv':
             estimator = self.rsf_best_estimator
         else:
-            raise ValueError('Current only support GridSearchCV and '
-                             + 'RandomSearchCV')
+            raise ValueError(
+                'Current only support GridSearchCV and RandomSearchCV'
+            )
 
         if file_name is None:
             file_name = 'learning_curve'
-
-        self.grid_search.set_params(cv=3)  # Use a lower vc times to accelerate
 
         train_sizes, train_scores, test_scores = learning_curve(
             estimator, X=self.X, y=self.y, cv=5, n_jobs=6,
@@ -553,7 +675,6 @@ class ASEPredictor:
                 label='Cross-validation score')
 
         ax.legend(loc='best')
-
         fig.savefig(file_name)
 
     def save_model(self, pickle_file_name=None):
@@ -569,6 +690,7 @@ class ASEPredictor:
             pickle_file_name = 'slkearn_model.pl'
 
         joblib.dump(self.gsf, pickle_file_name)
+        # joblib.dump(self.rsf, pickle_file_name)
 
     # TODO: save the training data
     def save_training_data(self):
@@ -588,16 +710,11 @@ def main():
 
     Args: none
     Returns: none
-    Examples:
-        >>> imoprt ASEPredictor
-        >>> ipf = 'input.tsv'
-        >>> ap = ASEPredictor(ipf)
-        >>> ap.run()
     """
     FILE_PATH = [
         '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
         'outputs', 'biosGavinOverlapCov10',
-        'biosGavinOlCv10AntUfltCstLog2FCVar.tsv'
+        'biosGavinOlCv10AntUfltCstLog2FCBin.tsv'
     ]
 
     input_file = join(FILE_PATH)
