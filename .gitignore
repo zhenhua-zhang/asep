@@ -1,11 +1,7 @@
-.vscode/
-*code-workspace
-*.Rproj*
 */__pycache__/
 */.ipynb_checkpoints/
 env/
 syntax_test/
 explore_log2FC/
 utls/toy.sam
-.Rhistory
 Notes.md

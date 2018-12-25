@@ -1,9 +1,11 @@
+#!/usr/bin/env Rscript
+
 rm(list=ls())
 
 library('dplyr')
 
 ppaste <- function(...){
-  paste(..., sep='/')
+    paste(..., sep='/')
 }
 
 hmd <- '/home/umcg-zzhang'
@@ -16,48 +18,52 @@ opd <- ppaste(pjd, 'outputs', 'biosGavinOverlapCov10')
 opf <- ppaste(opd, 'biosGavinOlCv10AntUfltCstLog2FCBin.tsv')
 
 add_binom_log2fc_chist <- function(rtb){
-  # :prams: rtb (data.frame): input data.frame
-  
-  df <- rtb %>%
-    mutate(
-      binom_p=binom.test(c(refAlleleBios, altAlleleBios), p=0.5),
-      log2FC=-log2(altAlleleBios/refAlleleBios)
-    ) %>%
-    group_by(chr, pos, ref, alt) %>%
-    mutate(
-      FDRPerVariant=p.adjust(binom_p),
-      varInsideChi2Pval=chisq.test(refAlleleBios, alrAlleleBios)
-    ) %>%
-    ungroup() %>%
-    as.data.frame()
+                                        # :prams: rtb (data.frame): input data.frame
     
-  return(df)
+    df <- rtb %>%
+        mutate(
+            binom_p=binom.test(c(refAlleleBios, altAlleleBios), p=0.5),
+            log2FC=-log2(altAlleleBios/refAlleleBios)
+        ) %>%
+        group_by(chr, pos, ref, alt) %>%
+        mutate(
+            FDRPerVariant=p.adjust(binom_p),
+            varInsideChi2Pval=chisq.test(refAlleleBios, alrAlleleBios)
+        ) %>%
+        ungroup() %>%
+        as.data.frame()
+    
+    return(df)
 }
 
 trans_into_bin <- function(rtb, cr, pv=0.01){
-  # :prams: rtb (data.frame): input data.frame
-  # :prams: cr (vector): slelected rows
+                                        # :prams: rtb (data.frame): input data.frame
+                                        # :prams: cr (vector): slelected rows
 
-  gp <- rtb %>%
-    group_by(chr, pos, ref, alt) %>%
-    mutate(
-      var=ifelse(length(log2FC)<=1, 0, var(log2FC)),
-      mean=mean(log2FC), 
-      gp_size=length(log2FC),
-      p_value=ifelse(
-        length(log2FC)<=1, 
-        ifelse(FDRPerVariant<=0.01 || abs(log2FC) >= 1, 0, 1), 
-        ifelse(max(log2FC)==min(log2FC), NA, t.test(log2FC, mu=0)$p.value)
-      )
-    ) %>%
-    ungroup() %>%
-    mutate(ASE=ifelse(p_value<=pv, ifelse(mean<0, -1, 1), 0)) %>%
-    select(rn) %>%
-    arrange(chr, pos, ref, alt) %>%
-    distinct() %>%
-    as.data.frame()
+    gp <- rtb %>%
+        group_by(chr, pos, ref, alt) %>%
+        mutate(
+            var=ifelse(length(log2FC)<=1, 0, var(log2FC)),
+            mean=mean(log2FC), 
+            gp_size=length(log2FC),
+            p_value=ifelse(
+                length(log2FC)<=1, 
+                ifelse(FDRPerVariant<=0.01 || abs(log2FC) >= 1, 0, 1), 
+                ifelse(
+                    max(log2FC)==min(log2FC),
+                    ifelse(abs(max(log2FC))>1, 0, 1),
+                    t.test(log2FC, mu=0)$p.value
+                )
+            )
+        ) %>%
+        ungroup() %>%
+        mutate(ASE=ifelse(p_value<=pv, ifelse(mean<0, -1, 1), 0)) %>%
+        select(rn) %>%
+        arrange(chr, pos, ref, alt) %>%
+        distinct() %>%
+        as.data.frame()
 
-  return(gp)
+    return(gp)
 }
 
 rtb <- read.csv(ipf, header = TRUE, sep='\t')

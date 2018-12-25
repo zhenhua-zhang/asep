@@ -1,18 +1,14 @@
+"""I'm docstrting
+
+"""
+
 from collections import defaultdict
 
-import numpy as np
-from sklearn.ensemble import (AdaBoostRegressor, ExtraTreesClassifier,
-                              GradientBoostingRegressor, RandomForestRegressor)
-from sklearn.feature_selection import (SelectFromModel, SelectKBest,
-                                       f_regression, mutual_info_regression)
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import ExpSineSquared, WhiteKernel
-from sklearn.impute import MissingIndicator, SimpleImputer
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import mutual_info_regression
+from sklearn.impute import SimpleImputer
 from sklearn.kernel_ridge import KernelRidge
-from sklearn.linear_model import ElasticNet
-from sklearn.neural_network import MLPRegressor
-from sklearn.pipeline import FeatureUnion
-from sklearn.preprocessing import Normalizer, RobustScaler, StandardScaler
+
 
 estimators_list = [
     ('imputator', SimpleImputer()),

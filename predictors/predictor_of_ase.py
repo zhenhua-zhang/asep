@@ -1,5 +1,7 @@
 #!./env/bin/python
 # -*- coding: utf-8 -*-
+
+import matplotlib.pyplot as plt
 """Predictor of the variance of log2fc of variant with ASE
 
 Allele-specific expression predictor
@@ -39,9 +41,13 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import learning_curve
 from sklearn.preprocessing import LabelEncoder
+from sklearn.multiclass import OneVsOneClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
+from sklearn.metrics import make_scorer
+from sklearn.metrics import precision_score
+from sklearn.metrics import accuracy_score
+# from sklearn.impute import SimpleImputer
 from scipy.stats import spearmanr
 from pandas import DataFrame
 from numpy import dtype
@@ -52,16 +58,10 @@ from numpy import dtype
 # from sklearn.preprocessing import Normalizer
 # from sklearn.pipeline import FeatureUnion
 # from sklearn.impute import MissingIndicator
-# from sklearn.impute import SimpleImputer
 
 # maplotlib as visualization modules
-try:
-    import matplotlib.pyplot as plt
-except ImportError:
-    stderr.write("failed to import maplotlib.pyplot directly\n")
-    import matplotlib as mpl
-    mpl.use('agg')
-    import matplotlib.pyplot as plt
+import matplotlib as mpl
+mpl.use('agg')
 
 
 def timmer(func):
@@ -86,6 +86,7 @@ def timmer(func):
 
 
 class Config:
+
     """Config module for the ASEPredictor
 
     Args:
@@ -100,7 +101,7 @@ class Config:
         """
 
         self.estimators_list = [
-            ('imputator', SimpleImputer()),
+            # ('imputator', SimpleImputer()),
             # ('standard_scaler', StandardScaler()),  # TODO: useful ???
             # ('normalizer', Normalizer()),  # TODO: usefule ???
             ('feature_selection', SelectKBest()),
@@ -109,24 +110,27 @@ class Config:
             ('rfc', RandomForestClassifier(n_estimators=20))
         ]
 
+        precision_scorer = make_scorer(precision_score, average='micro')
+        accuracy_scorer = make_scorer(accuracy_score)
+
         self.grid_search_opt_params = defaultdict(None)
         self.grid_search_opt_params.update(
             dict(
                 cv=5,
                 n_jobs=3,
-                refit='ra',
+                refit='accu',
                 iid=False,
                 scoring=dict(  # model evaluation metrics
-                    ra='roc_auc',
-                    preci='precision',
-                    accu='accuracy'
+                    accu=accuracy_scorer,
+                    preci=precision_scorer
                 ),
                 param_grid=[
                     dict(
-                        imputator__strategy=['mean'],
-                        feature_selection__score_func=[mutual_info_classif],
-                        feature_selection__k=list(range(2, 20, 2)),
-                        rfc__min_samples_split=list(range(2, 10))
+                        # imputator__strategy=['mean'],
+                        estimator__feature_selection__score_func=[
+                            mutual_info_classif],
+                        estimator__feature_selection__k=list(range(2, 20, 2)),
+                        estimator__rfc__min_samples_split=list(range(2, 10))
                     ),
                 ],
                 return_train_score=True,
@@ -138,20 +142,20 @@ class Config:
             dict(
                 cv=5,
                 n_jobs=3,
-                refit='ev',
+                refit='preci',
                 n_iters=10,
                 iid=False,  # To supress warnings
                 scoring=dict(  # model evaluation metrics
-                    ra='roc_auc',
                     preci='precision',
                     accu='accuracy'
                 ),
                 param_distribution=[
                     dict(
-                        imputator__strategy=['mean'],
-                        feature_selection__score_func=[mutual_info_classif],
-                        feature_selection__k=list(range(2, 20, 2)),
-                        rfc__min_samples_split=list(range(2, 10))
+                        # imputator__strategy=['mean'],
+                        estimator__feature_selection__score_func=[
+                            mutual_info_classif],
+                        estimator__feature_selection__k=list(range(2, 20, 2)),
+                        estimator__rfc__min_samples_split=list(range(2, 10))
                     ),
                 ],
                 return_train_score=True,  # to supress a warning
@@ -163,11 +167,12 @@ class Config:
         """
 
 
-class ASEPredictor():
+class ASEPredictor:
+
     """A class implementing prediction of ASE variance of a variant
 
     Example:
-        >>> imoprt ASEPredictor
+        >>> import ASEPredictor
         >>> ipf = 'input.tsv'
         >>> ap = ASEPredictor(ipf)
         >>> ap.run()
@@ -234,8 +239,6 @@ class ASEPredictor():
         self.rsf_y_pred = None
 
     def __str__(self):
-        """
-        """
         return "ASEPredictor"
 
     @timmer
@@ -244,7 +247,6 @@ class ASEPredictor():
 
         Args: None
         Returns: None
-
         """
         self.debug()
 
@@ -263,16 +265,18 @@ class ASEPredictor():
 
         # flt = 'log2FCVar>0'
         flt = None
-        cols_discarded = ['var', 'mean', 'p_value', 'gp_size']
-        self.slice_data_frame(flt=flt, cols=cols_discarded, keep=False)
+        cols_discarded = ['var', 'mean', 'p_value',
+                          'gp_size', 'mirSVR.Score', 'mirSVR.E', 'mirSVR.Aln']
+        self.slice_data_frame(fltout=flt, cols=cols_discarded,
+                              rows=[], keep=False)
+        self.simple_imputer()
+        self.label_encoder(remove=False)
+        self.setup_xy(y_col='ASE')
+        self.train_test_slicer(test_size=0.15)
 
-        self.label_encoder(encode=False)
-        self.setup_xy()
-        self.train_test_slicer()
-
-        self.setup_pipeline(estimators=self.estimators_list)
+        self.setup_pipeline(estimators=self.estimators_list, multi_class=True)
         self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
-        self.draw_learning_curve()
+        self.draw_learning_curve(scoring='accuracy')
 
     @staticmethod
     def set_seed(sed=None):
@@ -403,7 +407,7 @@ class ASEPredictor():
 
         if not keep and (rows is None or cols is None):
             raise TypeError(
-                'if keep is False, niether rows nor cols can be None'
+                'if keep is False, neither rows nor cols can be None'
             )
 
         if isinstance(fltout, str):
@@ -435,7 +439,7 @@ class ASEPredictor():
                 skipped encoded. string represents only the specific column
                 will be skipped; list or tuple means all contained elements
                 will be skipped; None means no columns will be skipped.
-            encode(bool): remove columns need to be encoded.
+            remove (bool): remove columns need to be encoded.
         Returns: none
         Raises:
             TypeError:
@@ -463,15 +467,98 @@ class ASEPredictor():
         target_cols_encoded = [n + '_encoded' for n in target_cols]
 
         encoder = LabelEncoder()
-        for cn, _ in zip(target_cols, target_cols_encoded):
+        for cn, cne in zip(target_cols, target_cols_encoded):
             if remove is True:
                 del self.work_df[cn]
                 continue
 
-            self.work_df[cn] = encoder.fit_transform(
-                self.work_df[cn].fillna('NA')
-            )
+            try:
+                self.work_df[cne] = encoder.fit_transform(self.work_df[cn])
+                del self.work_df[cn]
+            except Exception as e:
+                print(e, file=stderr)
+                print(cne)
 
+        self.update_work_dataframe_info()
+
+    def simple_imputer(self):
+        """A simple imputater based on pandas DataFrame.replace method.
+
+        The columns information are derived from Dannis
+
+
+        For all columns. In fact all of the missing values are np.NaN
+        # to_replace_list = {
+        #     'motifEName': '', 'GeneID': '', 'GeneName': '', 'CCDS': '', 'Intron': '',
+        #     'Exon': '', 'ref': '', 'alt': '', 'Consequence': '', 'GC': np.NaN,
+        #     'CpG': np.NaN, 'motifECount': np.NaN, 'motifEScoreChng': np.NaN,
+        #     'motifEHIPos': np.NaN, 'oAA': np.NaN, 'nAA': '', 'cDNApos': np.NaN,
+        #     'relcDNApos': np.NaN, 'CDSpos': np.NaN, 'relCDSpos': np.NaN, 'protPos': np.NaN,
+        #     'relProtPos': np.NaN, 'Domain': '', 'Dst2Splice': np.NaN,
+        #     'Dst2SplType': '', 'minDistTSS': np.NaN, 'minDistTSE': np.NaN,
+        #     'SIFTcat': '', 'SIFTval': np.NaN, 'PolyPhenCat': '',
+        #     'PolyPhenVal': np.NaN, 'priPhCons': np.NaN, 'mamPhCons': np.NaN,
+        #     'verPhCons': np.NaN, 'priPhyloP': np.NaN, 'mamPhyloP': np.NaN,
+        #     'verPhyloP': np.NaN, 'bStatistic': np.NaN, 'targetScan': np.NaN,
+        #     'mirSVR-Score': np.NaN, 'mirSVR-E': np.NaN, 'mirSVR-Aln': np.NaN,
+        #     'cHmmTssA': np.NaN, 'cHmmTssAFlnk': np.NaN, 'cHmmTxFlnk': np.NaN,
+        #     'cHmmTx': np.NaN, 'cHmmTxWk': np.NaN, 'cHmmEnhG': np.NaN,
+        #     'cHmmEnh': np.NaN, 'cHmmZnfRpts': np.NaN, 'cHmmHet': np.NaN,
+        #     'cHmmTssBiv': np.NaN, 'cHmmBivFlnk': np.NaN, 'cHmmEnhBiv': np.NaN,
+        #     'cHmmReprPC': np.NaN, 'cHmmReprPCWk': np.NaN, 'cHmmQuies': np.NaN,
+        #     'GerpRS': np.NaN, 'GerpRSpval': np.NaN, 'GerpN': np.NaN, 'GerpS': np.NaN,
+        #     'TFBS': np.NaN, 'TFBSPeaks': np.NaN, 'TFBSPeaksMax': np.NaN, 'tOverlapMotifs': np.NaN,
+        #     'motifDist': np.NaN, 'Segway': '', 'EncH3K27Ac': np.NaN,
+        #     'EncH3K4Me1': np.NaN, 'EncH3K4Me3': np.NaN, 'EncExp': np.NaN, 'EncNucleo': np.NaN,
+        #     'EncOCC': np.NaN, 'EncOCCombPVal': np.NaN, 'EncOCDNasePVal': np.NaN,
+        #     'EncOCFairePVal': np.NaN, 'EncOCpolIIPVal': np.NaN, 'EncOCctcfPVal': np.NaN,
+        #     'EncOCmycPVal': np.NaN, 'EncOCDNaseSig': np.NaN, 'EncOCFaireSig': np.NaN,
+        #     'EncOCpolIISig': np.NaN, 'EncOCctcfSig': np.NaN, 'EncOCmycSig': np.NaN,
+        #     'Grantham': np.NaN, 'Dist2Mutation': np.NaN, 'Freq100bp': np.NaN, 'Rare100bp': np.NaN,
+        #     'Sngl100bp': np.NaN, 'Freq1000bp': np.NaN, 'Rare1000bp': np.NaN, 'Sngl1000bp': np.NaN,
+        #     'Freq10000bp': np.NaN, 'Rare10000bp': np.NaN, 'Sngl10000bp': np.NaN,
+        #     'dbscSNV.ada_score': np.NaN, 'dbscSNV.rf_score': np.NaN
+        # }
+
+        """
+        impute_values_dict = {
+            'motifEName': 'unknown', 'GeneID': 'unknown', 'GeneName': 'unknown',
+            'CCDS': 'unknown', 'Intron': 'unknown',
+            'Exon': 'unknown', 'ref': 'N', 'alt': 'N', 'Consequence': 'UNKNOWN', 'GC': 0.42,
+            'CpG': 0.02, 'motifECount': 0, 'motifEScoreChng': 0,
+            'motifEHIPos': 0, 'oAA': 'unknown', 'nAA': 'unknown', 'cDNApos': 0,
+            'relcDNApos': 0, 'CDSpos': 0, 'relCDSpos': 0, 'protPos': 0,
+            'relProtPos': 0, 'Domain': 'UD', 'Dst2Splice': 0,
+            'Dst2SplType': 'unknown', 'minDistTSS': 5.5, 'minDistTSE': 5.5,
+            'SIFTcat': 'UD', 'SIFTval': 0, 'PolyPhenCat': 'unknown',
+            'PolyPhenVal': 0, 'priPhCons': 0.115, 'mamPhCons': 0.079,
+            'verPhCons': 0.094, 'priPhyloP': -0.033, 'mamPhyloP': -0.038,
+            'verPhyloP': 0.017, 'bStatistic': 800, 'targetScan': 0,
+            'mirSVR-Score': 0, 'mirSVR-E': 0, 'mirSVR-Aln': 0,
+            'cHmmTssA': 0.0667, 'cHmmTssAFlnk': 0.0667, 'cHmmTxFlnk': 0.0667,
+            'cHmmTx': 0.0667, 'cHmmTxWk': 0.0667, 'cHmmEnhG': 0.0667,
+            'cHmmEnh': 0.0667, 'cHmmZnfRpts': 0.0667, 'cHmmHet': 0.667,
+            'cHmmTssBiv': 0.667, 'cHmmBivFlnk': 0.0667, 'cHmmEnhBiv': 0.0667,
+            'cHmmReprPC': 0.0667, 'cHmmReprPCWk': 0.0667, 'cHmmQuies': 0.0667,
+            'GerpRS': 0, 'GerpRSpval': 0, 'GerpN': 1.91, 'GerpS': -0.2,
+            'TFBS': 0, 'TFBSPeaks': 0, 'TFBSPeaksMax': 0, 'tOverlapMotifs': 0,
+            'motifDist': 0, 'Segway': 'unknown', 'EncH3K27Ac': 0,
+            'EncH3K4Me1': 0, 'EncH3K4Me3': 0, 'EncExp': 0, 'EncNucleo': 0,
+            'EncOCC': 5, 'EncOCCombPVal': 0, 'EncOCDNasePVal': 0,
+            'EncOCFairePVal': 0, 'EncOCpolIIPVal': 0, 'EncOCctcfPVal': 0,
+            'EncOCmycPVal': 0, 'EncOCDNaseSig': 0, 'EncOCFaireSig': 0,
+            'EncOCpolIISig': 0, 'EncOCctcfSig': 0, 'EncOCmycSig': 0,
+            'Grantham': 0, 'Dist2Mutation': 0, 'Freq100bp': 0, 'Rare100bp': 0,
+            'Sngl100bp': 0, 'Freq1000bp': 0, 'Rare1000bp': 0, 'Sngl1000bp': 0,
+            'Freq10000bp': 0, 'Rare10000bp': 0, 'Sngl10000bp': 0,
+            'dbscSNV.ada_score': 0, 'dbscSNV.rf_score': 0
+        }
+
+        to_replace_list = np.NaN
+
+        self.work_df = self.work_df.replace(
+            to_replace_list, impute_values_dict
+        )
         self.update_work_dataframe_info()
 
     def setup_xy(self, x_cols=None, y_col=None):
@@ -481,15 +568,14 @@ class ASEPredictor():
             x_cols(list, tuple, None):
             y_col(string, None):
         Returns: none
-        Raise:
+        Raises:
             ValueError:
         """
         cols = self.work_df.columns
         if x_cols is None and y_col is None:
             x_cols, y_col = cols[:-1], cols[-1]
         elif x_cols is None:
-            cols.remove(y_col)
-            x_cols = cols
+            x_cols = cols.drop(y_col)
         elif y_col is None:
             y_col = cols[-1]
             if y_col in x_cols:
@@ -500,7 +586,7 @@ class ASEPredictor():
 
     def feature_pre_selection_by_spearman(self, drop_list=[], target=None,
                                           pvalue_threshhold=0.1):
-        """Drop features with low corrlation to target variables
+        """Drop features with low correlation to target variables
         """
         if target is None:
             target = self.y
@@ -526,17 +612,20 @@ class ASEPredictor():
     def train_test_slicer(self, **kwargs):
         """Set up training and testing data set by train_test_split
         """
-        self.X_train, self.X_test, self.y_train, self.y_test \
-            = train_test_split(self.X, self.y, **kwargs)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+            self.X, self.y, **kwargs)
 
-    def setup_pipeline(self, estimators=None):
+    def setup_pipeline(self, estimators=None, multi_class=False):
         """Setup a training pipeline
 
         Args:
             estimators (estimator): None or a list of dicts; optional
                 A list with estimators and their parameters
         """
-        self.pipeline = Pipeline(estimators)
+        if multi_class:
+            self.pipeline = OneVsOneClassifier(Pipeline(estimators))
+        else:
+            self.pipeline = Pipeline(estimators)
 
     @timmer
     def grid_search_opt(self, estimator=None, **kwargs):
@@ -545,7 +634,7 @@ class ASEPredictor():
         Strategy 1. Exhaustive grid search
 
         Args:
-            estimators (estimator): compulsory; scikit-learn estimator object
+            estimator (estimator): compulsory; scikit-learn estimator object
                 Machine learning algorithm to be used
             **kwargs: optional, keyword argument
                 Any keyword argument suitable
@@ -583,7 +672,7 @@ class ASEPredictor():
         pass
 
     @timmer
-    def random_search_opt(self, estimators, **kwargs):
+    def random_search_opt(self, estimators=None, **kwargs):
         """Hyper-parameters optimization by RandomizedSearchCV
 
         # Strategy 2. Randomized parameter optimization
@@ -638,8 +727,8 @@ class ASEPredictor():
             file_name = 'learning_curve'
 
         train_sizes, train_scores, test_scores = learning_curve(
-            estimator, X=self.X, y=self.y, cv=5, n_jobs=6,
-            train_sizes=np.linspace(.1, 1., 10))
+            estimator, X=self.X, y=self.y, cv=10, n_jobs=6,
+            train_sizes=np.linspace(.1, 1., 10), **kwargs)
 
         train_scores_mean = np.mean(train_scores, axis=1)
         train_scores_std = np.std(train_scores, axis=1)
@@ -711,15 +800,23 @@ def main():
     Args: none
     Returns: none
     """
-    FILE_PATH = [
+
+    input_file = join(
         '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
         'outputs', 'biosGavinOverlapCov10',
         'biosGavinOlCv10AntUfltCstLog2FCBin.tsv'
-    ]
-
-    input_file = join(FILE_PATH)
+    )
     ap = ASEPredictor(input_file)
     ap.debug()
+
+
+input_file = join(
+    '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
+    'outputs', 'biosGavinOverlapCov10',
+    'biosGavinOlCv10AntUfltCstLog2FCBin.tsv'
+)
+ap = ASEPredictor(input_file)
+ap.debug()
 
 
 if __name__ == '__main__':
