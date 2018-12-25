@@ -5,3 +5,6 @@ syntax_test/
 explore_log2FC/
 utls/toy.sam
 Notes.md
+/*/*.png
+.idea
+.ropeproject
