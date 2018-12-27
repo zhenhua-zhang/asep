@@ -1,7 +1,7 @@
 #!./env/bin/python
 # -*- coding: utf-8 -*-
 
-import matplotlib.pyplot as plt
+
 """Predictor of the variance of log2fc of variant with ASE
 
 Allele-specific expression predictor
@@ -21,12 +21,14 @@ TODO:
 
 import copy
 import json
+import pickle
 import time
 
 from collections import defaultdict
 from functools import wraps
 from os.path import join
 from sys import stderr
+from sys import stdout
 
 # Third party modules
 import joblib
@@ -43,6 +45,7 @@ from sklearn.model_selection import learning_curve
 from sklearn.preprocessing import LabelEncoder
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import AdaBoostClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import make_scorer
 from sklearn.metrics import precision_score
@@ -60,8 +63,12 @@ from numpy import dtype
 # from sklearn.impute import MissingIndicator
 
 # maplotlib as visualization modules
-import matplotlib as mpl
-mpl.use('agg')
+try:
+    import matplotlib.pyplot as plt
+except ImportError('Failed to import matplotlib.pyplot...') as e:
+    import matplotlib as mpl
+    mpl.use('agg')
+    import matplotlib.pyplot as plt
 
 
 def timmer(func):
@@ -85,8 +92,52 @@ def timmer(func):
     return wrapper_timmer
 
 
-class Config:
+def make_file_name(fn=None, pre=None, suf=None):
+    """Create file name based on timestamp
 
+    Args:
+        fn (str or None): optional; defualt None
+           The file name, if need.
+        pre (str or None): optional; default None
+           The prefix of the dumped file
+        suf (str or None): optional; default None
+           The suffix of the dumped file
+    Returns:
+        fn (str):
+           The created filename.
+    """
+
+    if pre is None:
+        pre = 'config'
+
+    if suf is None:
+        suf = 'json'
+
+    if fn is None:
+        fn = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
+    else:
+        fn += time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
+
+    fn += '.' + suf
+    fn = pre + '_' + fn
+    return fn
+
+
+def format_print(title, main_content, pipe=stdout):
+    """A method format the prints"""
+    print('=' * 80)
+    print('=' * 10 + ' Start: ' + title)
+    print('=' * 80)
+    print()
+    print(main_content)
+    print()
+    print('=' * 80)
+    print('=' * 10 + ' End  : ' + title)
+    print('=' * 80)
+    print('\n\n')
+
+
+class Config:
     """Config module for the ASEPredictor
 
     Args:
@@ -107,43 +158,85 @@ class Config:
             ('feature_selection', SelectKBest()),
 
             # Random forest classifier
-            ('rfc', RandomForestClassifier(n_estimators=20))
+            ('rfc', RandomForestClassifier()),
+
+            # Ada boost classifier
+            # ('abc', AdaBoostClassifier())
         ]
 
         precision_scorer = make_scorer(precision_score, average='micro')
-        accuracy_scorer = make_scorer(accuracy_score)
 
         self.grid_search_opt_params = defaultdict(None)
         self.grid_search_opt_params.update(
             dict(
                 cv=5,
                 n_jobs=3,
-                refit='accu',
                 iid=False,
-                scoring=dict(  # model evaluation metrics
-                    accu=accuracy_scorer,
-                    preci=precision_scorer
-                ),
+                scoring=precision_scorer,
                 param_grid=[
                     dict(
                         # imputator__strategy=['mean'],
-                        estimator__feature_selection__score_func=[
-                            mutual_info_classif],
-                        estimator__feature_selection__k=list(range(2, 20, 2)),
-                        estimator__rfc__min_samples_split=list(range(2, 10))
+                        # estimator__feature_selection__score_func=[
+                        #     mutual_info_classif],
+                        # estimator__feature_selection__k=[26],
+                        # estimator__rfc__n_estimators=[272],
+                        # estimator__rfc__min_samples_split=[7],
+
+                        feature_selection__score_func=[mutual_info_classif],
+                        feature_selection__k=list(range(10, 20)),
+                        rfc__n_estimators=list(range(280, 320, 2)),
+                        rfc__min_samples_split=[23, 24, 25, 26],
+                        # abc__learning_rate=[1e-2, 1e-1, 5e-1, 1]
                     ),
                 ],
                 return_train_score=True,
             )
         )
 
+        binary_class_result = """
+        refit method is: accu
+        Grid search cv, Best score: 0.7672496733152401
+        Grid search cv, Best params: {'feature_selection__k': 18, 'rfc__min_samples_split': 26,
+                'feature_selection__score_func': <function mutual_info_classif at 0x7f91d29db048>,
+                'rfc__n_estimators': 312}
+        Grid search cv, Best index: 716
+        model refit score: 0.7591587516960652
+        grid_search_opt is done; elapsed: 13059.82885 secs
+        draw_learning_curve is done; elapsed: 197.96572 secs
+        debug is done; elapsed: 13258.54829 secs
+        """
+
+        binary_class_result = """
+        refit method is: accu
+        Grid search cv, Best score: 0.7620992547279541
+        Grid search cv, Best params: {'feature_selection__k': 26, 'rfc__min_samples_split': 7, 'feature_selection__score_func': <function mutual_info_classif at 0x7f91d29db048>, 'rfc__n_estimators': 272}
+        Grid search cv, Best index: 0
+        model refit score: 0.7550881953867028
+        grid_search_opt is done; elapsed: 24.41246 secs
+        draw_learning_curve is done; elapsed: 188.91536 secs
+        debug is done; elapsed: 214.12289 secs
+        """
+
+        triple_class_result = '''Although the learning curve is bad, but the accuracy socre is fairly good(~0.71)
+        refit method is: accu
+        Grid search cv, Best score: 0.7122657462095721
+        Grid search cv, Best params: {
+            'estimator__feature_selection__k': 26,
+            'estimator__feature_selection__score_func': < function mutual_info_classif at 0x7fd643d970d0 > ,
+            'estimator__rfc__min_samples_split': 7, 'estimator__rfc__n_estimators': 272}
+        Grid search cv, Best index: 147
+        model refit score: 0.7048846675712347
+        grid_search_opt is done
+        elapsed: 9331.35579 secs
+        draw_learning_curve is done
+        elapsed: 378.91496 secs
+        debug is done elapsed: 9711.09119 secs
+        '''
+
         self.random_search_opt_params = defaultdict(None)
         self.random_search_opt_params.update(
             dict(
-                cv=5,
-                n_jobs=3,
-                refit='preci',
-                n_iters=10,
+                cv=5, n_jobs=3, refit='preci', n_iters=10,
                 iid=False,  # To supress warnings
                 scoring=dict(  # model evaluation metrics
                     preci='precision',
@@ -152,19 +245,57 @@ class Config:
                 param_distribution=[
                     dict(
                         # imputator__strategy=['mean'],
-                        estimator__feature_selection__score_func=[
-                            mutual_info_classif],
-                        estimator__feature_selection__k=list(range(2, 20, 2)),
-                        estimator__rfc__min_samples_split=list(range(2, 10))
+                        # estimator__feature_selection__score_func=[
+                        #     mutual_info_classif],
+                        # estimator__feature_selection__k=list(range(2, 20, 2)),
+                        # estimator__rfc__min_samples_split=list(range(2, 10)),
+
+                        feature_selection__score_func=[mutual_info_classif],
+                        feature_selection__k=list(range(2, 20, 2)),
+                        rfc__min_samples_split=list(range(2, 10))
                     ),
                 ],
                 return_train_score=True,  # to supress a warning
             )
         )
 
-    def set_estimators_list(self, **kwargs):
-        """Set estimators
+        self.config_file_name = make_file_name()
+        self.write_config_into_file(self.config_file_name)
+
+    def dump_config_into_file(self, fn=None):
+        """Write the config into a file to make life easier.
+
+        Args:
+            fn (str or None): optional; default None
         """
+
+        config_dict = {
+            'estimators': self.estimators_list,
+            'gs_params': self.grid_search_opt_params,
+            'rs_params': self.random_search_opt_params
+        }
+
+        with open(fn, 'wb') as fnh:
+            pickle.dump(config_dict, fnh)
+
+    def load_config_from_file(self, fn=None):
+        """Load saved config into memory
+
+        Args:
+            fn (str or None): compulsory; default None
+        Raises:
+            IOError: when argument fn is None, raise IOError.
+        """
+
+        if fn is None:
+            raise IOError('Need input file name')
+
+        with open(fn, 'rb') as fh:
+            config_dict = pickle.load(fh)
+
+        self.estimators_list = config_dict['estimators']
+        self.grid_search_opt_params = config_dict['gs_params']
+        self.random_search_opt_params = config_dict['rs_params']
 
 
 class ASEPredictor:
@@ -271,10 +402,15 @@ class ASEPredictor:
                               rows=[], keep=False)
         self.simple_imputer()
         self.label_encoder(remove=False)
-        self.setup_xy(y_col='ASE')
-        self.train_test_slicer(test_size=0.15)
 
-        self.setup_pipeline(estimators=self.estimators_list, multi_class=True)
+        # change into binary classification. Need to change setup_pipeline multi_class into False
+        self.work_df.ASE = self.work_df.ASE.apply(abs)
+
+        self.setup_xy(y_col='ASE')
+        self.train_test_slicer(test_size=0.1)
+
+        self.setup_pipeline(
+            estimators=self.estimators_list, multi_class=False)
         self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
         self.draw_learning_curve(scoring='accuracy')
 
@@ -638,38 +774,39 @@ class ASEPredictor:
                 Machine learning algorithm to be used
             **kwargs: optional, keyword argument
                 Any keyword argument suitable
-
-        Returns: none
-        Raises: none
         """
         if estimator is None:
             estimator = self.pipeline
 
         self.grid_search = GridSearchCV(estimator=estimator, **kwargs)
+        self.gsf = self.grid_search.fit(self.X_train, self.y_train)
 
-        gsf = self.grid_search.fit(self.X_train, self.y_train)
+    def training_reporter(self, fitted_model=None):
+        """Report the training information"""
+        if fitted_model is None or fitted_model == 'rsf':
+            fitted_model = self.gsf
+        elif fitted_model == 'rsf':
+            fitted_model = self.rsf
+        else:
+            raise ValueError("Current only support two built-in fitted model")
 
-        self.gsf = gsf
-        self.gsf_results = gsf.cv_results_
-        self.gsf_cv_df = pd.DataFrame(self.gsf_results)
+        model_params = fitted_model.get_params()
+        best_estimators = fitted_model.best_estimator_
+        best_index = fitted_model.best_index_
+        best_params = fitted_model.best_params_
+        best_score = fitted_model.best_score_
+        cv_results = fitted_model.cv_results_
+        scorer = fitted_model.scorer_
+        format_print('Scorer', scorer)
+        format_print('Best estimators', best_estimators)
+        format_print('Best params', best_params)
+        format_print('Best score', best_score)
+        format_print('Best index', best_index)
+        format_print('Cross-validation results', cv_result_file_name)
 
-        if 'refit' in kwargs:
-            print('refit method is: {}'.format(kwargs['refit']))
-            self.gsf_best_estimator = gsf.best_estimator_
-            self.gsf_best_score = gsf.best_score_
-            self.gsf_best_params = gsf.best_params_
-            self.gsf_best_index = gsf.best_index_
-            print('Grid search cv, Best score: {}'.format(gsf.best_score_))
-            print('Grid search cv, Best params: {}'.format(gsf.best_params_))
-            print('Grid search cv, Best index: {}'.format(gsf.best_index_))
-
-        self.gsf_y_pred = gsf.predict(self.X_test)
-
-        gsf_score = gsf.score(self.X_test, self.y_test)
-        print('model refit score: {}'.format(gsf_score))
-
-    def collect_cv_results(self, method='grid', param_dict=None):
-        pass
+        self.y_pred = fitted_model.predict(self.X_test)
+        fitted_model_score = fitted_model.score(self.X_test, self.y_test)
+        print('Model score: {}'.format(fitted_model_score))
 
     @timmer
     def random_search_opt(self, estimators=None, **kwargs):
@@ -776,12 +913,12 @@ class ASEPredictor:
         """
 
         if pickle_file_name is None:
-            pickle_file_name = 'slkearn_model.pl'
+            pickle_file_name = make_file_name(pre='model', suf='pkl')
 
         joblib.dump(self.gsf, pickle_file_name)
-        # joblib.dump(self.rsf, pickle_file_name)
 
     # TODO: save the training data
+
     def save_training_data(self):
         pass
 
@@ -794,13 +931,22 @@ class ASEPredictor:
         pass
 
 
+def save_ap_obj(ob, file_name=None):
+    """Save ASEPredictor instance by pickle"""
+    if file_name is None:
+        file_name = 'apobj'
+
+    pklf_name = make_file_name(file_name, None, 'pkl')
+    with open(pklf_name, 'wb') as pklof:
+        pickle.dump(ob, pklf_name)
+
+
 def main():
     """Main function to run the module
 
     Args: none
     Returns: none
     """
-
     input_file = join(
         '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
         'outputs', 'biosGavinOverlapCov10',
@@ -808,15 +954,7 @@ def main():
     )
     ap = ASEPredictor(input_file)
     ap.debug()
-
-
-input_file = join(
-    '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
-    'outputs', 'biosGavinOverlapCov10',
-    'biosGavinOlCv10AntUfltCstLog2FCBin.tsv'
-)
-ap = ASEPredictor(input_file)
-ap.debug()
+    save_ap_obj(ap)
 
 
 if __name__ == '__main__':
