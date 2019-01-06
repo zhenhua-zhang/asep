@@ -50,6 +50,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import make_scorer
 from sklearn.metrics import precision_score
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_curve
 # from sklearn.impute import SimpleImputer
 from scipy.stats import spearmanr
 from pandas import DataFrame
@@ -92,49 +93,62 @@ def timmer(func):
     return wrapper_timmer
 
 
-def make_file_name(fn=None, pre=None, suf=None):
+def make_time_stamp():
+    """Setup time stamp for the package"""
+    global time_stamp
+    time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
+
+
+def make_file_name(fn=None, pre=None, suf=None, ts=None):
     """Create file name based on timestamp
 
     Args:
         fn (str or None): optional; defualt None
-           The file name, if need.
+            The file name, if need.
         pre (str or None): optional; default None
-           The prefix of the dumped file
+            The prefix of the dumped file
         suf (str or None): optional; default None
-           The suffix of the dumped file
+            The suffix of the dumped file
+        ts (str or None): optional; default None
+            Time stamp used in file name
     Returns:
         fn (str):
-           The created filename.
+            The created filename.
     """
-
-    if pre is None:
-        pre = 'config'
-
-    if suf is None:
-        suf = 'json'
+    if ts is None:
+        global time_stamp
+        ts = time_stamp
 
     if fn is None:
-        fn = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
+        fn = ts
     else:
-        fn += time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
+        fn += '_' + ts
 
-    fn += '.' + suf
-    fn = pre + '_' + fn
+    if pre:
+        fn = pre + '_' + fn
+
+    if suf:
+        fn += '.' + suf
+
     return fn
 
 
 def format_print(title, main_content, pipe=stdout):
     """A method format the prints"""
-    print('=' * 80)
-    print('=' * 10 + ' Start: ' + title)
-    print('=' * 80)
-    print()
-    print(main_content)
-    print()
-    print('=' * 80)
-    print('=' * 10 + ' End  : ' + title)
-    print('=' * 80)
-    print('\n\n')
+    head_no = 10
+    head = '-' * head_no
+    tail_no = 60 - len(title)
+
+    if tail_no < 0:
+        tail_no = 0
+    tail = '-' * tail_no
+
+    flag = ' '.join([head, title, tail])
+
+    print(flag, file=pipe)
+    print(' ', main_content, file=pipe)
+    print(flag, file=pipe)
+    print(file=pipe)
 
 
 class Config:
@@ -175,7 +189,6 @@ class Config:
                 scoring=precision_scorer,
                 param_grid=[
                     dict(
-                        # imputator__strategy=['mean'],
                         # estimator__feature_selection__score_func=[
                         #     mutual_info_classif],
                         # estimator__feature_selection__k=[26],
@@ -183,10 +196,9 @@ class Config:
                         # estimator__rfc__min_samples_split=[7],
 
                         feature_selection__score_func=[mutual_info_classif],
-                        feature_selection__k=list(range(10, 20)),
-                        rfc__n_estimators=list(range(280, 320, 2)),
-                        rfc__min_samples_split=[23, 24, 25, 26],
-                        # abc__learning_rate=[1e-2, 1e-1, 5e-1, 1]
+                        feature_selection__k=[20],
+                        rfc__n_estimators=[200],
+                        rfc__min_samples_split=[26],
                     ),
                 ],
                 return_train_score=True,
@@ -259,8 +271,8 @@ class Config:
             )
         )
 
-        self.config_file_name = make_file_name()
-        self.write_config_into_file(self.config_file_name)
+        self.config_file_name = make_file_name(pre='config', suf='pkl')
+        self.dump_config_into_file(self.config_file_name)
 
     def dump_config_into_file(self, fn=None):
         """Write the config into a file to make life easier.
@@ -309,7 +321,7 @@ class ASEPredictor:
         >>> ap.run()
     """
 
-    def __init__(self, file_name, verbose=False, save_model=False):
+    def __init__(self, file_name, verbose=False):
         """Set up basic variables
 
         Args:
@@ -323,51 +335,29 @@ class ASEPredictor:
         self.grid_search_opt_params = config.grid_search_opt_params
 
         self.raw_df = None
-        self.raw_df_info = dict(shape=None, rows=[], cols=[])
-        self.raw_df_shape = None
-        self.raw_df_rows = None
-        self.raw_df_cols = None
-
         self.work_df = None
-        self.work_df_info = dict(shape=None, rows=[], cols=[])
-        self.work_df_shape = None
-        self.work_df_cols = None
-        self.work_df_rows = None
+        self.raw_df_info = defaultdict(None)
+        self.work_df_info = defaultdict(None)
+
+        self.pre_selected_features = None
 
         self.X = None
         self.y = None
-
-        self.pre_selected_features = None
 
         self.X_train = None
         self.y_train = None
         self.X_test = None
         self.y_test = None
 
+        self.y_pred = None
+
         self.pipeline = None
 
         self.grid_search = None
         self.gsf = None
-        self.gsf_results_matrix = defaultdict(list)
-
-        self.gsf_results = None
-        self.gsf_cv_df = None
-        self.gsf_best_estimator = None
-        self.gsf_best_score = None
-        self.gsf_best_params = None
-        self.gsf_best_index = None
-        self.gsf_y_pred = None
 
         self.random_search = None
         self.rsf = None
-        self.rsf_results = None
-        self.rsf_results_matrix = defaultdict(list)
-        self.rsf_cv_df = None
-        self.rsf_best_estimator = None
-        self.rsf_best_score = None
-        self.rsf_best_params = None
-        self.rsf_best_index = None
-        self.rsf_y_pred = None
 
     def __str__(self):
         return "ASEPredictor"
@@ -396,23 +386,28 @@ class ASEPredictor:
 
         # flt = 'log2FCVar>0'
         flt = None
-        cols_discarded = ['var', 'mean', 'p_value',
-                          'gp_size', 'mirSVR.Score', 'mirSVR.E', 'mirSVR.Aln']
-        self.slice_data_frame(fltout=flt, cols=cols_discarded,
-                              rows=[], keep=False)
+        cols_discarded = [
+            'var', 'mean', 'p_value', 'gp_size', 'mirSVR.Score', 'mirSVR.E', 'mirSVR.Aln'
+        ]
+        self.slice_data_frame(
+            fltout=flt, cols=cols_discarded, rows=[], keep=False
+        )
         self.simple_imputer()
         self.label_encoder(remove=False)
 
-        # change into binary classification. Need to change setup_pipeline multi_class into False
+        # change into binary classification.
+        # need to change setup_pipeline multi_class into False
         self.work_df.ASE = self.work_df.ASE.apply(abs)
 
         self.setup_xy(y_col='ASE')
         self.train_test_slicer(test_size=0.1)
 
         self.setup_pipeline(
-            estimators=self.estimators_list, multi_class=False)
+            estimators=self.estimators_list, multi_class=False
+        )
         self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
-        self.draw_learning_curve(scoring='accuracy')
+        self.training_reporter()
+        self.draw_learning_curve()
 
     @staticmethod
     def set_seed(sed=None):
@@ -444,7 +439,7 @@ class ASEPredictor:
         return True
 
     def get_input_file_name(self):
-        """Get the name of input file
+        """Get the name of input file.
         """
         return self.input_file_name
 
@@ -462,7 +457,7 @@ class ASEPredictor:
                 return pd.read_table(file_handle, nrows=nrows)
 
     def check_df(self, df='work_df'):
-        """Check the sanity of input DataFrame
+        """Check the sanity of input DataFrame.
 
         Args:
             df (str): the data frame to be checked
@@ -481,21 +476,21 @@ class ASEPredictor:
             raise ValueError('Unknown DataFrame {}...'.format(df))
 
     def update_work_dataframe_info(self):
-        """Update the working dataframe after modifying the working dataframe
+        """Update the working dataframe after modifying the working dataframe.
         """
-        self.work_df_cols = self.work_df.columns
-        self.work_df_rows = self.work_df.index
-        self.work_df_shape = self.work_df.shape
+        self.work_df_info['shape'] = self.work_df.shape
+        self.work_df_info['columns'] = self.work_df.columns
+        self.work_df_info['index'] = self.work_df.index
 
     def setup_raw_dataframe_info(self):
-        """Restore the raw dataframe infromation
+        """Update the raw dataframe infromation.
         """
-        self.raw_df_cols = self.raw_df.columns
-        self.raw_df_rows = self.raw_df.index
-        self.raw_df_shape = self.raw_df.shape
+        self.raw_df_info['shape'] = self.raw_df.shape
+        self.raw_df_info['columns'] = self.raw_df.columns
+        self.raw_df_info['index'] = self.raw_df.index
 
     def setup_work_df(self):
-        """Deep copy the raw DataFrame into work DataFrame
+        """Deep copy the raw DataFrame into work DataFrame.
 
         Args: none
         Returns: none
@@ -512,7 +507,7 @@ class ASEPredictor:
 
     def slice_data_frame(self, rows=None, cols=None, keep=False,
                          fltout=None, ax=1):
-        """Slice the DataFrame base on rows and cols
+        """Slice the DataFrame base on rows and cols.
 
         Args:
             rows (list, tuple, None): optional, default None
@@ -549,7 +544,7 @@ class ASEPredictor:
         if isinstance(fltout, str):
             self.work_df = self.work_df.query(fltout)
         elif callable(fltout):
-            self.work_df = self.work_df[self.work_df.apply(fltout, axis=1)]
+            self.work_df = self.work_df[self.work_df.apply(fltout, axis=ax)]
 
         if rows is None and cols is None:
             rows = self.work_df.index
@@ -567,7 +562,7 @@ class ASEPredictor:
         self.update_work_dataframe_info()
 
     def label_encoder(self, target_cols=None, skip=None, remove=True):
-        """Encode category columns
+        """Encode category columns.
 
         Args:
             target_cols(list or None): name of columns to be encoded
@@ -621,7 +616,6 @@ class ASEPredictor:
         """A simple imputater based on pandas DataFrame.replace method.
 
         The columns information are derived from Dannis
-
 
         For all columns. In fact all of the missing values are np.NaN
         # to_replace_list = {
@@ -698,7 +692,7 @@ class ASEPredictor:
         self.update_work_dataframe_info()
 
     def setup_xy(self, x_cols=None, y_col=None):
-        """Set up predictor variables and target variables
+        """Set up predictor variables and target variables.
 
         Args:
             x_cols(list, tuple, None):
@@ -722,7 +716,7 @@ class ASEPredictor:
 
     def feature_pre_selection_by_spearman(self, drop_list=[], target=None,
                                           pvalue_threshhold=0.1):
-        """Drop features with low correlation to target variables
+        """Drop features with low correlation to target variables.
         """
         if target is None:
             target = self.y
@@ -781,33 +775,6 @@ class ASEPredictor:
         self.grid_search = GridSearchCV(estimator=estimator, **kwargs)
         self.gsf = self.grid_search.fit(self.X_train, self.y_train)
 
-    def training_reporter(self, fitted_model=None):
-        """Report the training information"""
-        if fitted_model is None or fitted_model == 'rsf':
-            fitted_model = self.gsf
-        elif fitted_model == 'rsf':
-            fitted_model = self.rsf
-        else:
-            raise ValueError("Current only support two built-in fitted model")
-
-        model_params = fitted_model.get_params()
-        best_estimators = fitted_model.best_estimator_
-        best_index = fitted_model.best_index_
-        best_params = fitted_model.best_params_
-        best_score = fitted_model.best_score_
-        cv_results = fitted_model.cv_results_
-        scorer = fitted_model.scorer_
-        format_print('Scorer', scorer)
-        format_print('Best estimators', best_estimators)
-        format_print('Best params', best_params)
-        format_print('Best score', best_score)
-        format_print('Best index', best_index)
-        format_print('Cross-validation results', cv_result_file_name)
-
-        self.y_pred = fitted_model.predict(self.X_test)
-        fitted_model_score = fitted_model.score(self.X_test, self.y_test)
-        print('Model score: {}'.format(fitted_model_score))
-
     @timmer
     def random_search_opt(self, estimators=None, **kwargs):
         """Hyper-parameters optimization by RandomizedSearchCV
@@ -830,8 +797,41 @@ class ASEPredictor:
         random_search = RandomizedSearchCV(estimators, **kwargs)
 
         rsf = random_search.fit(self.X_train, self.y_train)
-        self.rsf_results = rsf
         self.rsf_cv_df = pd.DataFrame(rsf.cv_results_)
+
+    def training_reporter(self, fitted_model=None):
+        """Report the training information"""
+        if fitted_model is None or fitted_model == 'rsf':
+            fitted_model = self.gsf
+        elif fitted_model == 'rsf':
+            fitted_model = self.rsf
+        else:
+            raise ValueError("Current only support two built-in fitted model")
+
+        model_params = fitted_model.get_params()
+        best_estimators = fitted_model.best_estimator_
+        best_index = fitted_model.best_index_
+        best_params = fitted_model.best_params_
+        best_score = fitted_model.best_score_
+        cv_results = fitted_model.cv_results_
+        scorer = fitted_model.scorer_
+        format_print('Params', model_params)
+        format_print('Scorer', scorer)
+        format_print('Best estimators', best_estimators)
+        format_print('Best params', best_params)
+        format_print('Best score', best_score)
+        format_print('Best index', best_index)
+
+        cv_result_fn = make_file_name(fn='training', pre='report', suf='tvs')
+        with open(cv_result_fn, 'w') as cvof:
+            tmp_data_frame = pd.DataFrame(cv_results)
+            tmp_data_frame.to_csv(cvof, sep='\t')
+
+        format_print('Cross-validation results', cv_result_fn)
+
+        self.y_pred = fitted_model.predict(self.X_test)
+        fitted_model_score = fitted_model.score(self.X_test, self.y_test)
+        format_print('Model score', fitted_model_score)
 
     @timmer
     def draw_learning_curve(self, estimator=None, file_name=None, title=None,
@@ -852,9 +852,9 @@ class ASEPredictor:
             https://scikit-learn.org/stable/auto_examples/model_selection/plot_learning_curve.html
         """
         if estimator is None:
-            estimator = self.gsf_best_estimator
+            estimator = self.gsf.best_estimator_
         elif estimator == 'rscv':
-            estimator = self.rsf_best_estimator
+            estimator = self.rsf.best_estimator_
         else:
             raise ValueError(
                 'Current only support GridSearchCV and RandomSearchCV'
@@ -872,73 +872,69 @@ class ASEPredictor:
         test_scores_mean = np.mean(test_scores, axis=1)
         test_scores_std = np.std(test_scores, axis=1)
 
-        fig, ax = plt.subplots()
+        fig, (ax_learning_curve, ax_roc_curve) = plt.subplots(
+            nrows=2, figsize=(10, 20)
+        )
 
         if title is None:
             title = 'Learning_curve'
-        ax.set_title(title)
+        ax_learning_curve.set_title(title)
 
         if x_label is None:
             x_label = 'Training examples'
-        ax.set_xlabel(x_label)
+        ax_learning_curve.set_xlabel(x_label)
 
         if y_label is None:
             y_label = 'Score'
-        ax.set_ylabel(y_label)
+        ax_learning_curve.set_ylabel(y_label)
 
         upper_border = train_scores_mean + train_scores_std
         lower_border = train_scores_mean - train_scores_std
-        ax.fill_between(train_sizes, upper_border, lower_border, alpha=0.1)
+        ax_learning_curve.fill_between(
+            train_sizes, upper_border, lower_border, alpha=0.1
+        )
 
         upper_border = test_scores_mean + test_scores_std
         lower_border = test_scores_mean - test_scores_std
-        ax.fill_between(train_sizes, upper_border, lower_border, alpha=0.1)
+        ax_learning_curve.fill_between(
+            train_sizes, upper_border, lower_border, alpha=0.1
+        )
 
-        ax.plot(train_sizes, train_scores_mean, 'o-', color='r',
-                label='Training score')
+        ax_learning_curve.plot(
+            train_sizes, train_scores_mean, 'o-', color='r', label='Training score'
+        )
 
-        ax.plot(train_sizes, test_scores_mean, 'o-', color='g',
-                label='Cross-validation score')
+        ax_learning_curve.plot(
+            train_sizes, test_scores_mean, 'o-', color='g', label='Cross-validation score'
+        )
 
-        ax.legend(loc='best')
+        ax_learning_curve.legend(loc='best')
+
+        self.y_pred_prob = estimator.predict_proba(self.X_test)[:, 1]
+        fp, tp, _ = roc_curve(self.y_test, self.y_pred_prob)
+        ax_roc_curve.plot(fp, tp)
+        ax_roc_curve.set_xlabel('False positive rate')
+        ax_roc_curve.set_ylabel('True positive rate')
+        ax_roc_curve.set_title('ROC curve')
+
         fig.savefig(file_name)
-
-    def save_model(self, pickle_file_name=None):
-        """Save the mode in to pickle format
-
-        Args:
-            pickle_file_name (str): optional, default None
-        Returns: none
-        Raises: none
-        """
-
-        if pickle_file_name is None:
-            pickle_file_name = make_file_name(pre='model', suf='pkl')
-
-        joblib.dump(self.gsf, pickle_file_name)
-
-    # TODO: save the training data
-
-    def save_training_data(self):
-        pass
-
-    # TODO: save the signature(e.g version and dependencies) of scikit-learn
-    def save_sklearn_sig(self):
-        pass
-
-    # TODO: save the cross-validation data set obtained from training data
-    def save_cv_data(self):
-        pass
 
 
 def save_ap_obj(ob, file_name=None):
     """Save ASEPredictor instance by pickle"""
     if file_name is None:
-        file_name = 'apobj'
+        file_name = 'ASEPre'
 
-    pklf_name = make_file_name(file_name, None, 'pkl')
+    pklf_name = make_file_name(file_name, pre='training', suf='pkl')
     with open(pklf_name, 'wb') as pklof:
-        pickle.dump(ob, pklf_name)
+        pickle.dump(ob, pklof)
+
+
+def load_asepredictor_obj(file_name):
+    """Load ASEPredictor instance by pickle"""
+
+    with open(file_name, 'wb') as pklif:
+        return pickle.load(pklif)
 
 
 def main():
@@ -947,6 +943,9 @@ def main():
     Args: none
     Returns: none
     """
+
+    make_time_stamp()
+
     input_file = join(
         '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
         'outputs', 'biosGavinOverlapCov10',
@@ -956,6 +955,8 @@ def main():
     ap.debug()
     save_ap_obj(ap)
 
+
+main()
 
 if __name__ == '__main__':
     main()
