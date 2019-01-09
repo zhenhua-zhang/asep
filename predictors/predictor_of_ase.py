@@ -1,8 +1,7 @@
 #!./env/bin/python
 # -*- coding: utf-8 -*-
 
-
-"""Predictor of the variance of log2fc of variant with ASE
+"""Predicting Allele-specific expression effect
 
 Allele-specific expression predictor
 
@@ -12,10 +11,12 @@ Example:
 Attributes:
     input_file_name (str): data set used to train the model
 
+Methods:
+    __init__(self, file_name, verbose=False)
+
 TODO:
     * Eliminate some module level variables
     * Add more input file type
-
 """
 
 
@@ -30,10 +31,16 @@ from os.path import join
 from sys import stderr
 from sys import stdout
 
-# Third party modules
-import joblib
+# numpy
 import numpy as np
+from numpy import dtype
+
+# pandas
 import pandas as pd
+from pandas import DataFrame
+
+# scipy
+from scipy.stats import spearmanr
 
 # scikit-learn modules
 from sklearn.feature_selection import mutual_info_classif
@@ -51,10 +58,7 @@ from sklearn.metrics import make_scorer
 from sklearn.metrics import precision_score
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_curve
-# from sklearn.impute import SimpleImputer
-from scipy.stats import spearmanr
-from pandas import DataFrame
-from numpy import dtype
+from sklearn.metrics import roc_auc_score
 
 # from sklearn.feature_selection import SelectFromModel
 # from sklearn.preprocessing import RobustScaler
@@ -62,13 +66,15 @@ from numpy import dtype
 # from sklearn.preprocessing import Normalizer
 # from sklearn.pipeline import FeatureUnion
 # from sklearn.impute import MissingIndicator
+# from sklearn.impute import SimpleImputer
 
 # maplotlib as visualization modules
 try:
     import matplotlib.pyplot as plt
 except ImportError('Failed to import matplotlib.pyplot...') as e:
+    print(e, file=stderr)
     import matplotlib as mpl
-    mpl.use('agg')
+    mpl.use('Agg')
     import matplotlib.pyplot as plt
 
 
@@ -147,23 +153,52 @@ def format_print(title, main_content, pipe=stdout):
 
     print(flag, file=pipe)
     print(' ', main_content, file=pipe)
-    print(flag, file=pipe)
     print(file=pipe)
 
 
 class Config:
     """Config module for the ASEPredictor
 
-    Args:
-        extimators_list (list): compulsory, no default
+A class to configure the ASEPredictor class. You can use the default 
+configuration by using arrtibutes estimators_list, grid_search_opt_params, and
+random_search_opt_params. You can also load your own configurations by
+laod_config(YOUR-FILE-NAME), but please note it will covert the current 
+configurations(`set_default` will get you back to the default configs).
+
+    Attributes:
+        estimators_list (list): compulsory, no default
             A list of 2D-tuple, where tuple is (NAME, sklearn_estimator)
         grid_search_opt_params (defaultdict): compulsory, default defaultdict()
-            A defaultdict from built-in
+            A `defaultdict` from built-in `collections` module
+        random_search_opt_params (defaultdict): options, default defaultdict()
+            A `defaultdict` form built-in `collections` module
+
+    Methods:
+        set_default(self):
+        get_configs(self):
+        set_configs(self, **kwargs):
+        dump_config(self, fn=None): dump configurations into a pickle file
+        load_config(self, fn=None)
+
+    Examples:
+        >>> import Config
+        >>> config = Config()
+        >>> config.dump_config('configuration_file_name.pkl')
+        >>> config = config.load
     """
 
     def __init__(self):
-        """
-        """
+        """Initializing configuration metrics"""
+        self.estimator_list = None
+        self.grid_search_opt_params = defaultdict(None)
+        self.random_search_opt_params = defaultdict(None)
+
+        self.set_default()
+        self.config_file_name = make_file_name(pre='config', suf='pkl')
+        self.dump_configs(self.config_file_name)
+
+    def set_default(self):
+        """Set up default configuration"""
 
         self.estimators_list = [
             # ('imputator', SimpleImputer()),
@@ -178,103 +213,62 @@ class Config:
             # ('abc', AdaBoostClassifier())
         ]
 
-        precision_scorer = make_scorer(precision_score, average='micro')
-
-        self.grid_search_opt_params = defaultdict(None)
         self.grid_search_opt_params.update(
             dict(
-                cv=5,
+                cv=10,
                 n_jobs=3,
                 iid=False,
-                scoring=precision_scorer,
+                refit=True,  # by default is True
+                scoring=make_scorer(precision_score, average='micro'),
                 param_grid=[
                     dict(
-                        # estimator__feature_selection__score_func=[
-                        #     mutual_info_classif],
-                        # estimator__feature_selection__k=[26],
-                        # estimator__rfc__n_estimators=[272],
-                        # estimator__rfc__min_samples_split=[7],
-
                         feature_selection__score_func=[mutual_info_classif],
-                        feature_selection__k=[20],
-                        rfc__n_estimators=[200],
-                        rfc__min_samples_split=[26],
+                        feature_selection__k=list(range(3, 110, 2)),
+                        rfc__n_estimators=list(range(100, 1000, 10)),
+                        rfc__max_features=['auto', 'sqrt'],
+                        rfc__max_depth=list(range(10, 110, 11)),
+                        rfc__min_samples_split=[2, 5, 10],
+                        rfc__min_samples_leaf=[1, 2, 4],
+                        rfc__bootstrap=[True, False]
                     ),
                 ],
                 return_train_score=True,
             )
         )
 
-        binary_class_result = """
-        refit method is: accu
-        Grid search cv, Best score: 0.7672496733152401
-        Grid search cv, Best params: {'feature_selection__k': 18, 'rfc__min_samples_split': 26,
-                'feature_selection__score_func': <function mutual_info_classif at 0x7f91d29db048>,
-                'rfc__n_estimators': 312}
-        Grid search cv, Best index: 716
-        model refit score: 0.7591587516960652
-        grid_search_opt is done; elapsed: 13059.82885 secs
-        draw_learning_curve is done; elapsed: 197.96572 secs
-        debug is done; elapsed: 13258.54829 secs
-        """
-
-        binary_class_result = """
-        refit method is: accu
-        Grid search cv, Best score: 0.7620992547279541
-        Grid search cv, Best params: {'feature_selection__k': 26, 'rfc__min_samples_split': 7, 'feature_selection__score_func': <function mutual_info_classif at 0x7f91d29db048>, 'rfc__n_estimators': 272}
-        Grid search cv, Best index: 0
-        model refit score: 0.7550881953867028
-        grid_search_opt is done; elapsed: 24.41246 secs
-        draw_learning_curve is done; elapsed: 188.91536 secs
-        debug is done; elapsed: 214.12289 secs
-        """
-
-        triple_class_result = '''Although the learning curve is bad, but the accuracy socre is fairly good(~0.71)
-        refit method is: accu
-        Grid search cv, Best score: 0.7122657462095721
-        Grid search cv, Best params: {
-            'estimator__feature_selection__k': 26,
-            'estimator__feature_selection__score_func': < function mutual_info_classif at 0x7fd643d970d0 > ,
-            'estimator__rfc__min_samples_split': 7, 'estimator__rfc__n_estimators': 272}
-        Grid search cv, Best index: 147
-        model refit score: 0.7048846675712347
-        grid_search_opt is done
-        elapsed: 9331.35579 secs
-        draw_learning_curve is done
-        elapsed: 378.91496 secs
-        debug is done elapsed: 9711.09119 secs
-        '''
-
-        self.random_search_opt_params = defaultdict(None)
         self.random_search_opt_params.update(
             dict(
-                cv=5, n_jobs=3, refit='preci', n_iters=10,
-                iid=False,  # To supress warnings
-                scoring=dict(  # model evaluation metrics
-                    preci='precision',
-                    accu='accuracy'
+                cv=5,
+                n_jobs=3,
+                refit=True,  # by default is true
+                n_iter=10,
+                iid=False,
+                scoring=make_scorer(precision_score, average='micro'),
+                param_distributions=dict(
+                    feature_selection__score_func=[mutual_info_classif],
+                    feature_selection__k=list(range(3, 110, 2)),
+                    rfc__n_estimators=list(range(100, 1000, 10)),
+                    rfc__max_features=['auto', 'sqrt'],
+                    rfc__max_depth=list(range(10, 110, 11)),
+                    rfc__min_samples_split=[2, 5, 10],
+                    rfc__min_samples_leaf=[1, 2, 4],
+                    rfc__bootstrap=[True, False]
                 ),
-                param_distribution=[
-                    dict(
-                        # imputator__strategy=['mean'],
-                        # estimator__feature_selection__score_func=[
-                        #     mutual_info_classif],
-                        # estimator__feature_selection__k=list(range(2, 20, 2)),
-                        # estimator__rfc__min_samples_split=list(range(2, 10)),
-
-                        feature_selection__score_func=[mutual_info_classif],
-                        feature_selection__k=list(range(2, 20, 2)),
-                        rfc__min_samples_split=list(range(2, 10))
-                    ),
-                ],
                 return_train_score=True,  # to supress a warning
             )
         )
 
-        self.config_file_name = make_file_name(pre='config', suf='pkl')
-        self.dump_config_into_file(self.config_file_name)
+    def get_configs(self):
+        """Get current configs"""
+        return {'estimators': self.estimators_list,
+                'grid_search_parameters': self.grid_search_opt_params,
+                'random_search_parameters': self.random_search_opt_params
+                }
 
-    def dump_config_into_file(self, fn=None):
+    def set_configs(self, **kwargs):  # TODO: to finish this method
+        """Set configs"""
+
+    def dump_configs(self, fn=None):
         """Write the config into a file to make life easier.
 
         Args:
@@ -290,7 +284,7 @@ class Config:
         with open(fn, 'wb') as fnh:
             pickle.dump(config_dict, fnh)
 
-    def load_config_from_file(self, fn=None):
+    def load_configs(self, fn=None):
         """Load saved config into memory
 
         Args:
@@ -333,6 +327,7 @@ class ASEPredictor:
         config = Config()
         self.estimators_list = config.estimators_list
         self.grid_search_opt_params = config.grid_search_opt_params
+        self.random_search_opt_params = config.random_search_opt_params
 
         self.raw_df = None
         self.work_df = None
@@ -384,30 +379,49 @@ class ASEPredictor:
         self.check_df('raw_df')
         self.setup_work_df()
 
-        # flt = 'log2FCVar>0'
         flt = None
         cols_discarded = [
             'var', 'mean', 'p_value', 'gp_size', 'mirSVR.Score', 'mirSVR.E', 'mirSVR.Aln'
         ]
-        self.slice_data_frame(
-            fltout=flt, cols=cols_discarded, rows=[], keep=False
+        self.work_df = self.slice_data_frame(
+            fltout=flt, cols=[], rows=[], keep=False
         )
-        self.simple_imputer()
-        self.label_encoder(remove=False)
+        self.update_work_dataframe_info()
 
         # change into binary classification.
         # need to change setup_pipeline multi_class into False
-        self.work_df.ASE = self.work_df.ASE.apply(abs)
+        multiclass = False
+        if not multiclass:
+            self.work_df.ASE = self.work_df.ASE.apply(abs)
 
-        self.setup_xy(y_col='ASE')
-        self.train_test_slicer(test_size=0.1)
+        self.simple_imputer()
+        self.label_encoder(remove=False)
+
+        flt = 'gp_size > 5'
+        self.train_test_df = self.slice_data_frame(
+            fltout=flt, cols=cols_discarded, rows=[], keep=False
+        )
+
+        flt = 'gp_size <= 5'
+        self.validating_df = self.slice_data_frame(
+            fltout=flt, cols=cols_discarded, rows=[], keep=False
+        )
+
+        self.X, self.y = self.setup_xy(self.train_test_df, y_col='ASE')
+        self.train_test_slicer(test_size=0.05)
+
+        self.X_val, self.y_val = self.setup_xy(self.validating_df, y_col='ASE')
 
         self.setup_pipeline(
-            estimators=self.estimators_list, multi_class=False
+            estimators=self.estimators_list, multi_class=multiclass
         )
-        self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
+        # self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
+        self.random_search_opt(self.pipeline, **self.random_search_opt_params)
+
         self.training_reporter()
-        self.draw_learning_curve()
+        # self.draw_learning_curve()
+        self.draw_roc_curve()
+        self.draw_K_main_features()
 
     @staticmethod
     def set_seed(sed=None):
@@ -542,9 +556,11 @@ class ASEPredictor:
             )
 
         if isinstance(fltout, str):
-            self.work_df = self.work_df.query(fltout)
+            result_df = copy.deepcopy(self.work_df.query(fltout))
         elif callable(fltout):
-            self.work_df = self.work_df[self.work_df.apply(fltout, axis=ax)]
+            reuslt_df = copy.deepcopy(
+                self.work_df[self.work_df.apply(fltout, axis=ax)]
+            )
 
         if rows is None and cols is None:
             rows = self.work_df.index
@@ -555,11 +571,13 @@ class ASEPredictor:
             cols = self.work_df.columns
 
         if keep:
-            self.work_df = self.work_df.loc[rows, cols]
+            result_df = copy.deepcopy(self.work_df.loc[rows, cols])
         else:
-            self.work_df = self.work_df.drop(index=rows, columns=cols)
+            result_df = copy.deepcopy(
+                self.work_df.drop(index=rows, columns=cols)
+            )
 
-        self.update_work_dataframe_info()
+        return result_df
 
     def label_encoder(self, target_cols=None, skip=None, remove=True):
         """Encode category columns.
@@ -604,7 +622,8 @@ class ASEPredictor:
                 continue
 
             try:
-                self.work_df[cne] = encoder.fit_transform(self.work_df[cn])
+                self.work_df[cne] = encoder.fit_transform(
+                    self.work_df[cn])
                 del self.work_df[cn]
             except Exception as e:
                 print(e, file=stderr)
@@ -691,17 +710,17 @@ class ASEPredictor:
         )
         self.update_work_dataframe_info()
 
-    def setup_xy(self, x_cols=None, y_col=None):
+    def setup_xy(self, dataframe, x_cols=None, y_col=None):
         """Set up predictor variables and target variables.
 
         Args:
             x_cols(list, tuple, None):
             y_col(string, None):
-        Returns: none
+        Returns: DataFrame
         Raises:
             ValueError:
         """
-        cols = self.work_df.columns
+        cols = dataframe.columns
         if x_cols is None and y_col is None:
             x_cols, y_col = cols[:-1], cols[-1]
         elif x_cols is None:
@@ -711,13 +730,13 @@ class ASEPredictor:
             if y_col in x_cols:
                 raise ValueError('Target column is in predictor columns')
 
-        self.X = self.work_df.loc[:, x_cols]
-        self.y = self.work_df.loc[:, y_col]
+        X_cols = copy.deepcopy(dataframe.loc[:, x_cols])
+        y_col = copy.deepcopy(dataframe.loc[:, y_col])
+        return (X_cols, y_col)
 
     def feature_pre_selection_by_spearman(self, drop_list=[], target=None,
                                           pvalue_threshhold=0.1):
-        """Drop features with low correlation to target variables.
-        """
+        """Drop features with low correlation to target variables."""
         if target is None:
             target = self.y
 
@@ -794,74 +813,74 @@ class ASEPredictor:
         if estimators is None:
             estimators = self.pipeline
 
-        random_search = RandomizedSearchCV(estimators, **kwargs)
-
-        rsf = random_search.fit(self.X_train, self.y_train)
-        self.rsf_cv_df = pd.DataFrame(rsf.cv_results_)
-
-    def training_reporter(self, fitted_model=None):
-        """Report the training information"""
-        if fitted_model is None or fitted_model == 'rsf':
-            fitted_model = self.gsf
-        elif fitted_model == 'rsf':
-            fitted_model = self.rsf
-        else:
-            raise ValueError("Current only support two built-in fitted model")
-
-        model_params = fitted_model.get_params()
-        best_estimators = fitted_model.best_estimator_
-        best_index = fitted_model.best_index_
-        best_params = fitted_model.best_params_
-        best_score = fitted_model.best_score_
-        cv_results = fitted_model.cv_results_
-        scorer = fitted_model.scorer_
-        format_print('Params', model_params)
-        format_print('Scorer', scorer)
-        format_print('Best estimators', best_estimators)
-        format_print('Best params', best_params)
-        format_print('Best score', best_score)
-        format_print('Best index', best_index)
-
-        cv_result_fn = make_file_name(fn='training', pre='report', suf='tvs')
-        with open(cv_result_fn, 'w') as cvof:
-            tmp_data_frame = pd.DataFrame(cv_results)
-            tmp_data_frame.to_csv(cvof, sep='\t')
-
-        format_print('Cross-validation results', cv_result_fn)
-
-        self.y_pred = fitted_model.predict(self.X_test)
-        fitted_model_score = fitted_model.score(self.X_test, self.y_test)
-        format_print('Model score', fitted_model_score)
+        self.random_search = RandomizedSearchCV(estimators, **kwargs)
+        self.rsf = self.random_search.fit(self.X_train, self.y_train)
 
     @timmer
-    def draw_learning_curve(self, estimator=None, file_name=None, title=None,
-                            x_label=None, y_label=None, **kwargs):
+    def training_reporter(self):
+        """Report the training information"""
+
+        model_index = {0: 'grid', 1: 'random'}
+
+        for index, fitted_model in enumerate([self.gsf, self.rsf]):
+            if fitted_model is None:
+                continue
+
+            # working dataframe information
+            format_print('work dataframe information', self.work_df_info)
+
+            model_params = fitted_model.get_params()
+            best_estimators = fitted_model.best_estimator_
+            best_index = fitted_model.best_index_
+            best_params = fitted_model.best_params_
+            best_score = fitted_model.best_score_
+            cv_results = fitted_model.cv_results_
+            scorer = fitted_model.scorer_
+            format_print('Params', model_params)
+            format_print('Scorer', scorer)
+            format_print('Best estimators', best_estimators)
+            format_print('Best params', best_params)
+            format_print('Best score', best_score)
+            format_print('Best index', best_index)
+
+            prefix = 'cross_validation_' + model_index[index]
+            cv_result_fn = make_file_name(
+                fn='training', pre=prefix, suf='tvs')
+            with open(cv_result_fn, 'w') as cvof:
+                tmp_data_frame = pd.DataFrame(cv_results)
+                tmp_data_frame.to_csv(cvof, sep='\t')
+
+            format_print('Cross-validation results', cv_result_fn)
+
+            self.y_pred = fitted_model.predict(self.X_test)
+            fitted_model_score = fitted_model.score(self.X_test, self.y_test)
+            format_print('Model score', fitted_model_score)
+
+    @timmer
+    def draw_learning_curve(self, strategy=None, **kwargs):
         """Draw the learning curve of specific estimator or pipeline
 
         Args:
-            estimator (estimator): compulsary, defualt None
-            file_name (str): optional, default None
-            title (str): optional, default None
-            x_label (str): optional; default None
-            y_label (str): optional; default None
+            strategy (str or None): optional, default None
             **kwargs: optional; default empty
 
-        Returns: none
-        Raises: none
         Notes:
             https://scikit-learn.org/stable/auto_examples/model_selection/plot_learning_curve.html
         """
-        if estimator is None:
-            estimator = self.gsf.best_estimator_
-        elif estimator == 'rscv':
-            estimator = self.rsf.best_estimator_
-        else:
-            raise ValueError(
-                'Current only support GridSearchCV and RandomSearchCV'
-            )
+        model_index = {0: 'grid', 1: 'random'}
+        for index, estimator in enumerate([self.gsf, self.rsf]):
+            if estimator is None:
+                continue
 
-        if file_name is None:
-            file_name = 'learning_curve'
+            if strategy is None:
+                estimator = copy.deepcopy(self.estimators_list[-1][-1])
+                estimator.set_params(n_estimators=100)
+            elif strategy == 'best':
+                estimator = estimator.best_estimator_
+            elif strategy == 'pipe':
+                pass
+            else:
+                raise ParameterError
 
         train_sizes, train_scores, test_scores = learning_curve(
             estimator, X=self.X, y=self.y, cv=10, n_jobs=6,
@@ -872,52 +891,96 @@ class ASEPredictor:
         test_scores_mean = np.mean(test_scores, axis=1)
         test_scores_std = np.std(test_scores, axis=1)
 
-        fig, (ax_learning_curve, ax_roc_curve) = plt.subplots(
-            nrows=2, figsize=(10, 20)
+        fig, ax_learning = plt.subplots(figsize=(10, 10))
+
+        upper = train_scores_mean + train_scores_std
+        lower = train_scores_mean - train_scores_std
+        ax_learning.fill_between(train_sizes, upper, lower, alpha=0.1)
+        ax_learning.plot(
+            train_sizes, train_scores_mean, color='r', label='Training score'
         )
 
-        if title is None:
-            title = 'Learning_curve'
-        ax_learning_curve.set_title(title)
-
-        if x_label is None:
-            x_label = 'Training examples'
-        ax_learning_curve.set_xlabel(x_label)
-
-        if y_label is None:
-            y_label = 'Score'
-        ax_learning_curve.set_ylabel(y_label)
-
-        upper_border = train_scores_mean + train_scores_std
-        lower_border = train_scores_mean - train_scores_std
-        ax_learning_curve.fill_between(
-            train_sizes, upper_border, lower_border, alpha=0.1
+        upper = test_scores_mean + test_scores_std
+        lower = test_scores_mean - test_scores_std
+        ax_learning.fill_between(train_sizes, upper, lower, alpha=0.1)
+        ax_learning.plot(
+            train_sizes, test_scores_mean, color='g', label='Cross-validation score'
         )
 
-        upper_border = test_scores_mean + test_scores_std
-        lower_border = test_scores_mean - test_scores_std
-        ax_learning_curve.fill_between(
-            train_sizes, upper_border, lower_border, alpha=0.1
-        )
+        ax_learning.set_title('Learning curve')
+        ax_learning.set_xlabel('Training examples')
+        ax_learning.set_ylabel('Score')
+        ax_learning.legend(loc='best')
 
-        ax_learning_curve.plot(
-            train_sizes, train_scores_mean, 'o-', color='r', label='Training score'
-        )
-
-        ax_learning_curve.plot(
-            train_sizes, test_scores_mean, 'o-', color='g', label='Cross-validation score'
-        )
-
-        ax_learning_curve.legend(loc='best')
-
-        self.y_pred_prob = estimator.predict_proba(self.X_test)[:, 1]
-        fp, tp, _ = roc_curve(self.y_test, self.y_pred_prob)
-        ax_roc_curve.plot(fp, tp)
-        ax_roc_curve.set_xlabel('False positive rate')
-        ax_roc_curve.set_ylabel('True positive rate')
-        ax_roc_curve.set_title('ROC curve')
-
+        file_name = make_file_name(pre='learning_curve', suf='png')
         fig.savefig(file_name)
+
+    @timmer
+    def draw_roc_curve(self, estimator=None, **kwargs):
+        """Draw ROC curve for test and validate data set"""
+
+        model_index = {0: 'grid', 1: 'random'}
+        for index, estimator in enumerate([self.gsf, self.rsf]):
+            if estimator is None:
+                continue
+
+            fig, ax_roc = plt.subplots(figsize=(10, 10))
+
+            self.y_test_pred_prob = estimator.predict_proba(self.X_test)[:, 1]
+            fp, tp, _ = roc_curve(self.y_test, self.y_test_pred_prob)
+            ax_roc.plot(fp, tp, color='r', label='Testing dataset')
+
+            # if there is a validating data set
+            self.y_val_pred_prob = estimator.predict_proba(self.X_val)[:, 1]
+            fp, tp, _ = roc_curve(self.y_val, self.y_val_pred_prob)
+            ax_roc.plot(fp, tp, color='g', label='Validating dataset')
+
+            ax_roc.set_xlabel('False positive rate')
+            ax_roc.set_ylabel('True positive rate')
+            ax_roc.set_title('ROC curve')
+            ax_roc.legend(loc='best')
+
+            prefix = 'roc_curve_' + model_index[index]
+            file_name = make_file_name(pre=prefix, suf='png')
+            fig.savefig(file_name)
+
+    @timmer
+    def draw_K_main_features(self, k=20, **kwargs):
+        """Draw feature importance for the model"""
+        model_index = {0: 'grid', 1: 'random'}
+
+        for index, estimator in enumerate([self.gsf, self.rsf]):
+            if estimator is None:
+                continue
+
+            ftr_slc_est = estimator.best_estimator_.steps[0][-1]
+            slc_ftr_idc = ftr_slc_est.get_support(True)
+
+            rfc_ftr_ipt = estimator.best_estimator_.steps[-1][-1]
+            rfc_ftr_ipt = rfc_ftr_ipt.feature_importances_
+
+            ftr_nms = self.X_train.columns[slc_ftr_idc]
+            ftr_ipt_mtx = list(zip(ftr_nms, rfc_ftr_ipt))
+
+            ftr_ipt_mtx = sorted(ftr_ipt_mtx, key=lambda x: -x[-1])
+            ftr_ipt_mtx = ftr_ipt_mtx[:k]
+
+            rfc_ftr_ipt = [x[-1] for x in ftr_ipt_mtx]
+            ftr_nms = [x[0] for x in ftr_ipt_mtx]
+
+            fig, ax_features = plt.subplots(figsize=(10, 10))
+            ax_features.bar(ftr_nms, rfc_ftr_ipt)
+
+            ax_features.set_xticklabels(
+                ftr_nms, rotation_mode='anchor', rotation=45, horizontalalignment='right'
+            )
+            ax_features.set_xlabel('Features')
+            ax_features.set_ylabel('Importance')
+            ax_features.set_title('Feature importances')
+
+            prefix = 'feature_importance_' + model_index[index]
+            file_name = make_file_name(pre=prefix, suf='png')
+            fig.savefig(file_name)
 
 
 def save_ap_obj(ob, file_name=None):
@@ -956,7 +1019,17 @@ def main():
     save_ap_obj(ap)
 
 
-main()
+make_time_stamp()
+
+input_file = join(
+    '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
+    'outputs', 'biosGavinOverlapCov10',
+    'biosGavinOlCv10AntUfltCstLog2FCBin.tsv'
+)
+ap = ASEPredictor(input_file)
+ap.debug()
+save_ap_obj(ap)
+
 
 if __name__ == '__main__':
     main()
