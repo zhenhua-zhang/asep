@@ -8,4 +8,5 @@ Notes.md
 /*/*.png
 .idea
 .ropeproject
-predictors/ap.pkl
+predictors/2019*
+predictors/output_figs
