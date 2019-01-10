@@ -72,7 +72,7 @@ from sklearn.metrics import roc_auc_score
 try:
     import matplotlib.pyplot as plt
 except ImportError('Failed to import matplotlib.pyplot...') as e:
-    print(e, file=stderr)
+    print(e)
     import matplotlib as mpl
     mpl.use('Agg')
     import matplotlib.pyplot as plt
@@ -159,10 +159,10 @@ def format_print(title, main_content, pipe=stdout):
 class Config:
     """Config module for the ASEPredictor
 
-A class to configure the ASEPredictor class. You can use the default 
+A class to configure the ASEPredictor class. You can use the default
 configuration by using arrtibutes estimators_list, grid_search_opt_params, and
 random_search_opt_params. You can also load your own configurations by
-laod_config(YOUR-FILE-NAME), but please note it will covert the current 
+laod_config(YOUR-FILE-NAME), but please note it will covert the current
 configurations(`set_default` will get you back to the default configs).
 
     Attributes:
@@ -419,9 +419,7 @@ class ASEPredictor:
         self.random_search_opt(self.pipeline, **self.random_search_opt_params)
 
         self.training_reporter()
-        # self.draw_learning_curve()
-        self.draw_roc_curve()
-        self.draw_K_main_features()
+        self.draw_figures()
 
     @staticmethod
     def set_seed(sed=None):
@@ -857,34 +855,35 @@ class ASEPredictor:
             format_print('Model score', fitted_model_score)
 
     @timmer
-    def draw_learning_curve(self, strategy=None, **kwargs):
+    def draw_learning_curve(self, estimator, model_index, strategy=None, **kwargs):
         """Draw the learning curve of specific estimator or pipeline
 
         Args:
+            estimator (sklearn estimators): compulsary
+            model_index (string): compulsary
             strategy (str or None): optional, default None
             **kwargs: optional; default empty
+                Keyword arguments for learning_curve from scikit-learn
 
         Notes:
             https://scikit-learn.org/stable/auto_examples/model_selection/plot_learning_curve.html
         """
-        model_index = {0: 'grid', 1: 'random'}
-        for index, estimator in enumerate([self.gsf, self.rsf]):
-            if estimator is None:
-                continue
-
-            if strategy is None:
-                estimator = copy.deepcopy(self.estimators_list[-1][-1])
-                estimator.set_params(n_estimators=100)
-            elif strategy == 'best':
-                estimator = estimator.best_estimator_
-            elif strategy == 'pipe':
-                pass
-            else:
-                raise ParameterError
+        if strategy is None:
+            estimator = copy.deepcopy(self.estimators_list[-1][-1])
+            estimator.set_params(n_estimators=100)
+        elif strategy == 'best':
+            estimator = estimator.best_estimator_
+        elif strategy == 'pipe':
+            pass
+        else:
+            raise Exception(
+                'For [strategy] argument, (None, \'best\', or \'pipe\')'
+            )
 
         train_sizes, train_scores, test_scores = learning_curve(
             estimator, X=self.X, y=self.y, cv=10, n_jobs=6,
-            train_sizes=np.linspace(.1, 1., 10), **kwargs)
+            train_sizes=np.linspace(.1, 1., 10), **kwargs
+        )
 
         train_scores_mean = np.mean(train_scores, axis=1)
         train_scores_std = np.std(train_scores, axis=1)
@@ -907,80 +906,81 @@ class ASEPredictor:
             train_sizes, test_scores_mean, color='g', label='Cross-validation score'
         )
 
-        ax_learning.set_title('Learning curve')
-        ax_learning.set_xlabel('Training examples')
-        ax_learning.set_ylabel('Score')
+        ax_learning.set(
+            title='Learning curve', xlabel='Training examples', ylabel='Score'
+        )
         ax_learning.legend(loc='best')
 
-        file_name = make_file_name(pre='learning_curve', suf='png')
-        fig.savefig(file_name)
+        prefix = 'learning_curve_' + model_index
+        fig.savefig(make_file_name(pre=predix, suf='png'))
 
     @timmer
-    def draw_roc_curve(self, estimator=None, **kwargs):
+    def draw_roc_curve(self, estimator, model_index, **kwargs):
         """Draw ROC curve for test and validate data set"""
 
-        model_index = {0: 'grid', 1: 'random'}
-        for index, estimator in enumerate([self.gsf, self.rsf]):
-            if estimator is None:
-                continue
+        fig, ax_roc = plt.subplots(figsize=(10, 10))
 
-            fig, ax_roc = plt.subplots(figsize=(10, 10))
+        self.y_test_pred_prob = estimator.predict_proba(self.X_test)[:, 1]
+        fp, tp, _ = roc_curve(self.y_test, self.y_test_pred_prob)
+        ax_roc.plot(fp, tp, color='r', label='Testing')
 
-            self.y_test_pred_prob = estimator.predict_proba(self.X_test)[:, 1]
-            fp, tp, _ = roc_curve(self.y_test, self.y_test_pred_prob)
-            ax_roc.plot(fp, tp, color='r', label='Testing dataset')
-
-            # if there is a validating data set
+        # if there is a validating data set
+        if self.X_val not is None:
             self.y_val_pred_prob = estimator.predict_proba(self.X_val)[:, 1]
             fp, tp, _ = roc_curve(self.y_val, self.y_val_pred_prob)
-            ax_roc.plot(fp, tp, color='g', label='Validating dataset')
+            ax_roc.plot(fp, tp, color='g', label='Validating')
 
-            ax_roc.set_xlabel('False positive rate')
-            ax_roc.set_ylabel('True positive rate')
-            ax_roc.set_title('ROC curve')
-            ax_roc.legend(loc='best')
+        ax_roc.set(
+            title='ROC curve', xlabel='False positive rage', ylabel='True positive rate'
+        )
+        ax_roc.legend(loc='best')
 
-            prefix = 'roc_curve_' + model_index[index]
-            file_name = make_file_name(pre=prefix, suf='png')
-            fig.savefig(file_name)
+        prefix = 'roc_curve_' + model_index
+        fig.savefig(make_file_name(pre=prefix, suf='png'))
 
     @timmer
-    def draw_K_main_features(self, k=20, **kwargs):
+    def draw_K_main_features(self, estimator, index, k=20, **kwargs):
         """Draw feature importance for the model"""
-        model_index = {0: 'grid', 1: 'random'}
+        ftr_slc_est = estimator.best_estimator_.steps[0][-1]
+        slc_ftr_idc = ftr_slc_est.get_support(True)
 
-        for index, estimator in enumerate([self.gsf, self.rsf]):
+        rfc_ftr_ipt = estimator.best_estimator_.steps[-1][-1]
+        rfc_ftr_ipt = rfc_ftr_ipt.feature_importances_
+
+        ftr_nms = self.X_train.columns[slc_ftr_idc]
+        ftr_ipt_mtx = list(zip(ftr_nms, rfc_ftr_ipt))
+
+        ftr_ipt_mtx = sorted(ftr_ipt_mtx, key=lambda x: -x[-1])
+        ftr_ipt_mtx = ftr_ipt_mtx[:k]
+
+        rfc_ftr_ipt = [x[-1] for x in ftr_ipt_mtx]
+        ftr_nms = [x[0] for x in ftr_ipt_mtx]
+
+        fig, ax_features = plt.subplots(figsize=(10, 10))
+        ax_features.bar(ftr_nms, rfc_ftr_ipt)
+
+        ax_features.set_xticklabels(
+            ftr_nms, rotation_mode='anchor', rotation=45, horizontalalignment='right'
+        )
+        ax_features.set(
+            title='Feature importances', xlabel='Features', ylabel='Importance'
+        )
+
+        prefix = 'feature_importance_' + model_index[index]
+        fig.savefig(make_file_name(pre=prefix, suf='png'))
+
+    @timmer
+    def draw_figures(self, **kwargs):
+        """Draw learning curve, ROC curve, and bar graph for the importance of features"""
+        model_indexs = {0: 'grid', 1: 'random'}
+        for index, estimator in enumerate([self.rsf, self.gsf]):
             if estimator is None:
                 continue
 
-            ftr_slc_est = estimator.best_estimator_.steps[0][-1]
-            slc_ftr_idc = ftr_slc_est.get_support(True)
-
-            rfc_ftr_ipt = estimator.best_estimator_.steps[-1][-1]
-            rfc_ftr_ipt = rfc_ftr_ipt.feature_importances_
-
-            ftr_nms = self.X_train.columns[slc_ftr_idc]
-            ftr_ipt_mtx = list(zip(ftr_nms, rfc_ftr_ipt))
-
-            ftr_ipt_mtx = sorted(ftr_ipt_mtx, key=lambda x: -x[-1])
-            ftr_ipt_mtx = ftr_ipt_mtx[:k]
-
-            rfc_ftr_ipt = [x[-1] for x in ftr_ipt_mtx]
-            ftr_nms = [x[0] for x in ftr_ipt_mtx]
-
-            fig, ax_features = plt.subplots(figsize=(10, 10))
-            ax_features.bar(ftr_nms, rfc_ftr_ipt)
-
-            ax_features.set_xticklabels(
-                ftr_nms, rotation_mode='anchor', rotation=45, horizontalalignment='right'
-            )
-            ax_features.set_xlabel('Features')
-            ax_features.set_ylabel('Importance')
-            ax_features.set_title('Feature importances')
-
-            prefix = 'feature_importance_' + model_index[index]
-            file_name = make_file_name(pre=prefix, suf='png')
-            fig.savefig(file_name)
+            model_index = model_indexs[index]
+            self.draw_roc_curve(estimator, model_index)
+            self.draw_learning_curve(estimator, model_index)
+            self.draw_K_main_features(estimator, model_index)
 
 
 def save_ap_obj(ob, file_name=None):
