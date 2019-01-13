@@ -1,10 +1,13 @@
 # Ignore all ipython notebook checkpoints directories
 **/.ipynb_checkpoints/
 
+# Ignore all rope project directories
+**/.ropeproject
+
 # Ignore all python cache directories
 **/__pycache__/
 
-# Ignore all '.png', '.tsv', '.sam', '.bam', '.vcf', '.tbi' files
+# Ignore all '.png', '.tsv', '.sam', '.bam', '.vcf', '.tbi', '.docx' files
 **/*.bai
 **/*.bam
 **/*.bed
@@ -15,6 +18,7 @@
 **/*.tsv
 **/*.tbi
 **/*.vcf
+**/*.docx
 
 # Ignore Python virtual environment files
 env/
@@ -28,3 +32,4 @@ explore_log2FC
 predictors/2019*/
 predictors/ap.pkl
 predictors/output_figs
+
