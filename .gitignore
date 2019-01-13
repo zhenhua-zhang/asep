@@ -1,14 +1,30 @@
-*/.ipynb_checkpoints
-*/__pycache__
-.ropeproject
-/*/*.png
+# Ignore all ipython notebook checkpoints directories
+**/.ipynb_checkpoints/
+
+# Ignore all python cache directories
+**/__pycache__/
+
+# Ignore all '.png', '.tsv', '.sam', '.bam', '.vcf', '.tbi' files
+**/*.bai
+**/*.bam
+**/*.bed
+**/*.fa
+**/*.fai
+**/*.png
+**/*.sam
+**/*.tsv
+**/*.tbi
+**/*.vcf
+
+# Ignore Python virtual environment files
+env/
+
+# Ignore all syntax test files
+syntax_test/
+
+# Misc
 Notes.md
-bios_eqtlgen_overlaps/*tsv
-env
 explore_log2FC
-misc
-predictors/2019*
+predictors/2019*/
 predictors/ap.pkl
 predictors/output_figs
-syntax_test
-utls/toy.sam
