@@ -1,12 +1,12 @@
 */.ipynb_checkpoints
 */__pycache__
-.idea
 .ropeproject
 /*/*.png
 Notes.md
 bios_eqtlgen_overlaps/*tsv
 env
 explore_log2FC
+misc
 predictors/2019*
 predictors/ap.pkl
 predictors/output_figs
