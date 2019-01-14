@@ -925,7 +925,7 @@ class ASEPredictor:
         ax_roc.plot(fp, tp, color='r', label='Testing')
 
         # if there is a validating data set
-        if self.X_val not is None:
+        if self.X_val is not None:
             self.y_val_pred_prob = estimator.predict_proba(self.X_val)[:, 1]
             fp, tp, _ = roc_curve(self.y_val, self.y_val_pred_prob)
             ax_roc.plot(fp, tp, color='g', label='Validating')

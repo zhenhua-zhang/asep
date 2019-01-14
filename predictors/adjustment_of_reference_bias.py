@@ -1,4 +1,4 @@
-
+import copy
 import gzip
 import pysam
 
@@ -23,6 +23,44 @@ tabix -p gff Homo_sapiens.GRCh37.71.Chr1-22.X.Y.gtf.bgz
 
 """
 
+chromsomes = ['x', 'y']
+chromsomes.extend([str(x) for x in range(1, 23)])
+chromsomes.extend(['chr' + x for x in chromsomes])
+
+
+G_LINE = ""
+
+
+def recursive_join(it, sp="\t"):
+    """Join the elements of a iterable object"""
+    global G_LINE
+    for element in it:
+        if isinstance(element, (list, tuple)):
+            recursive_join(element)
+        elif isinstance(element, str):
+            G_LINE += element + sp
+        else:
+            raise ValueError(
+                'Cannot concatenate {} to a str'.format(element)
+            )
+    return G_LINE
+
+
+def to_tsv(my_list, file_name, mode='w', sp="\t", extinfo=''):
+    """Write a list into file"""
+    if extinfo:
+        bs, ext = os.path.splitext(file_name)
+        file_name = bs + "_" + extinfo + ext
+
+    with open(file_name, mode=mode) as opfh:
+        for ele in my_list:
+            if isinstance(ele, str):
+                opfh.writelines(ele)
+            elif isinstance(ele, (list, tuple)):
+                opfh.writelines(sp.join(ele))
+            else:
+                raise ValueError("Unknown type to write into a file")
+
 
 class BiasAdjustment:
     """Adjust reference bias
@@ -35,82 +73,87 @@ class BiasAdjustment:
     def __init__(self, fn):
         """Initialization of BiasAdjustment
         """
+        self.ipfn = fn
         self.ifh = self.read_file(fn)  # Input file handle
 
     def __str__(self):
         """__str__() method; return specific strings"""
         return "BiasAdjustment"
 
-    def read_file(self, fn, mode='r'):
+    def read_file(self, fn, mode="r"):
         """Load the target file"""
-
-        if fn.endswith('.gz') or fn.endswith('.bgz'):
+        if fn.endswith(".gz") or fn.endswith(".bgz"):
             return gzip.open(fn, mode=mode)
         else:
             return open(fn, mode=mode)
 
-    @staticmethod
-    def is_indexed(file_name, suffix, check_time_stamp=False):
-        """Check if the input file has updated index file"""
-        older = None
-        if check_time_stamp:
-            file_timestamp = os.path.getmtime(file_name)
-            file_index_timestamp = os.path.getmtime(file_name + suffix)
-            older = file_timestamp < file_index_timestamp
-
-        indexed = os.path.exists(file_name)
-        return (indexed, older)
-
-    def sort_tsv(self, file_name, with_patch=False, file_type=None,
+    def sort_tsv(self, file_name, file_type=None, with_patch=False,
                  chrom_col=None, pos_col=None):
-        """Sort tab-separated file
-        """
-        if file_type in ['vcf', 'bed']:
-            chrom_col = 0
-            pos_col = 1
-        elif file_type in ['gff', 'gtf', 'gff3']:
-            chrom_col = 0
-            pos_col = 3
+        """Sort tab-separated file """
+        if file_type in ["vcf", "bed"]:
+            chrom_col, pos_col = 0, 1
+        elif file_type in ["gff", "gtf", "gff3"]:
+            chrom_col, pos_col = 0, 3
         elif None not in [file_type, chrom_col, pos_col]:
             pass
         else:
-            raise ValueError(
-                '''Please leave file_type and specify chrom_col and pos_col.'''
-            )
+            errmsg = [
+                "Please specify file_type,",
+                " or specify chrom_col and pos_col without specifying file_type"
+            ]
+            raise ValueError(" ".join(errmsg))
 
-        header, lines, name_column = [], [], ''
-        file_handler = self.read_file(file_name, mode='r')
+        header, lines = [], []
+        file_handler = self.read_file(file_name)
 
-        line = next(file_handler, 'EOF')
-        assert line is not 'EOF', 'The file cannot be empty.'
+        line = next(file_handler, "EOF")
+        assert line != "EOF", "The file cannot be empty."
 
-        # {lambda x: len(x) for x in list(file_handler) if x.startswith('#')}
-
-        while line != 'EOF':
-            if line.startswith('#'):
+        while line != "EOF":
+            if line.startswith("#"):
                 header.append(line)
-            line = next(file_handler, 'EOF')
+            else:
+                line_list = line.split("\t")
+                if with_patch or line_list[chrom_col].lower() in chromsomes:
+                    lines.append(line_list)
 
-        lines = [line.split('\t') for x in list(file_handler)]
-        lines = sorted(lines, key=itemgetter(chrom_col, pos_col))
-        return iter(header.extend(lines))
+            line = next(file_handler, "EOF")
 
-    def make_index(self, file_name, file_type='fa'):
+        lines = sorted(lines, key=lambda x: (x[chrom_col], int(x[pos_col])))
+        header.extend(lines)
+
+        return header
+
+    @staticmethod
+    def make_index(file_name):
         """Make index file for input file"""
-        if file_type == 'fa':
-            self.is_indexed(file_name, '.fai')
-            pysam.faidx(file_name)
-        elif file_type in ['bam', 'cram']:
-            self.is_indexed(file_name, '.bai')
-            pysam.index(file_name)
-        elif file_type in ['gff', 'bed', 'vcf']:
-            self.is_indexed(file_name, '.tbi')
-            pysam.tabix_index(file_name, preset=file_type)
+        f_bs, f_ext = os.path.splitext(file_name)
+
+        def indexed(fn, ext): return os.path.exists(fn + ext)
+
+        def uptodate(fn, ext): return os.getmtime(fn) < os.getmtime(fn + ext)
+
+        infomsg = "{} was indexed and is uptodate. Skipping".format(file_name)
+        if f_ext == ".fa":
+            if indexed(file_name, ".fai") and uptodate(file_name, ".fai"):
+                print(infomsg)
+            else:
+                pysam.faidx(file_name)
+        elif f_ext in [".bam", ".cram"]:
+            if indexed(file_name, ".bai") and uptodate(file_name, ".bai"):
+                print(infomsg)
+            else:
+                pysam.index(file_name)
+        elif f_ext in [".gff", ".bed", ".vcf", ".sam"]:
+            if indexed(file_name, ".gz.tbi") and uptodate(file_name, ".gz.tbi"):
+                print(infomsg)
+            else:
+                pysam.tabix_index(file_name, preset=f_ext.replace(".", ""))
 
     def parse_fasta(self, fasta_fn):
         """Parse fasta file"""
         with pysam.Fastafile(fasta_fn) as fafh:
-            print(fafh.fetch('22', 1, 10))
+            print(fafh.fetch("22", 1, 10))
 
     def get_gene_region(self, genes=[]):
         """Get the region of target gene"""
@@ -137,5 +180,5 @@ class BiasAdjustment:
         """The adjusted expectation of alternative allele counts"""
 
 
-ipf = '../misc/chr22.fa'
-# adj = BiasAdjustment(ipf)
+vcf = "../misc/clinvar_20180401.vcf"
+adj = BiasAdjustment(vcf)
