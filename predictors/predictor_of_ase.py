@@ -354,9 +354,6 @@ class ASEPredictor:
         self.random_search = None
         self.rsf = None
 
-    def __str__(self):
-        return "ASEPredictor"
-
     @timmer
     def run(self):
         """Execute a pre-designed construct pipeline

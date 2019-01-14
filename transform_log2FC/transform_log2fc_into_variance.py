@@ -16,10 +16,12 @@ import numpy as np
 import pandas as pd
 
 import matplotlib as mpl
+
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 from os.path import join
+
 
 def transform():
     HOME_DIR = '/home/umcg-zzhang/'
@@ -47,20 +49,20 @@ def transform():
             var = 0
 
         g_features = g.iloc[0, :kick_off_index]
-        g_features['log2FCVar'] =  var
+        g_features['log2FCVar'] = var
         log2FCVar_df = log2FCVar_df.append(g_features)
 
     log2FCVar_df.to_csv(OUTPUT_FILE, header=True, index=False, sep='\t')
 
-
     fig, (ax0, ax1) = plt.subplots(ncols=2)
 
     ax0.hist(log2FCVar_df.log2FCVar, bins=100)
-    ax1.hist(log2FCVar_df[log2FCVar_df.log2FCVar != 0 ].log2FCVar, bins=100)
+    ax1.hist(log2FCVar_df[log2FCVar_df.log2FCVar != 0].log2FCVar, bins=100)
 
     fig.set_edgecolor('white')
     fig.set_figwidth(10)
     fig.savefig('log2FCVar.png')
+
 
 def main():
     # Start a timer.
@@ -76,16 +78,16 @@ def main():
     ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
 
-
     # Set up logging
     lg = logging.getLogger()
-    lg.setLevel(logging.INFO)              # default logging level INFO
+    lg.setLevel(logging.INFO)  # default logging level INFO
     lg.addHandler(ch)
     lg.info("=== Start ... ===")
 
     transform()
 
-    lg.info("=== Done  ... ===\nTime elapsed: %0.5f" %(time.clock()-ct) )
+    lg.info("=== Done  ... ===\nTime elapsed: %0.5f" % (time.clock() - ct))
+
 
 if __name__ == '__main__':
     main()
