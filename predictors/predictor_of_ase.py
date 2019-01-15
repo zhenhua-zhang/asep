@@ -19,7 +19,6 @@ TODO:
     * Add more input file type
 """
 
-
 import copy
 import json
 import pickle
@@ -52,13 +51,14 @@ from sklearn.model_selection import learning_curve
 from sklearn.preprocessing import LabelEncoder
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.ensemble import AdaBoostClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import make_scorer
 from sklearn.metrics import precision_score
-from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_curve
-from sklearn.metrics import roc_auc_score
+
+# from sklearn.ensemble import AdaBoostClassifier
+# from sklearn.metrics import accuracy_score
+# from sklearn.metrics import roc_auc_score
 
 # from sklearn.feature_selection import SelectFromModel
 # from sklearn.preprocessing import RobustScaler
@@ -105,38 +105,38 @@ def make_time_stamp():
     time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
 
-def make_file_name(fn=None, pre=None, suf=None, ts=None):
+def make_file_name(file_name=None, prefix=None, suffix=None, _time_stamp=None):
     """Create file name based on timestamp
 
     Args:
-        fn (str or None): optional; defualt None
+        file_name (str or None): optional; defualt None
             The file name, if need.
-        pre (str or None): optional; default None
+        prefix (str or None): optional; default None
             The prefix of the dumped file
-        suf (str or None): optional; default None
+        suffix (str or None): optional; default None
             The suffix of the dumped file
-        ts (str or None): optional; default None
+        _time_stamp (str or None): optional; default None
             Time stamp used in file name
     Returns:
-        fn (str):
+        file_name (str):
             The created filename.
     """
-    if ts is None:
+    if _time_stamp is None:
         global time_stamp
-        ts = time_stamp
+        _time_stamp = time_stamp
 
-    if fn is None:
-        fn = ts
+    if file_name is None:
+        file_name = _time_stamp 
     else:
-        fn += '_' + ts
+        file_name += '_' + _time_stamp
 
-    if pre:
-        fn = pre + '_' + fn
+    if prefix:
+        file_name = prefix + '_' + file_name 
 
-    if suf:
-        fn += '.' + suf
+    if suffix:
+        file_name += '.' + suffix
 
-    return fn
+    return file_name
 
 
 def format_print(title, main_content, pipe=stdout):
@@ -189,7 +189,7 @@ configurations(`set_default` will get you back to the default configs).
 
     def __init__(self):
         """Initializing configuration metrics"""
-        self.estimator_list = None
+        self.estimators_list = None
         self.grid_search_opt_params = defaultdict(None)
         self.random_search_opt_params = defaultdict(None)
 
@@ -199,11 +199,10 @@ configurations(`set_default` will get you back to the default configs).
 
     def set_default(self):
         """Set up default configuration"""
-
         self.estimators_list = [
             # ('imputator', SimpleImputer()),
             # ('standard_scaler', StandardScaler()),  # TODO: useful ???
-            # ('normalizer', Normalizer()),  # TODO: usefule ???
+            # ('normalizer', Normalizer()),  # TODO: useful ???
             ('feature_selection', SelectKBest()),
 
             # Random forest classifier
@@ -254,7 +253,7 @@ configurations(`set_default` will get you back to the default configs).
                     rfc__min_samples_leaf=[1, 2, 4],
                     rfc__bootstrap=[True, False]
                 ),
-                return_train_score=True,  # to supress a warning
+                return_train_score=True,  # to suppress a warning
             )
         )
 
@@ -305,7 +304,6 @@ configurations(`set_default` will get you back to the default configs).
 
 
 class ASEPredictor:
-
     """A class implementing prediction of ASE variance of a variant
 
     Example:
@@ -321,6 +319,8 @@ class ASEPredictor:
         Args:
             file_name (str): input data set
         """
+        if verbose:
+            print(verbose)
 
         self.input_file_name = file_name
 
@@ -333,6 +333,11 @@ class ASEPredictor:
         self.work_df = None
         self.raw_df_info = defaultdict(None)
         self.work_df_info = defaultdict(None)
+
+        self.train_test_df = None
+        self.validating_df = None
+        self.X_val = None
+        self.y_val = None
 
         self.pre_selected_features = None
 
@@ -378,7 +383,8 @@ class ASEPredictor:
 
         flt = None
         cols_discarded = [
-            'var', 'mean', 'p_value', 'gp_size', 'mirSVR.Score', 'mirSVR.E', 'mirSVR.Aln'
+            'var', 'mean', 'p_value', 'gp_size', 'mirSVR.Score', 'mirSVR.E',
+            'mirSVR.Aln'
         ]
         self.work_df = self.slice_data_frame(
             fltout=flt, cols=[], rows=[], keep=False
@@ -420,8 +426,7 @@ class ASEPredictor:
 
     @staticmethod
     def set_seed(sed=None):
-        """Set the random seed of numpy
-        """
+        """Set the random seed of numpy"""
         if sed:
             np.random.seed(sed)
         else:
@@ -429,8 +434,7 @@ class ASEPredictor:
 
     @staticmethod
     def check_keys(pool_a, pool_b):
-        """Check if all elements in pool_a are also in pool_b
-        """
+        """Check if all elements in pool_a are also in pool_b"""
         if not isinstance(pool_a, (list, tuple)):
             raise TypeError('Require iterable value for pool_a...')
         if not isinstance(pool_b, (list, tuple)):
@@ -448,13 +452,11 @@ class ASEPredictor:
         return True
 
     def get_input_file_name(self):
-        """Get the name of input file.
-        """
+        """Get the name of input file."""
         return self.input_file_name
 
     def read_file_to_dataframe(self, nrows=None):
-        """Read input file into pandas DataFrame.
-        """
+        """Read input file into pandas DataFrame."""
         file_name = self.input_file_name
         try:
             file_handle = open(file_name)
@@ -485,27 +487,19 @@ class ASEPredictor:
             raise ValueError('Unknown DataFrame {}...'.format(df))
 
     def update_work_dataframe_info(self):
-        """Update the working dataframe after modifying the working dataframe.
-        """
+        """Update the information of working dataframe after modifying it"""
         self.work_df_info['shape'] = self.work_df.shape
         self.work_df_info['columns'] = self.work_df.columns
         self.work_df_info['index'] = self.work_df.index
 
     def setup_raw_dataframe_info(self):
-        """Update the raw dataframe infromation.
-        """
+        """Update the raw dataframe infromation"""
         self.raw_df_info['shape'] = self.raw_df.shape
         self.raw_df_info['columns'] = self.raw_df.columns
         self.raw_df_info['index'] = self.raw_df.index
 
     def setup_work_df(self):
-        """Deep copy the raw DataFrame into work DataFrame.
-
-        Args: none
-        Returns: none
-        Raises:
-            Exception:
-        """
+        """Deep copy the raw DataFrame into work DataFrame"""
         try:
             self.work_df = copy.deepcopy(self.raw_df)
         except Exception('Failed to deepcopy raw_df to work_df') as exp:
@@ -514,8 +508,8 @@ class ASEPredictor:
         self.setup_raw_dataframe_info()
         self.update_work_dataframe_info()
 
-    def slice_data_frame(self, rows=None, cols=None, keep=False,
-                         fltout=None, ax=1):
+    def slice_data_frame(self, rows=None, cols=None, keep=False, fltout=None,
+                         ax=1):
         """Slice the DataFrame base on rows and cols.
 
         Args:
@@ -537,8 +531,6 @@ class ASEPredictor:
                 `None`, no filter will be applied.
             ax (0, 1): optional, default 1
                 Axis along which the flt is applied. 0 for rows, 1 for column.
-        Returns: none
-        Raises: none
         """
         self.check_df()
 
@@ -553,7 +545,7 @@ class ASEPredictor:
         if isinstance(fltout, str):
             result_df = copy.deepcopy(self.work_df.query(fltout))
         elif callable(fltout):
-            reuslt_df = copy.deepcopy(
+            result_df = copy.deepcopy(
                 self.work_df[self.work_df.apply(fltout, axis=ax)]
             )
 
@@ -584,7 +576,6 @@ class ASEPredictor:
                 will be skipped; list or tuple means all contained elements
                 will be skipped; None means no columns will be skipped.
             remove (bool): remove columns need to be encoded.
-        Returns: none
         Raises:
             TypeError:
         """
@@ -632,44 +623,49 @@ class ASEPredictor:
         The columns information are derived from Dannis
 
         For all columns. In fact all of the missing values are np.NaN
-        # to_replace_list = {
-        #     'motifEName': '', 'GeneID': '', 'GeneName': '', 'CCDS': '', 'Intron': '',
-        #     'Exon': '', 'ref': '', 'alt': '', 'Consequence': '', 'GC': np.NaN,
-        #     'CpG': np.NaN, 'motifECount': np.NaN, 'motifEScoreChng': np.NaN,
-        #     'motifEHIPos': np.NaN, 'oAA': np.NaN, 'nAA': '', 'cDNApos': np.NaN,
-        #     'relcDNApos': np.NaN, 'CDSpos': np.NaN, 'relCDSpos': np.NaN, 'protPos': np.NaN,
-        #     'relProtPos': np.NaN, 'Domain': '', 'Dst2Splice': np.NaN,
-        #     'Dst2SplType': '', 'minDistTSS': np.NaN, 'minDistTSE': np.NaN,
-        #     'SIFTcat': '', 'SIFTval': np.NaN, 'PolyPhenCat': '',
-        #     'PolyPhenVal': np.NaN, 'priPhCons': np.NaN, 'mamPhCons': np.NaN,
-        #     'verPhCons': np.NaN, 'priPhyloP': np.NaN, 'mamPhyloP': np.NaN,
-        #     'verPhyloP': np.NaN, 'bStatistic': np.NaN, 'targetScan': np.NaN,
-        #     'mirSVR-Score': np.NaN, 'mirSVR-E': np.NaN, 'mirSVR-Aln': np.NaN,
-        #     'cHmmTssA': np.NaN, 'cHmmTssAFlnk': np.NaN, 'cHmmTxFlnk': np.NaN,
-        #     'cHmmTx': np.NaN, 'cHmmTxWk': np.NaN, 'cHmmEnhG': np.NaN,
-        #     'cHmmEnh': np.NaN, 'cHmmZnfRpts': np.NaN, 'cHmmHet': np.NaN,
-        #     'cHmmTssBiv': np.NaN, 'cHmmBivFlnk': np.NaN, 'cHmmEnhBiv': np.NaN,
-        #     'cHmmReprPC': np.NaN, 'cHmmReprPCWk': np.NaN, 'cHmmQuies': np.NaN,
-        #     'GerpRS': np.NaN, 'GerpRSpval': np.NaN, 'GerpN': np.NaN, 'GerpS': np.NaN,
-        #     'TFBS': np.NaN, 'TFBSPeaks': np.NaN, 'TFBSPeaksMax': np.NaN, 'tOverlapMotifs': np.NaN,
-        #     'motifDist': np.NaN, 'Segway': '', 'EncH3K27Ac': np.NaN,
-        #     'EncH3K4Me1': np.NaN, 'EncH3K4Me3': np.NaN, 'EncExp': np.NaN, 'EncNucleo': np.NaN,
-        #     'EncOCC': np.NaN, 'EncOCCombPVal': np.NaN, 'EncOCDNasePVal': np.NaN,
-        #     'EncOCFairePVal': np.NaN, 'EncOCpolIIPVal': np.NaN, 'EncOCctcfPVal': np.NaN,
-        #     'EncOCmycPVal': np.NaN, 'EncOCDNaseSig': np.NaN, 'EncOCFaireSig': np.NaN,
-        #     'EncOCpolIISig': np.NaN, 'EncOCctcfSig': np.NaN, 'EncOCmycSig': np.NaN,
-        #     'Grantham': np.NaN, 'Dist2Mutation': np.NaN, 'Freq100bp': np.NaN, 'Rare100bp': np.NaN,
-        #     'Sngl100bp': np.NaN, 'Freq1000bp': np.NaN, 'Rare1000bp': np.NaN, 'Sngl1000bp': np.NaN,
-        #     'Freq10000bp': np.NaN, 'Rare10000bp': np.NaN, 'Sngl10000bp': np.NaN,
-        #     'dbscSNV.ada_score': np.NaN, 'dbscSNV.rf_score': np.NaN
-        # }
+        to_replace_list = {
+            'motifEName': '', 'GeneID': '', 'GeneName': '', 'CCDS': '',
+            'Intron': '', 'Exon': '', 'ref': '', 'alt': '', 'Consequence': '',
+            'GC': np.NaN, 'CpG': np.NaN, 'motifECount': np.NaN,
+            'motifEScoreChng': np.NaN, 'motifEHIPos': np.NaN, 'oAA': np.NaN,
+            'nAA': '', 'cDNApos': np.NaN, 'relcDNApos': np.NaN,
+            'CDSpos': np.NaN, 'relCDSpos': np.NaN, 'protPos': np.NaN,
+            'relProtPos': np.NaN, 'Domain': '', 'Dst2Splice': np.NaN,
+            'Dst2SplType': '', 'minDistTSS': np.NaN, 'minDistTSE': np.NaN,
+            'SIFTcat': '', 'SIFTval': np.NaN, 'PolyPhenCat': '',
+            'PolyPhenVal': np.NaN, 'priPhCons': np.NaN, 'mamPhCons': np.NaN,
+            'verPhCons': np.NaN, 'priPhyloP': np.NaN, 'mamPhyloP': np.NaN,
+            'verPhyloP': np.NaN, 'bStatistic': np.NaN, 'targetScan': np.NaN,
+            'mirSVR-Score': np.NaN, 'mirSVR-E': np.NaN, 'mirSVR-Aln': np.NaN,
+            'cHmmTssA': np.NaN, 'cHmmTssAFlnk': np.NaN, 'cHmmTxFlnk': np.NaN,
+            'cHmmTx': np.NaN, 'cHmmTxWk': np.NaN, 'cHmmEnhG': np.NaN,
+            'cHmmEnh': np.NaN, 'cHmmZnfRpts': np.NaN, 'cHmmHet': np.NaN,
+            'cHmmTssBiv': np.NaN, 'cHmmBivFlnk': np.NaN, 'cHmmEnhBiv': np.NaN,
+            'cHmmReprPC': np.NaN, 'cHmmReprPCWk': np.NaN, 'cHmmQuies': np.NaN,
+            'GerpRS': np.NaN, 'GerpRSpval': np.NaN, 'GerpN': np.NaN,
+            'GerpS': np.NaN, 'TFBS': np.NaN, 'TFBSPeaks': np.NaN,
+            'TFBSPeaksMax': np.NaN, 'tOverlapMotifs': np.NaN,
+            'motifDist': np.NaN, 'Segway': '', 'EncH3K27Ac': np.NaN,
+            'EncH3K4Me1': np.NaN, 'EncH3K4Me3': np.NaN, 'EncExp': np.NaN,
+            'EncNucleo': np.NaN, 'EncOCC': np.NaN, 'EncOCCombPVal': np.NaN,
+            'EncOCDNasePVal': np.NaN, 'EncOCFairePVal': np.NaN,
+            'EncOCpolIIPVal': np.NaN, 'EncOCctcfPVal': np.NaN,
+            'EncOCmycPVal': np.NaN, 'EncOCDNaseSig': np.NaN,
+            'EncOCFaireSig': np.NaN, 'EncOCpolIISig': np.NaN,
+            'EncOCctcfSig': np.NaN, 'EncOCmycSig': np.NaN, 'Grantham': np.NaN,
+            'Dist2Mutation': np.NaN, 'Freq100bp': np.NaN, 'Rare100bp': np.NaN,
+            'Sngl100bp': np.NaN, 'Freq1000bp': np.NaN, 'Rare1000bp': np.NaN,
+            'Sngl1000bp': np.NaN, 'Freq10000bp': np.NaN, 'Rare10000bp': np.NaN,
+            'Sngl10000bp': np.NaN, 'dbscSNV.ada_score': np.NaN,
+            'dbscSNV.rf_score': np.NaN
+        }
 
         """
         impute_values_dict = {
             'motifEName': 'unknown', 'GeneID': 'unknown', 'GeneName': 'unknown',
             'CCDS': 'unknown', 'Intron': 'unknown',
-            'Exon': 'unknown', 'ref': 'N', 'alt': 'N', 'Consequence': 'UNKNOWN', 'GC': 0.42,
-            'CpG': 0.02, 'motifECount': 0, 'motifEScoreChng': 0,
+            'Exon': 'unknown', 'ref': 'N', 'alt': 'N', 'Consequence': 'UNKNOWN',
+            'GC': 0.42, 'CpG': 0.02, 'motifECount': 0, 'motifEScoreChng': 0,
             'motifEHIPos': 0, 'oAA': 'unknown', 'nAA': 'unknown', 'cDNApos': 0,
             'relcDNApos': 0, 'CDSpos': 0, 'relCDSpos': 0, 'protPos': 0,
             'relProtPos': 0, 'Domain': 'UD', 'Dst2Splice': 0,
@@ -756,8 +752,8 @@ class ASEPredictor:
     def train_test_slicer(self, **kwargs):
         """Set up training and testing data set by train_test_split
         """
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            self.X, self.y, **kwargs)
+        self.X_train, self.X_test, self.y_train, self.y_test = \
+                train_test_split(self.X, self.y, **kwargs)
 
     def setup_pipeline(self, estimators=None, multi_class=False):
         """Setup a training pipeline
@@ -800,10 +796,6 @@ class ASEPredictor:
                 A object
             **kwargs: keyword arguments
                 Any keyword argument suitable
-
-        Returns: none
-        Raises: none
-        Notes: none
         """
         if estimators is None:
             estimators = self.pipeline
@@ -822,7 +814,7 @@ class ASEPredictor:
                 continue
 
             # working dataframe information
-            format_print('work dataframe information', self.work_df_info)
+            format_print('Work dataframe information', self.work_df_info)
 
             model_params = fitted_model.get_params()
             best_estimators = fitted_model.best_estimator_
@@ -852,7 +844,8 @@ class ASEPredictor:
             format_print('Model score', fitted_model_score)
 
     @timmer
-    def draw_learning_curve(self, estimator, model_index, strategy=None, **kwargs):
+    def draw_learning_curve(
+            self, estimator, model_index, strategy=None, **kwargs):
         """Draw the learning curve of specific estimator or pipeline
 
         Args:
@@ -861,9 +854,6 @@ class ASEPredictor:
             strategy (str or None): optional, default None
             **kwargs: optional; default empty
                 Keyword arguments for learning_curve from scikit-learn
-
-        Notes:
-            https://scikit-learn.org/stable/auto_examples/model_selection/plot_learning_curve.html
         """
         if strategy is None:
             estimator = copy.deepcopy(self.estimators_list[-1][-1])
@@ -874,7 +864,7 @@ class ASEPredictor:
             pass
         else:
             raise Exception(
-                'For [strategy] argument, (None, \'best\', or \'pipe\')'
+                'For strategy argument, (None, \'best\', or \'pipe\')'
             )
 
         train_sizes, train_scores, test_scores = learning_curve(
@@ -900,7 +890,8 @@ class ASEPredictor:
         lower = test_scores_mean - test_scores_std
         ax_learning.fill_between(train_sizes, upper, lower, alpha=0.1)
         ax_learning.plot(
-            train_sizes, test_scores_mean, color='g', label='Cross-validation score'
+            train_sizes, test_scores_mean, color='g',
+            label='Cross-validation score'
         )
 
         ax_learning.set(
@@ -909,12 +900,11 @@ class ASEPredictor:
         ax_learning.legend(loc='best')
 
         prefix = 'learning_curve_' + model_index
-        fig.savefig(make_file_name(pre=predix, suf='png'))
+        fig.savefig(make_file_name(pre=prefix, suf='png'))
 
     @timmer
     def draw_roc_curve(self, estimator, model_index, **kwargs):
         """Draw ROC curve for test and validate data set"""
-
         fig, ax_roc = plt.subplots(figsize=(10, 10))
 
         self.y_test_pred_prob = estimator.predict_proba(self.X_test)[:, 1]
@@ -928,7 +918,8 @@ class ASEPredictor:
             ax_roc.plot(fp, tp, color='g', label='Validating')
 
         ax_roc.set(
-            title='ROC curve', xlabel='False positive rage', ylabel='True positive rate'
+            title='ROC curve', xlabel='False positive rage',
+            ylabel='True positive rate'
         )
         ax_roc.legend(loc='best')
 
@@ -936,7 +927,7 @@ class ASEPredictor:
         fig.savefig(make_file_name(pre=prefix, suf='png'))
 
     @timmer
-    def draw_K_main_features(self, estimator, index, k=20, **kwargs):
+    def draw_K_main_features(self, estimator, model_index, k=20, **kwargs):
         """Draw feature importance for the model"""
         ftr_slc_est = estimator.best_estimator_.steps[0][-1]
         slc_ftr_idc = ftr_slc_est.get_support(True)
@@ -957,18 +948,19 @@ class ASEPredictor:
         ax_features.bar(ftr_nms, rfc_ftr_ipt)
 
         ax_features.set_xticklabels(
-            ftr_nms, rotation_mode='anchor', rotation=45, horizontalalignment='right'
+            ftr_nms, rotation_mode='anchor', rotation=45,
+            horizontalalignment='right'
         )
         ax_features.set(
             title='Feature importances', xlabel='Features', ylabel='Importance'
         )
 
-        prefix = 'feature_importance_' + model_index[index]
+        prefix = 'feature_importance_' + model_index
         fig.savefig(make_file_name(pre=prefix, suf='png'))
 
     @timmer
     def draw_figures(self, **kwargs):
-        """Draw learning curve, ROC curve, and bar graph for the importance of features"""
+        """Draw learning curve, ROC curve, and feature importance bar graph"""
         model_indexs = {0: 'grid', 1: 'random'}
         for index, estimator in enumerate([self.rsf, self.gsf]):
             if estimator is None:
@@ -992,18 +984,12 @@ def save_ap_obj(ob, file_name=None):
 
 def load_asepredictor_obj(file_name):
     """Load ASEPredictor instance by pickle"""
-
     with open(file_name, 'wb') as pklif:
         return pickle.load(pklif)
 
 
 def main():
-    """Main function to run the module
-
-    Args: none
-    Returns: none
-    """
-
+    """Main function to run the module """
     make_time_stamp()
 
     input_file = join(
@@ -1014,18 +1000,6 @@ def main():
     ap = ASEPredictor(input_file)
     ap.debug()
     save_ap_obj(ap)
-
-
-make_time_stamp()
-
-input_file = join(
-    '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
-    'outputs', 'biosGavinOverlapCov10',
-    'biosGavinOlCv10AntUfltCstLog2FCBin.tsv'
-)
-ap = ASEPredictor(input_file)
-ap.debug()
-save_ap_obj(ap)
 
 
 if __name__ == '__main__':
