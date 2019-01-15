@@ -194,7 +194,7 @@ configurations(`set_default` will get you back to the default configs).
         self.random_search_opt_params = defaultdict(None)
 
         self.set_default()
-        self.config_file_name = make_file_name(pre='config', suf='pkl')
+        self.config_file_name = make_file_name(prefix='config', suffix='pkl')
         self.dump_configs(self.config_file_name)
 
     def set_default(self):
@@ -832,7 +832,7 @@ class ASEPredictor:
 
             prefix = 'cross_validation_' + model_index[index]
             cv_result_fn = make_file_name(
-                fn='training', pre=prefix, suf='tvs')
+                file_name='training', prefix=prefix, suffix='tvs')
             with open(cv_result_fn, 'w') as cvof:
                 tmp_data_frame = pd.DataFrame(cv_results)
                 tmp_data_frame.to_csv(cvof, sep='\t')
@@ -900,7 +900,7 @@ class ASEPredictor:
         ax_learning.legend(loc='best')
 
         prefix = 'learning_curve_' + model_index
-        fig.savefig(make_file_name(pre=prefix, suf='png'))
+        fig.savefig(make_file_name(prefix=prefix, suffix='png'))
 
     @timmer
     def draw_roc_curve(self, estimator, model_index, **kwargs):
@@ -924,7 +924,7 @@ class ASEPredictor:
         ax_roc.legend(loc='best')
 
         prefix = 'roc_curve_' + model_index
-        fig.savefig(make_file_name(pre=prefix, suf='png'))
+        fig.savefig(make_file_name(prefix=prefix, suffix='png'))
 
     @timmer
     def draw_K_main_features(self, estimator, model_index, k=20, **kwargs):
@@ -956,7 +956,7 @@ class ASEPredictor:
         )
 
         prefix = 'feature_importance_' + model_index
-        fig.savefig(make_file_name(pre=prefix, suf='png'))
+        fig.savefig(make_file_name(prefix=prefix, suffix='png'))
 
     @timmer
     def draw_figures(self, **kwargs):
@@ -977,7 +977,7 @@ def save_ap_obj(ob, file_name=None):
     if file_name is None:
         file_name = 'ASEPre'
 
-    pklf_name = make_file_name(file_name, pre='training', suf='pkl')
+    pklf_name = make_file_name(file_name, prefix='training', suffix='pkl')
     with open(pklf_name, 'wb') as pklof:
         pickle.dump(ob, pklof)
 
