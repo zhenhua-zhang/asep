@@ -18,7 +18,7 @@ module list
 pwd
 
 ASED=Documents/projects/ASEpredictor
-source ${HOME}/${ASED}/env/bin/activite
+source ${HOME}/${ASED}/_asep_env/bin/activate
 python ${HOME}/${ASED}/outputs/predictor/predictor_of_ase.py
 
 if [ $? -eq 0 ]; then
