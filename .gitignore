@@ -24,7 +24,7 @@
 .idea/
 
 # Ignore Python virtual environment files
-_env/
+_asep_env
 
 # Ignore all syntax test files
 _syntax_test/
