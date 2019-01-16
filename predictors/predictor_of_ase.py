@@ -76,6 +76,8 @@ except ImportError('Failed to import matplotlib.pyplot derictly...') as e:
     mpl.use('Agg')
     import matplotlib.pyplot as plt
 
+# global variables
+time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
 def timmer(func):
     """Print the runtime of the decorated function
@@ -125,12 +127,12 @@ def make_file_name(file_name=None, prefix=None, suffix=None, _time_stamp=None):
         _time_stamp = time_stamp
 
     if file_name is None:
-        file_name = _time_stamp 
+        file_name = _time_stamp
     else:
         file_name += '_' + _time_stamp
 
     if prefix:
-        file_name = prefix + '_' + file_name 
+        file_name = prefix + '_' + file_name
 
     if suffix:
         file_name += '.' + suffix
@@ -203,8 +205,8 @@ configurations(`set_default` will get you back to the default configs).
         """Set up default configuration"""
         self.estimators_list = [
             # ('imputator', SimpleImputer()),
-            # ('standard_scaler', StandardScaler()),  # TODO: useful ???
-            # ('normalizer', Normalizer()),  # TODO: useful ???
+            # ('standard_scaler', StandardScaler()),
+            # ('normalizer', Normalizer()),
             ('feature_selection', SelectKBest()),
 
             # Random forest classifier
@@ -280,7 +282,6 @@ configurations(`set_default` will get you back to the default configs).
         Args:
             fn (str or None): optional; default None
         """
-
         config_dict = {
             'estimators': self.estimators_list,
             'gs_params': self.grid_search_opt_params,
@@ -343,6 +344,8 @@ class ASEPredictor:
 
         self.train_test_df = None
         self.validating_df = None
+        self.y_val_pred_prob = None
+        self.y_test_pred_prob = None
         self.X_val = None
         self.y_val = None
 
@@ -368,16 +371,7 @@ class ASEPredictor:
 
     @timmer
     def run(self):
-        """Execute a pre-designed construct pipeline
-
-        Args: None
-        Returns: None
-        """
-        self.debug()
-
-    @timmer
-    def debug(self):
-        """Debug the whole module"""
+        """Execute a pre-designed construct pipeline"""
         limit = None
         self.raw_df = self.read_file_to_dataframe(nrows=limit)
 
@@ -424,37 +418,37 @@ class ASEPredictor:
         self.setup_pipeline(
             estimators=self.estimators_list, multi_class=multiclass
         )
-    # self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
-    self.random_search_opt(self.pipeline, **self.random_search_opt_params)
+        # self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
+        self.random_search_opt(self.pipeline, **self.random_search_opt_params)
 
-    self.training_reporter()
-    self.draw_figures()
+        self.training_reporter()
+        self.draw_figures()
 
-@staticmethod
-def set_seed(sed=None):
-    """Set the random seed of numpy"""
-    if sed:
-        np.random.seed(sed)
-    else:
-        np.random.seed(1234)
+    @staticmethod
+    def set_seed(sed=None):
+        """Set the random seed of numpy"""
+        if sed:
+            np.random.seed(sed)
+        else:
+            np.random.seed(1234)
 
-@staticmethod
-def check_keys(pool_a, pool_b):
-    """Check if all elements in pool_a are also in pool_b"""
-    if not isinstance(pool_a, (list, tuple)):
-        raise TypeError('Require iterable value for pool_a...')
-    if not isinstance(pool_b, (list, tuple)):
-        raise TypeError('Require iterable value for pool_b...')
-    pool_a_size = len(pool_a)
-    pool_b_size = len(pool_b)
-    if pool_a_size >= pool_b_size:
-        for key in pool_b:
-            if key not in pool_a:
-                raise KeyError('Invalid element {}'.format(key))
-    else:
-        for key in pool_a:
-            if key not in pool_b:
-                raise KeyError('Invalid element {}'.format(key))
+    @staticmethod
+    def check_keys(pool_a, pool_b):
+        """Check if all elements in pool_a are also in pool_b"""
+        if not isinstance(pool_a, (list, tuple)):
+            raise TypeError('Require iterable value for pool_a...')
+        if not isinstance(pool_b, (list, tuple)):
+            raise TypeError('Require iterable value for pool_b...')
+        pool_a_size = len(pool_a)
+        pool_b_size = len(pool_b)
+        if pool_a_size >= pool_b_size:
+            for key in pool_b:
+                if key not in pool_a:
+                    raise KeyError('Invalid element {}'.format(key))
+        else:
+            for key in pool_a:
+                if key not in pool_b:
+                    raise KeyError('Invalid element {}'.format(key))
         return True
 
     def get_input_file_name(self):
@@ -613,12 +607,10 @@ def check_keys(pool_a, pool_b):
                 continue
 
             try:
-                self.work_df[cne] = encoder.fit_transform(
-                    self.work_df[cn])
+                self.work_df[cne] = encoder.fit_transform(self.work_df[cn])
                 del self.work_df[cn]
             except Exception as e:
                 print(e, file=stderr)
-                print(cne)
 
         self.update_work_dataframe_info()
 
@@ -663,9 +655,7 @@ def check_keys(pool_a, pool_b):
             'Sngl1000bp': np.NaN, 'Freq10000bp': np.NaN, 'Rare10000bp': np.NaN,
             'Sngl10000bp': np.NaN, 'dbscSNV.ada_score': np.NaN,
             'dbscSNV.rf_score': np.NaN
-        }
-
-        """
+        }"""
         impute_values_dict = {
             'motifEName': 'unknown', 'GeneID': 'unknown', 'GeneName': 'unknown',
             'CCDS': 'unknown', 'Intron': 'unknown',
@@ -706,7 +696,8 @@ def check_keys(pool_a, pool_b):
         )
         self.update_work_dataframe_info()
 
-    def setup_xy(self, dataframe, x_cols=None, y_col=None):
+    @staticmethod
+    def setup_xy(dataframe, x_cols=None, y_col=None):
         """Set up predictor variables and target variables.
 
         Args:
@@ -740,7 +731,7 @@ def check_keys(pool_a, pool_b):
             raise TypeError("drop_list should be list, tuple")
 
         candidates_pool = {}
-        feature_pool = self.work_df_cols
+        feature_pool = self.work_df_info['columns']
         for _, candidate in enumerate(feature_pool):
             sm = spearmanr(self.work_df[candidate], target)
             c = sm.correlation
@@ -755,10 +746,10 @@ def check_keys(pool_a, pool_b):
         self.slice_data_frame(cols=self.pre_selected_features)
 
     def train_test_slicer(self, **kwargs):
-        """Set up training and testing data set by train_test_split
-        """
-        self.X_train, self.X_test, self.y_train, self.y_test = \
-                train_test_split(self.X, self.y, **kwargs)
+        """Set up training and testing data set by train_test_split"""
+        (self.X_train, self.X_test,
+         self.y_train, self.y_test
+        ) = train_test_split(self.X, self.y, **kwargs)
 
     def setup_pipeline(self, estimators=None, multi_class=False):
         """Setup a training pipeline
@@ -811,7 +802,6 @@ def check_keys(pool_a, pool_b):
     @timmer
     def training_reporter(self):
         """Report the training information"""
-
         model_index = {0: 'grid', 1: 'random'}
 
         for index, fitted_model in enumerate([self.gsf, self.rsf]):
@@ -820,24 +810,18 @@ def check_keys(pool_a, pool_b):
 
             # working dataframe information
             format_print('Work dataframe information', self.work_df_info)
-
-            model_params = fitted_model.get_params()
-            best_estimators = fitted_model.best_estimator_
-            best_index = fitted_model.best_index_
-            best_params = fitted_model.best_params_
-            best_score = fitted_model.best_score_
-            cv_results = fitted_model.cv_results_
-            scorer = fitted_model.scorer_
-            format_print('Params', model_params)
-            format_print('Scorer', scorer)
-            format_print('Best estimators', best_estimators)
-            format_print('Best params', best_params)
-            format_print('Best score', best_score)
-            format_print('Best index', best_index)
+            format_print('Params', fitted_model.get_params())
+            format_print('Scorer', fitted_model.scorer_)
+            format_print('Best estimators', fitted_model.best_estimator_)
+            format_print('Best params', fitted_model.best_params_)
+            format_print('Best score', fitted_model.best_score_)
+            format_print('Best index', fitted_model.best_index_)
 
             prefix = 'cross_validation_' + model_index[index]
             cv_result_fn = make_file_name(
                 file_name='training', prefix=prefix, suffix='tvs')
+
+            cv_results = fitted_model.cv_results_
             with open(cv_result_fn, 'w') as cvof:
                 tmp_data_frame = pd.DataFrame(cv_results)
                 tmp_data_frame.to_csv(cvof, sep='\t')
@@ -868,9 +852,7 @@ def check_keys(pool_a, pool_b):
         elif strategy == 'pipe':
             pass
         else:
-            raise Exception(
-                'For strategy argument, (None, \'best\', or \'pipe\')'
-            )
+            raise Exception('Valid strategy, (None, \'best\', or \'pipe\')')
 
         train_sizes, train_scores, test_scores = learning_curve(
             estimator, X=self.X, y=self.y, cv=10, n_jobs=6,
@@ -932,7 +914,7 @@ def check_keys(pool_a, pool_b):
         fig.savefig(make_file_name(prefix=prefix, suffix='png'))
 
     @timmer
-    def draw_K_main_features(self, estimator, model_index, k=20, **kwargs):
+    def draw_k_main_features(self, estimator, model_index, k=20, **kwargs):
         """Draw feature importance for the model"""
         ftr_slc_est = estimator.best_estimator_.steps[0][-1]
         slc_ftr_idc = ftr_slc_est.get_support(True)
@@ -974,7 +956,7 @@ def check_keys(pool_a, pool_b):
             model_index = model_indexs[index]
             self.draw_roc_curve(estimator, model_index)
             self.draw_learning_curve(estimator, model_index)
-            self.draw_K_main_features(estimator, model_index)
+            self.draw_k_main_features(estimator, model_index)
 
 
 def save_ap_obj(ob, file_name=None):
@@ -996,14 +978,13 @@ def load_asepredictor_obj(file_name):
 def main():
     """Main function to run the module """
     make_time_stamp()
-
     input_file = os.path.join(
         '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
         'outputs', 'biosGavinOverlapCov10',
         'biosGavinOlCv10AntUfltCstLog2FCBin.tsv'
     )
     ap = ASEPredictor(input_file)
-    ap.debug()
+    ap.run()
     save_ap_obj(ap)
 
 
