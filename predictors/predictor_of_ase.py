@@ -19,14 +19,14 @@ TODO:
     * Add more input file type
 """
 
+import os
 import copy
 import json
-import pickle
 import time
+import pickle
 
 from collections import defaultdict
 from functools import wraps
-from os.path import join
 from sys import stderr
 from sys import stdout
 
@@ -54,24 +54,23 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import make_scorer
 from sklearn.metrics import precision_score
+from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_curve
-
-# from sklearn.ensemble import AdaBoostClassifier
-# from sklearn.metrics import accuracy_score
-# from sklearn.metrics import roc_auc_score
 
 # from sklearn.feature_selection import SelectFromModel
 # from sklearn.preprocessing import RobustScaler
 # from sklearn.preprocessing import StandardScaler
 # from sklearn.preprocessing import Normalizer
 # from sklearn.pipeline import FeatureUnion
-# from sklearn.impute import MissingIndicator
+# from sklearn.ensemble import AdaBoostClassifier
+# from sklearn.metrics import roc_auc_score
 # from sklearn.impute import SimpleImputer
+# from sklearn.impute import MissingIndicator
 
 # maplotlib as visualization modules
 try:
     import matplotlib.pyplot as plt
-except ImportError('Failed to import matplotlib.pyplot...') as e:
+except ImportError('Failed to import matplotlib.pyplot derictly...') as e:
     print(e)
     import matplotlib as mpl
     mpl.use('Agg')
@@ -136,7 +135,8 @@ def make_file_name(file_name=None, prefix=None, suffix=None, _time_stamp=None):
     if suffix:
         file_name += '.' + suffix
 
-    return file_name
+    os.mkdir(_time_stamp)
+    return os.path.join(".", _time_stamp, file_name)
 
 
 def format_print(title, main_content, pipe=stdout):
@@ -212,13 +212,18 @@ configurations(`set_default` will get you back to the default configs).
             # ('abc', AdaBoostClassifier())
         ]
 
+        scoring_dict = dict(
+            precision=make_scorer(precision_score, average="micro"),
+            accuracy=make_scorer(accuracy_score)
+        )
+
         self.grid_search_opt_params.update(
             dict(
                 cv=10,
                 n_jobs=3,
                 iid=False,
-                refit=True,  # by default is True
-                scoring=make_scorer(precision_score, average='micro'),
+                refit="accuracy",  # by default is True
+                scoring=scoring_dict,
                 param_grid=[
                     dict(
                         feature_selection__score_func=[mutual_info_classif],
@@ -237,20 +242,20 @@ configurations(`set_default` will get you back to the default configs).
 
         self.random_search_opt_params.update(
             dict(
-                cv=5,
+                cv=10,
                 n_jobs=3,
-                refit=True,  # by default is true
-                n_iter=10,
+                n_iter=15,
                 iid=False,
-                scoring=make_scorer(precision_score, average='micro'),
+                refit="accuracy",  # by default is True
+                scoring=scoring_dict,
                 param_distributions=dict(
                     feature_selection__score_func=[mutual_info_classif],
                     feature_selection__k=list(range(3, 110, 2)),
-                    rfc__n_estimators=list(range(100, 1000, 10)),
+                    rfc__n_estimators=list(range(50, 1000, 10)),
                     rfc__max_features=['auto', 'sqrt'],
-                    rfc__max_depth=list(range(10, 110, 11)),
-                    rfc__min_samples_split=[2, 5, 10],
-                    rfc__min_samples_leaf=[1, 2, 4],
+                    rfc__max_depth=list(range(10, 111, 10)),
+                    rfc__min_samples_split=[2, 4, 6, 8, 10],
+                    rfc__min_samples_leaf=[2, 4, 6, 8],
                     rfc__bootstrap=[True, False]
                 ),
                 return_train_score=True,  # to suppress a warning
@@ -370,8 +375,7 @@ class ASEPredictor:
 
     @timmer
     def debug(self):
-        """Debug the whole module
-        """
+        """Debug the whole module"""
         limit = None
         self.raw_df = self.read_file_to_dataframe(nrows=limit)
 
@@ -418,7 +422,7 @@ class ASEPredictor:
         self.setup_pipeline(
             estimators=self.estimators_list, multi_class=multiclass
         )
-        # self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
+        self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
         self.random_search_opt(self.pipeline, **self.random_search_opt_params)
 
         self.training_reporter()
@@ -472,7 +476,6 @@ class ASEPredictor:
 
         Args:
             df (str): the data frame to be checked
-        Returns: none
         Raises:
             TypeError:
             ValueError:
@@ -992,7 +995,7 @@ def main():
     """Main function to run the module """
     make_time_stamp()
 
-    input_file = join(
+    input_file = os.path.join(
         '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
         'outputs', 'biosGavinOverlapCov10',
         'biosGavinOlCv10AntUfltCstLog2FCBin.tsv'
