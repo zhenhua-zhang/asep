@@ -135,7 +135,9 @@ def make_file_name(file_name=None, prefix=None, suffix=None, _time_stamp=None):
     if suffix:
         file_name += '.' + suffix
 
-    os.mkdir(_time_stamp)
+    if not os.path.exists(_time_stamp):
+        os.mkdir(_time_stamp)
+
     return os.path.join(".", _time_stamp, file_name)
 
 
@@ -422,37 +424,37 @@ class ASEPredictor:
         self.setup_pipeline(
             estimators=self.estimators_list, multi_class=multiclass
         )
-        self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
-        self.random_search_opt(self.pipeline, **self.random_search_opt_params)
+    # self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
+    self.random_search_opt(self.pipeline, **self.random_search_opt_params)
 
-        self.training_reporter()
-        self.draw_figures()
+    self.training_reporter()
+    self.draw_figures()
 
-    @staticmethod
-    def set_seed(sed=None):
-        """Set the random seed of numpy"""
-        if sed:
-            np.random.seed(sed)
-        else:
-            np.random.seed(1234)
+@staticmethod
+def set_seed(sed=None):
+    """Set the random seed of numpy"""
+    if sed:
+        np.random.seed(sed)
+    else:
+        np.random.seed(1234)
 
-    @staticmethod
-    def check_keys(pool_a, pool_b):
-        """Check if all elements in pool_a are also in pool_b"""
-        if not isinstance(pool_a, (list, tuple)):
-            raise TypeError('Require iterable value for pool_a...')
-        if not isinstance(pool_b, (list, tuple)):
-            raise TypeError('Require iterable value for pool_b...')
-        pool_a_size = len(pool_a)
-        pool_b_size = len(pool_b)
-        if pool_a_size >= pool_b_size:
-            for key in pool_b:
-                if key not in pool_a:
-                    raise KeyError('Invalid element {}'.format(key))
-        else:
-            for key in pool_a:
-                if key not in pool_b:
-                    raise KeyError('Invalid element {}'.format(key))
+@staticmethod
+def check_keys(pool_a, pool_b):
+    """Check if all elements in pool_a are also in pool_b"""
+    if not isinstance(pool_a, (list, tuple)):
+        raise TypeError('Require iterable value for pool_a...')
+    if not isinstance(pool_b, (list, tuple)):
+        raise TypeError('Require iterable value for pool_b...')
+    pool_a_size = len(pool_a)
+    pool_b_size = len(pool_b)
+    if pool_a_size >= pool_b_size:
+        for key in pool_b:
+            if key not in pool_a:
+                raise KeyError('Invalid element {}'.format(key))
+    else:
+        for key in pool_a:
+            if key not in pool_b:
+                raise KeyError('Invalid element {}'.format(key))
         return True
 
     def get_input_file_name(self):
