@@ -1,12 +1,7 @@
-import copy
-import gzip
-import pysam
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-from operator import itemgetter
-# from operator import attrgetter
-# from operator import methodcaller
-
-"""
+"""Adjustment for reference bias
 
 # Pick only auto and sexual chrommosomes
 awk '{if ($1 ~ /^[1-9XY]+){print $0}} Homo_sapiens.GRCh37.71.gtf \
@@ -22,6 +17,11 @@ cat Homo_sapiens.GRCh37.71.Chr1-22.X.Y.gtf \
 tabix -p gff Homo_sapiens.GRCh37.71.Chr1-22.X.Y.gtf.bgz
 
 """
+
+import pysam
+import copy
+import gzip
+
 
 chromsomes = ['x', 'y']
 chromsomes.extend([str(x) for x in range(1, 23)])
@@ -66,8 +66,8 @@ class BiasAdjustment:
     """Adjust reference bias
 
     When mapping reads to reference genome(e.g. GRCh37), there is a bias that
-    reference alleles have more chance be mapped and consequently the expect ratio of
-    alternative-counts / reference-counts is less than 1;
+    reference alleles have more chance be mapped and consequently the expect 
+    ratio of alternative-counts / reference-counts is less than 1;
     """
 
     def __init__(self, fn):
@@ -99,7 +99,7 @@ class BiasAdjustment:
         else:
             errmsg = [
                 "Please specify file_type,",
-                " or specify chrom_col and pos_col without specifying file_type"
+                "or specify chrom_col and pos_col without specifying file_type"
             ]
             raise ValueError(" ".join(errmsg))
 
