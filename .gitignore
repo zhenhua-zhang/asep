@@ -32,7 +32,4 @@ _syntax_test/
 # Misc
 _notes.md
 _explore_log2FC
-predictors/*/2019*
-predictors/ap.pkl
-predictors/output_figs
-
+**/2019*
