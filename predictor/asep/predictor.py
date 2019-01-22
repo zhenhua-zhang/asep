@@ -88,7 +88,7 @@ class ASEPredictor:
         self.validating_df = None
         self.y_val_pred_prob = None
         self.y_test_pred_prob = None
-        self.x_val = None
+        self.x_vals = None
         self.y_val = None
 
         self.pre_selected_features = None
@@ -122,15 +122,6 @@ class ASEPredictor:
 
         self.check_df('raw_df')
         self.setup_work_df()
-
-        flt = None
-        cols_discarded = [
-            'var', 'mean', 'p_value', 'gp_size', 'mirSVR.Score', 'mirSVR.E',
-            'mirSVR.Aln'
-        ]
-        self.work_df = self.slice_data_frame(
-            fltout=flt, cols=[], rows=[], keep=False
-        )
         self.update_work_dataframe_info()
 
         # change into binary classification.
@@ -141,6 +132,11 @@ class ASEPredictor:
 
         self.simple_imputer()
         self.label_encoder(remove=False)
+
+        cols_discarded = [
+            'var', 'mean', 'p_value', 'gp_size',
+            'mirSVR.Score', 'mirSVR.E', 'mirSVR.Aln'
+        ]
 
         flt = 'gp_size > 5'
         self.train_test_df = self.slice_data_frame(
@@ -153,14 +149,14 @@ class ASEPredictor:
         )
 
         self.x_cols, self.y_col = self.setup_xy(self.train_test_df, y_col='ASE')
-        self.train_test_slicer(test_size=0.05)
+        self.train_test_slicer(test_size=0.1)
 
-        self.x_val, self.y_val = self.setup_xy(self.validating_df, y_col='ASE')
+        self.x_vals, self.y_val = self.setup_xy(self.validating_df, y_col='ASE')
 
         self.setup_pipeline(
             estimators=self.estimators_list, multi_class=multiclass
         )
-        # self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
+        self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
         self.random_search_opt(self.pipeline, **self.random_search_opt_params)
 
         self.training_reporter()
@@ -288,6 +284,8 @@ class ASEPredictor:
             result_df = copy.deepcopy(
                 self.work_df[self.work_df.apply(fltout, axis=1)]
             )
+        else:
+            result_df = copy.deepcopy(self.work_df)
 
         if rows is None and cols is None:
             rows = self.work_df.index
@@ -298,11 +296,9 @@ class ASEPredictor:
             cols = self.work_df.columns
 
         if keep:
-            result_df = copy.deepcopy(self.work_df.loc[rows, cols])
+            result_df = result_df.loc[rows, cols]
         else:
-            result_df = copy.deepcopy(
-                self.work_df.drop(index=rows, columns=cols)
-            )
+            result_df = result_df.drop(index=rows, columns=cols)
 
         return result_df
 
@@ -653,8 +649,8 @@ class ASEPredictor:
         ax_roc.plot(false_pos, true_pos, color='r', label='Testing')
 
         # if there is a validating data set
-        if self.x_val is not None:
-            self.y_val_pred_prob = estimator.predict_proba(self.x_val)[:, 1]
+        if self.x_vals is not None:
+            self.y_val_pred_prob = estimator.predict_proba(self.x_vals)[:, 1]
             false_pos, true_pos, _ = roc_curve(self.y_val, self.y_val_pred_prob)
             ax_roc.plot(false_pos, true_pos, color='g', label='Validating')
 
