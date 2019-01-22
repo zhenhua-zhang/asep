@@ -12,7 +12,7 @@
 #SBATCH --job-name=predictor_of_ase
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=15
-#SBATCH --mem-per-cpu=5G
+#SBATCH --mem-per-cpu=1G
 
 module list 
 pwd
