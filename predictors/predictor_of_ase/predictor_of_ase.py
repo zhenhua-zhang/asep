@@ -68,13 +68,9 @@ from sklearn.metrics import roc_curve
 # from sklearn.impute import MissingIndicator
 
 # maplotlib as visualization modules
-try:
-    import matplotlib.pyplot as plt
-except ImportError('Failed to import matplotlib.pyplot derictly...') as e:
-    print(e)
-    import matplotlib as mpl
-    mpl.use('Agg')
-    import matplotlib.pyplot as plt
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 
 # global variables
 time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
@@ -204,16 +200,11 @@ configurations(`set_default` will get you back to the default configs).
     def set_default(self):
         """Set up default configuration"""
         self.estimators_list = [
-            # ('imputator', SimpleImputer()),
-            # ('standard_scaler', StandardScaler()),
-            # ('normalizer', Normalizer()),
+            # feature selelction function
             ('feature_selection', SelectKBest()),
 
             # Random forest classifier
             ('rfc', RandomForestClassifier()),
-
-            # Ada boost classifier
-            # ('abc', AdaBoostClassifier())
         ]
 
         scoring_dict = dict(
@@ -226,7 +217,7 @@ configurations(`set_default` will get you back to the default configs).
                 cv=10,
                 n_jobs=3,
                 iid=False,
-                refit="accuracy",  # by default is True
+                refit="precision",  # by default is True
                 scoring=scoring_dict,
                 param_grid=[
                     dict(
@@ -250,7 +241,7 @@ configurations(`set_default` will get you back to the default configs).
                 n_jobs=3,
                 n_iter=15,
                 iid=False,
-                refit="accuracy",  # by default is True
+                refit="precision",  # by default is True
                 scoring=scoring_dict,
                 param_distributions=dict(
                     feature_selection__score_func=[mutual_info_classif],
@@ -400,27 +391,26 @@ class ASEPredictor:
         self.simple_imputer()
         self.label_encoder(remove=False)
 
-        flt = 'gp_size > 5'
+        flt = 'gp_size >= 5'
         self.train_test_df = self.slice_data_frame(
-            fltout=flt, cols=cols_discarded, rows=[], keep=False
-        )
-
-        flt = 'gp_size <= 5'
-        self.validating_df = self.slice_data_frame(
             fltout=flt, cols=cols_discarded, rows=[], keep=False
         )
 
         self.X, self.y = self.setup_xy(self.train_test_df, y_col='ASE')
         self.train_test_slicer(test_size=0.05)
 
+        flt = 'gp_size < 5'
+        self.validating_df = self.slice_data_frame(
+            fltout=flt, cols=cols_discarded, rows=[], keep=False
+        )
         self.X_val, self.y_val = self.setup_xy(self.validating_df, y_col='ASE')
 
         self.setup_pipeline(
             estimators=self.estimators_list, multi_class=multiclass
         )
+
         # self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
         self.random_search_opt(self.pipeline, **self.random_search_opt_params)
-
         self.training_reporter()
         self.draw_figures()
 
@@ -547,6 +537,8 @@ class ASEPredictor:
             result_df = copy.deepcopy(
                 self.work_df[self.work_df.apply(fltout, axis=ax)]
             )
+        else:
+            result_df = copy.deepcopy(self.work_df)
 
         if rows is None and cols is None:
             rows = self.work_df.index
@@ -557,11 +549,9 @@ class ASEPredictor:
             cols = self.work_df.columns
 
         if keep:
-            result_df = copy.deepcopy(self.work_df.loc[rows, cols])
+            result_df = result_df.loc[rows, cols]
         else:
-            result_df = copy.deepcopy(
-                self.work_df.drop(index=rows, columns=cols)
-            )
+            result_df = result_df.drop(index=rows, columns=cols)
 
         return result_df
 
@@ -987,6 +977,7 @@ def main():
     ap.run()
     save_ap_obj(ap)
 
+main()
 
 if __name__ == '__main__':
     main()
