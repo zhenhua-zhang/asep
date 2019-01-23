@@ -15,17 +15,22 @@ def parse_opts():
     parser = OptionParser()
     group = OptionGroup(parser, "Input")  # Options for input
     group.add_option(
-        "-i", "--input-file", dest="input_file", help="The path of input file"
+        "-i", "--input-file", dest="input_file", default=None, 
+        help="The path to file of training dataset"
+    )
+    group.add_option(
+        "-v", "--vadation-file", dest="validation_file", default=None,
+        help="The path to file of validation dataset"
     )
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Filter")  # Options for filters
     group.add_option(
-        "-s", "--group-size", dest="group_size", 
+        "-s", "--group-size", dest="group_size", default=None,
         help="The least number of individuals bearing the same variant"
     )
     group.add_option(
-        "-S", "--skip-column", dest="skip_columns",
+        "-S", "--skip-column", dest="skip_columns", default=None,
         help=" ".join(
             [
                 "The columns will be skipped.",
@@ -35,7 +40,7 @@ def parse_opts():
         )
     )
     group.add_option(
-        "-t", "--target-col", dest="target_col",
+        "-t", "--target-col", dest="target_col", default=None,
         help="The column name of response variable or target variables"
     )
     parser.add_option_group(group)
@@ -46,8 +51,8 @@ def parse_opts():
         help=" ".join(
             [
                 "The strategy used to optimize hyperparameters.",
-                "0 is RandomizedSearchCV().",
-                "1 is GridSearchCV().",
+                "0 is RandomizedSearchCV();",
+                "1 is GridSearchCV();",
                 "2 is both."
             ]
         )
@@ -55,22 +60,22 @@ def parse_opts():
 
     group = OptionGroup(parser, "Output")
     group.add_option(
-        "-o", "--output-dir", dest="output_dir",
+        "-o", "--output-dir", dest="output_dir", default=None, 
         help="The directory including output files"
     )
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Configuration")
     group.add_option(
-        "-c", "--config-file", dest="config_file",
+        "-c", "--config-file", dest="config_file", default=None,
         help="The path to configuration file"
     )
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Misc")
     group.add_option(
-        "--test-size", dest="test_size",
-        help="The proportation of dataset for testing"
+        "--test-size", dest="test_size", default=None,
+        help="The proportion of dataset for testing"
     )
     parser.add_option_group(group)
 
