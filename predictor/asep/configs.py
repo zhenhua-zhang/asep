@@ -14,7 +14,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import make_scorer
 
 # utilities.py
-from utilities import make_file_name
+from .utilities import make_file_name
 
 
 class Config:
@@ -23,7 +23,7 @@ class Config:
     A class to configure the ASEPredictor class. You can use the default
     configuration by using attributes estimators_list, grid_search_opt_params,
     and random_search_opt_params. You can also load your own configurations by
-    laod_config(YOUR-FILE-NAME), but please note it will covert the current
+    load_config(YOUR-FILE-NAME), but please note it will covert the current
     configurations(`set_default` will get you back to the default configs). If
     you want change the default settings, please make a instance and modify it
     like modifying a Python dict object, but please note the structure and
