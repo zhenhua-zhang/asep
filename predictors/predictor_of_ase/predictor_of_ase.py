@@ -409,8 +409,8 @@ class ASEPredictor:
             estimators=self.estimators_list, multi_class=multiclass
         )
 
-        # self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
-        self.random_search_opt(self.pipeline, **self.random_search_opt_params)
+        self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
+        # self.random_search_opt(self.pipeline, **self.random_search_opt_params)
         self.training_reporter()
         self.draw_figures()
 
@@ -946,7 +946,7 @@ class ASEPredictor:
             model_index = model_indexs[index]
             self.draw_roc_curve(estimator, model_index)
             self.draw_k_main_features(estimator, model_index)
-            self.draw_learning_curve(estimator, model_index, strategy='pipe')
+            self.draw_learning_curve(estimator, model_index, strategy='best')
 
 
 def save_ap_obj(ob, file_name=None):
@@ -977,7 +977,6 @@ def main():
     ap.run()
     save_ap_obj(ap)
 
-main()
 
 if __name__ == '__main__':
     main()
