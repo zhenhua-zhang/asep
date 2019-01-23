@@ -20,6 +20,9 @@
 **/*.vcf
 **/*.docx
 
+# Ignore all starting with _
+**/_*
+
 # Ignore pycharm project directory
 .idea/
 
