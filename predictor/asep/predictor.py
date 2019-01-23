@@ -45,12 +45,12 @@ except ImportError as err:
     from matplotlib import pyplot
 
 # config.py
-from configs import Config
+from .configs import Config
 
 # utilities.py
-from utilities import make_file_name
-from utilities import format_print
-from utilities import timmer
+from .utilities import make_file_name
+from .utilities import format_print
+from .utilities import timmer
 
 
 class ASEPredictor:
