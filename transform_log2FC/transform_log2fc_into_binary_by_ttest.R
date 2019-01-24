@@ -1,44 +1,30 @@
 #!/usr/bin/env Rscript
-
 rm(list = ls())
 
 library("dplyr")
+library("foreach")
 
-ppaste <- function(...){
-    paste(..., sep = "/")
-}
+ppaste <- function(...){ paste(..., sep = "/") }
 
-hmd <- path.expand("~")
-pjd <- ppaste(hmd, "Documents", "projects", "ASEpredictor")
-
-ipd <- ppaste(pjd, "outputs", "biosGavinOverlapCov10")
-ipf <- ppaste(ipd, "biosGavinOlCv10AntUfltCst.tsv")
-
-opd <- ppaste(pjd, "outputs", "biosGavinOverlapCov10")
-opf <- ppaste(opd, "biosGavinOlCv10AntUfltCstLog2FCBin.tsv")
-
-# biosGavinOlCv10AntUfltCst.tsv
-
-add_binom_log2fc_chist <- function(rtb) {
-    df <- rtb %>%
-        mutate(
-            binom_p = binom.test(c(refAlleleBios, altAlleleBios), p = 0.5),
-            log2FC = ifelse(altAlleleBios == refAlleleBios, NA, -log2(altAlleleBios / refAlleleBios))
-        ) %>%
-        group_by(chr, pos, ref, alt) %>%
-        mutate(
-            FDRPerVariant = p.adjust(binom_p),
-            varInsideChi2Pval = chisq.test(refAlleleBios, alrAlleleBios)
-        ) %>%
-        ungroup() %>%
-        as.data.frame()
-
-    return(df)
+bnm.tst <- function(succ_vec, fail_vec){
+	foreach(s=succ_vec, f=fail_vec) %dopar% {
+		binom.test(c(s, f), p = 0.05)$p.value
+	}
 }
 
 trans_into_bin <- function(rtb, cr, pv = 0.01){
     gp <- rtb %>%
+		filter(refCountsBios >= 5 & altCountsBios >= 5 & refCountsBios != altCountsBios) %>%
+        mutate(
+			binom_p = bnm.tst(refCountsBios, altCountsBios),
+			log2FC = log2(altCountsBios / refCountsBios)
+        ) %>%
         group_by(chr, pos, ref, alt) %>%
+        mutate(
+			overallMean = sum(altCountsBios) / sum(refCountsBios),
+			FDRPerVariant = p.adjust(binom_p),
+			varInsideChi2Pval = chisq.test(refCountsBios, altCountsBios)
+        ) %>%
         mutate(
             var = ifelse(length(log2FC) <= 1, 0, var(log2FC)),
             mean = mean(log2FC),
@@ -49,7 +35,7 @@ trans_into_bin <- function(rtb, cr, pv = 0.01){
                 ifelse(
                     max(log2FC) == min(log2FC),
                     ifelse(abs(max(log2FC)) > 1, 0, 1),
-                    t.test(log2FC, mu = 0)$p.value
+                    t.test(log2FC, mu = overallMean)$p.value
                 )
             )
         ) %>%
@@ -63,10 +49,15 @@ trans_into_bin <- function(rtb, cr, pv = 0.01){
     return(gp)
 }
 
-rtb <- read.csv(ipf, header = TRUE, sep = "\t")
-rn <- colnames(rtb)[1:117]
-rn <- c(rn, "var", "mean", "p_value", "gp_size", "ASE")
+hmd <- path.expand("~")
+pjd <- ppaste(hmd, "Documents", "projects", "ASEpredictor")
 
+ipd <- ppaste(pjd, "outputs", "biosGavinOverlapCov10")
+ipf <- ppaste(ipd, "biosGavinOverlapCov10Anno.tsv")
+rtb <- read.csv(ipf, header = TRUE, sep = "\t")
+rn <- c(colnames(rtb)[1:118], "var", "mean", "p_value", "gp_size", "ASE")
 odf <- trans_into_bin(rtb, rn)
-rm(rtb)
+
+opd <- ppaste(pjd, "outputs", "biosGavinOverlapCov10")
+opf <- ppaste(opd, "biosGavinOlCv10AntUfltCstLog2FCBin_.tsv")
 write.table(odf, file = opf, quote = FALSE, sep = "\t", row.names = FALSE)
