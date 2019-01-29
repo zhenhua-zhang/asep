@@ -34,6 +34,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import roc_curve
+from sklearn.metrics import auc
 
 # maplotlib
 try:
@@ -646,13 +647,29 @@ class ASEPredictor:
 
         self.y_test_pred_prob = estimator.predict_proba(self.x_test)[:, 1]
         false_pos, true_pos, _ = roc_curve(self.y_test, self.y_test_pred_prob)
-        ax_roc.plot(false_pos, true_pos, color='r', label='Testing')
+        roc_area = auc(false_pos, true_pos)
+        sample_size = len(false_pos)
+        ax_roc.plot(
+            false_pos, true_pos, color='r',
+            label=' '.join([
+                'Testing:',
+                'area={:2f}, sample_size={}'.format(roc_area, sample_size)
+            ])
+        )
 
         # if there is a validating data set
         if self.x_vals is not None:
             self.y_val_pred_prob = estimator.predict_proba(self.x_vals)[:, 1]
             false_pos, true_pos, _ = roc_curve(self.y_val, self.y_val_pred_prob)
-            ax_roc.plot(false_pos, true_pos, color='g', label='Validating')
+            roc_area = auc(false_pos, true_pos)
+            sample_size = len(false_pos)
+            ax_roc.plot(
+                false_pos, true_pos, color='g',
+                label=' '.join([
+                    'Validating:',
+                    'area={:2f}, sample_size={}'.format(roc_area, sample_size)
+                ])
+            )
 
         ax_roc.set(
             title='ROC curve', xlabel='False positive rage',
