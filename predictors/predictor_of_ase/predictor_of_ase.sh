@@ -7,7 +7,7 @@
 # Version    : v0.0.1
 # License    : MIT
 #
-#SBATCH --time=12:0:0
+#SBATCH --time=8:00:0
 #SBATCH --output=%j-%u-predictor_of_ase.log
 #SBATCH --job-name=predictor_of_ase
 #SBATCH --ntasks=1
