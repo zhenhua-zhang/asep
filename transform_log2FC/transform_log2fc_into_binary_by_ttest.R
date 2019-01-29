@@ -40,11 +40,11 @@ trans_into_bin <- function(rtb, cr, pv = 0.01){
     mutate(
       FDRPerVariant = p.adjust(binom_p),
       # varInsideChi2Pval = ifelse(
-         # length(refCountsBios) <= 2,  
-         # 1,
-         # TODO: Is there a bug for chisq.test? it claimed at least 
-         # TODO: two levels, but here I used at least there levels
-         # chisq.test(refCountsBios, altCountsBios)$p.value
+        # length(refCountsBios) <= 2,  
+        # 1,
+        # TODO: Is there a bug for chisq.test? it claimed at least 
+        # TODO: two levels, but here I used at least there levels
+        # chisq.test(refCountsBios, altCountsBios)$p.value
       # ),
       group_size = length(log2FC),
 
@@ -75,7 +75,7 @@ trans_into_bin <- function(rtb, cr, pv = 0.01){
       FC_mean = mean(FC),
       pval_st_FC = ifelse(
         length(FC) > 2,
-        ifelse( max(log2FC) == min(FC), 0, shapiro.test(FC)$p.value),
+        ifelse( max(FC) == min(FC), 0, shapiro.test(FC)$p.value),
         0
       ),
       pval_st_FC_adj = p.adjust(pval_st_FC),
