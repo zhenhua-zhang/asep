@@ -56,6 +56,7 @@ from sklearn.metrics import make_scorer
 from sklearn.metrics import precision_score
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_curve
+from sklearn.metrics import auc
 
 # from sklearn.feature_selection import SelectFromModel
 # from sklearn.preprocessing import RobustScaler
@@ -215,22 +216,20 @@ configurations(`set_default` will get you back to the default configs).
         self.grid_search_opt_params.update(
             dict(
                 cv=10,
-                n_jobs=3,
+                n_jobs=7,
                 iid=False,
                 refit="precision",  # by default is True
                 scoring=scoring_dict,
-                param_grid=[
-                    dict(
-                        feature_selection__score_func=[mutual_info_classif],
-                        feature_selection__k=list(range(3, 110, 2)),
-                        rfc__n_estimators=list(range(100, 1000, 10)),
-                        rfc__max_features=['auto', 'sqrt'],
-                        rfc__max_depth=list(range(10, 110, 11)),
-                        rfc__min_samples_split=[2, 5, 10],
-                        rfc__min_samples_leaf=[1, 2, 4],
-                        rfc__bootstrap=[True, False]
-                    ),
-                ],
+                param_grid=dict(
+                    feature_selection__score_func=[mutual_info_classif],
+                    feature_selection__k=list(range(3, 110, 2)),
+                    rfc__n_estimators=list(range(50, 1000, 10)),
+                    rfc__max_features=['auto', 'sqrt'],
+                    rfc__max_depth=list(range(10, 111, 10)),
+                    rfc__min_samples_split=[2, 4, 6, 8, 10],
+                    rfc__min_samples_leaf=[2, 4, 6, 8],
+                    rfc__bootstrap=[True, False],
+                ),
                 return_train_score=True,
             )
         )
@@ -238,8 +237,8 @@ configurations(`set_default` will get you back to the default configs).
         self.random_search_opt_params.update(
             dict(
                 cv=10,
-                n_jobs=3,
-                n_iter=15,
+                n_jobs=7,
+                n_iter=20,
                 iid=False,
                 refit="precision",  # by default is True
                 scoring=scoring_dict,
@@ -374,8 +373,11 @@ class ASEPredictor:
 
         flt = None
         cols_discarded = [
-            'var', 'mean', 'p_value', 'gp_size', 'mirSVR.Score', 'mirSVR.E',
-            'mirSVR.Aln'
+            "meta_log2FC_mean", "log2FC_var", "log2FC_mean", "pval_tt_log2FC",
+            "pval_tt_log2FC_adj", "pval_st_log2FC", "pval_st_log2FC_adj",
+            "meta_FC_Mean", "FC_var", "FC_mean", "pval_tt_FC", "pval_tt_FC_adj",
+            "pval_st_FC", "pval_st_FC_adj", "group_size", 'mirSVR.Score',
+            'mirSVR.E', 'mirSVR.Aln'
         ]
         self.work_df = self.slice_data_frame(
             fltout=flt, cols=[], rows=[], keep=False
@@ -391,15 +393,15 @@ class ASEPredictor:
         self.simple_imputer()
         self.label_encoder(remove=False)
 
-        flt = 'gp_size >= 5'
+        flt = 'group_size >= 5'
         self.train_test_df = self.slice_data_frame(
             fltout=flt, cols=cols_discarded, rows=[], keep=False
         )
 
         self.X, self.y = self.setup_xy(self.train_test_df, y_col='ASE')
-        self.train_test_slicer(test_size=0.05)
+        self.train_test_slicer(test_size=0.1)
 
-        flt = 'gp_size < 5'
+        flt = 'group_size < 2'
         self.validating_df = self.slice_data_frame(
             fltout=flt, cols=cols_discarded, rows=[], keep=False
         )
@@ -409,8 +411,8 @@ class ASEPredictor:
             estimators=self.estimators_list, multi_class=multiclass
         )
 
-        self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
-        # self.random_search_opt(self.pipeline, **self.random_search_opt_params)
+        # self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
+        self.random_search_opt(self.pipeline, **self.random_search_opt_params)
         self.training_reporter()
         self.draw_figures()
 
@@ -845,7 +847,7 @@ class ASEPredictor:
             raise Exception('Valid strategy, (None, \'best\', or \'pipe\')')
 
         train_sizes, train_scores, test_scores = learning_curve(
-            estimator, X=self.X, y=self.y, cv=10, n_jobs=6,
+            estimator, X=self.X, y=self.y, cv=10, n_jobs=1,
             train_sizes=np.linspace(.1, 1., 10), **kwargs
         )
 
@@ -886,17 +888,33 @@ class ASEPredictor:
 
         self.y_test_pred_prob = estimator.predict_proba(self.X_test)[:, 1]
         fp, tp, _ = roc_curve(self.y_test, self.y_test_pred_prob)
-        ax_roc.plot(fp, tp, color='r', label='Testing')
+        roc_area = auc(fp, tp)
+        sample_size = self.y_test.shape[0]
+        ax_roc.plot(
+            fp, tp, color='r',
+            label=' '.join([
+                'Testing:',
+                'area={:.3f}, sample_size={}'.format(roc_area, sample_size)
+            ])
+        )
 
         # if there is a validating data set
         if self.X_val is not None:
             self.y_val_pred_prob = estimator.predict_proba(self.X_val)[:, 1]
             fp, tp, _ = roc_curve(self.y_val, self.y_val_pred_prob)
-            ax_roc.plot(fp, tp, color='g', label='Validating')
+            roc_area = auc(fp, tp)
+            sample_size = self.y_val.shape[0]
+            ax_roc.plot(
+                fp, tp, color='g', 
+                label=' '.join([
+                    'Validating:',
+                    'area={:.3f}, sample_size={}'.format(roc_area, sample_size)
+                ])
+            )
 
         ax_roc.set(
-            title='ROC curve', xlabel='False positive rage',
-            ylabel='True positive rate'
+            xlabel='False positive rage', ylabel='True positive rate',
+            title='ROC curve'
         )
         ax_roc.legend(loc='best')
 
@@ -946,7 +964,7 @@ class ASEPredictor:
             model_index = model_indexs[index]
             self.draw_roc_curve(estimator, model_index)
             self.draw_k_main_features(estimator, model_index)
-            self.draw_learning_curve(estimator, model_index, strategy='best')
+            self.draw_learning_curve(estimator, model_index, strategy="pipe")
 
 
 def save_ap_obj(ob, file_name=None):
