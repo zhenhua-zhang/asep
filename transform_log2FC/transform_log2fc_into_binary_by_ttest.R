@@ -95,7 +95,10 @@ trans_into_bin <- function(rtb, cr, pv = 0.01){
   gp <- gp %>%
     ungroup() %>%
     mutate(
-       ASE = ifelse(pval_tt_FC_adj <= pv, ifelse(log2FC_mean < 0, -1, 1), 0)
+       ASE_FC = ifelse(pval_tt_FC_adj <= 0.01, ifelse(log2FC_mean < 0, -1, 1), 0),
+       ASE_log2FC = ifelse(
+		   pval_tt_log2FC_adj <= 0.05, ifelse(log2FC_mean < 0, -1, 1), 0
+	   )
     )
 
   cat("SELECT, ARRANGE, DISTINCT, and Make dataframe ...\n")
