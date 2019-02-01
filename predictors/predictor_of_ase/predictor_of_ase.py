@@ -24,6 +24,7 @@ import copy
 import json
 import time
 import pickle
+import statistics
 
 from collections import defaultdict
 from functools import wraps
@@ -39,22 +40,25 @@ import pandas as pd
 from pandas import DataFrame
 
 # scipy
-from scipy.stats import spearmanr
+import scipy
+from scipy import stats
+from scipy import interp
 
 # scikit-learn modules
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.feature_selection import SelectKBest
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import learning_curve
+from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import LabelEncoder
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import make_scorer
 from sklearn.metrics import precision_score
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import make_scorer
 from sklearn.metrics import roc_curve
 from sklearn.metrics import auc
 
@@ -199,7 +203,20 @@ configurations(`set_default` will get you back to the default configs).
         self.dump_configs(self.config_file_name)
 
     def set_default(self):
-        """Set up default configuration"""
+        """Set up default configuration
+
+        A emperical hyperparameter matrix
+        {
+            'rfc__n_estimators': 290,
+            'rfc__min_samples_split': 8,
+            'rfc__min_samples_leaf': 4,
+            'rfc__max_features': 'auto',
+            'rfc__max_depth': 90,
+            'rfc__bootstrap': False,
+            'feature_selection__score_func': mutual_info_classif,
+            'feature_selection__k': 51
+        }
+        """
         self.estimators_list = [
             # feature selelction function
             ('feature_selection', SelectKBest()),
@@ -215,40 +232,37 @@ configurations(`set_default` will get you back to the default configs).
 
         self.grid_search_opt_params.update(
             dict(
-                cv=10,
-                n_jobs=7,
+                cv=5,
+                n_jobs=-1,  # Use all cores
                 iid=False,
-                refit="precision",  # by default is True
+                refit="precision",
                 scoring=scoring_dict,
                 param_grid=dict(
                     feature_selection__score_func=[mutual_info_classif],
-                    feature_selection__k=list(range(3, 110, 2)),
-                    rfc__n_estimators=list(range(50, 1000, 10)),
-                    rfc__max_features=['auto', 'sqrt'],
-                    rfc__max_depth=list(range(10, 111, 10)),
-                    rfc__min_samples_split=[2, 4, 6, 8, 10],
+                    feature_selection__k=list(range(15, 81, 2)),
+                    rfc__n_estimators=list(range(50, 501, 20)),
+                    rfc__max_depth=list(range(50, 111, 10)),
+                    rfc__min_samples_split=[4, 6, 8, 10, 12],
                     rfc__min_samples_leaf=[2, 4, 6, 8],
-                    rfc__bootstrap=[True, False],
+                    rfc__bootstrap=[True, False]
                 ),
-                return_train_score=True,
+                return_train_score=True,  # to suppress a warning
             )
         )
-
         self.random_search_opt_params.update(
             dict(
-                cv=10,
-                n_jobs=7,
-                n_iter=20,
+                cv=5,
+                n_jobs=-1,  # Use all cores
+                n_iter=15,
                 iid=False,
-                refit="precision",  # by default is True
+                refit="precision",
                 scoring=scoring_dict,
                 param_distributions=dict(
                     feature_selection__score_func=[mutual_info_classif],
-                    feature_selection__k=list(range(3, 110, 2)),
-                    rfc__n_estimators=list(range(50, 1000, 10)),
-                    rfc__max_features=['auto', 'sqrt'],
-                    rfc__max_depth=list(range(10, 111, 10)),
-                    rfc__min_samples_split=[2, 4, 6, 8, 10],
+                    feature_selection__k=list(range(20, 81, 2)),
+                    rfc__n_estimators=list(range(50, 501, 20)),
+                    rfc__max_depth=list(range(50, 111, 10)),
+                    rfc__min_samples_split=[4, 6, 8, 10, 12],
                     rfc__min_samples_leaf=[2, 4, 6, 8],
                     rfc__bootstrap=[True, False]
                 ),
@@ -334,12 +348,8 @@ class ASEPredictor:
 
         self.train_test_df = None
         self.validating_df = None
-        self.y_val_pred_prob = None
-        self.y_test_pred_prob = None
         self.X_val = None
         self.y_val = None
-
-        self.pre_selected_features = None
 
         self.X = None
         self.y = None
@@ -362,7 +372,7 @@ class ASEPredictor:
     @timmer
     def run(self):
         """Execute a pre-designed construct pipeline"""
-        limit = None
+        limit = 500
         self.raw_df = self.read_file_to_dataframe(nrows=limit)
 
         sed = 1234
@@ -376,8 +386,8 @@ class ASEPredictor:
             "meta_log2FC_mean", "log2FC_var", "log2FC_mean", "pval_tt_log2FC",
             "pval_tt_log2FC_adj", "pval_st_log2FC", "pval_st_log2FC_adj",
             "meta_FC_Mean", "FC_var", "FC_mean", "pval_tt_FC", "pval_tt_FC_adj",
-            "pval_st_FC", "pval_st_FC_adj", "group_size", 'mirSVR.Score',
-            'mirSVR.E', 'mirSVR.Aln'
+            "pval_st_FC", "pval_st_FC_adj", "group_size", "mirSVR.Score",
+            "mirSVR.E", "mirSVR.Aln", "gnomad_AF", "Freq100bp"
         ]
         self.work_df = self.slice_data_frame(
             fltout=flt, cols=[], rows=[], keep=False
@@ -399,22 +409,18 @@ class ASEPredictor:
         )
 
         self.X, self.y = self.setup_xy(self.train_test_df, y_col='ASE')
-        self.train_test_slicer(test_size=0.1)
 
-        flt = 'group_size < 2'
-        self.validating_df = self.slice_data_frame(
-            fltout=flt, cols=cols_discarded, rows=[], keep=False
-        )
-        self.X_val, self.y_val = self.setup_xy(self.validating_df, y_col='ASE')
+        # flt = 'group_size < 2'
+        # self.validating_df = self.slice_data_frame(
+            # fltout=flt, cols=cols_discarded, rows=[], keep=False
+        # )
+        # self.X_val, self.y_val = self.setup_xy(self.validating_df, y_col='ASE')
 
         self.setup_pipeline(
             estimators=self.estimators_list, multi_class=multiclass
         )
 
-        # self.grid_search_opt(self.pipeline, **self.grid_search_opt_params)
-        self.random_search_opt(self.pipeline, **self.random_search_opt_params)
-        self.training_reporter()
-        self.draw_figures()
+        self.k_fold_stratified_validation()
 
     @staticmethod
     def set_seed(sed=None):
@@ -713,30 +719,6 @@ class ASEPredictor:
         y_col = copy.deepcopy(dataframe.loc[:, y_col])
         return (X_cols, y_col)
 
-    def feature_pre_selection_by_spearman(self, drop_list=[], target=None,
-                                          pvalue_threshhold=0.1):
-        """Drop features with low correlation to target variables."""
-        if target is None:
-            target = self.y
-
-        if not isinstance(drop_list, (list, tuple)):
-            raise TypeError("drop_list should be list, tuple")
-
-        candidates_pool = {}
-        feature_pool = self.work_df_info['columns']
-        for _, candidate in enumerate(feature_pool):
-            sm = spearmanr(self.work_df[candidate], target)
-            c = sm.correlation
-            p = sm.pvalue
-            if p <= pvalue_threshhold and candidate not in drop_list:
-                candidates_pool[candidate] = dict(pvalue=p, correlation=c)
-
-        with open('candidates.json', 'w') as json_f:
-            json.dump(candidates_pool, json_f, sort_keys=True, indent=4)
-
-        self.pre_selected_features = candidates_pool.keys()
-        self.slice_data_frame(cols=self.pre_selected_features)
-
     def train_test_slicer(self, **kwargs):
         """Set up training and testing data set by train_test_split"""
         (self.X_train, self.X_test,
@@ -842,13 +824,13 @@ class ASEPredictor:
         elif strategy == 'best':
             estimator = estimator.best_estimator_
         elif strategy == 'pipe':
-            pass
+            estimator.set_params(n_iter=3, cv=3, iid=False)
         else:
             raise Exception('Valid strategy, (None, \'best\', or \'pipe\')')
 
         train_sizes, train_scores, test_scores = learning_curve(
-            estimator, X=self.X, y=self.y, cv=10, n_jobs=1,
-            train_sizes=np.linspace(.1, 1., 10), **kwargs
+            estimator, X=self.X, y=self.y, cv=3,
+            train_sizes=np.linspace(.1, 1., 20), **kwargs
         )
 
         train_scores_mean = np.mean(train_scores, axis=1)
@@ -862,7 +844,8 @@ class ASEPredictor:
         lower = train_scores_mean - train_scores_std
         ax_learning.fill_between(train_sizes, upper, lower, alpha=0.1)
         ax_learning.plot(
-            train_sizes, train_scores_mean, color='r', label='Training score'
+            train_sizes, train_scores_mean, color='r', 
+            label='Training score(precision)'
         )
 
         upper = test_scores_mean + test_scores_std
@@ -870,102 +853,151 @@ class ASEPredictor:
         ax_learning.fill_between(train_sizes, upper, lower, alpha=0.1)
         ax_learning.plot(
             train_sizes, test_scores_mean, color='g',
-            label='Cross-validation score'
+            label='Cross-validation score(precision)'
         )
 
         ax_learning.set(
-            title='Learning curve', xlabel='Training examples', ylabel='Score'
+            title='Learning curve',
+            xlabel='Training examples', ylabel='Score(precision)'
         )
         ax_learning.legend(loc='best')
 
         prefix = 'learning_curve_' + model_index
         fig.savefig(make_file_name(prefix=prefix, suffix='png'))
 
-    @timmer
-    def draw_roc_curve(self, estimator, model_index, **kwargs):
-        """Draw ROC curve for test and validate data set"""
-        fig, ax_roc = plt.subplots(figsize=(10, 10))
+    def k_fold_stratified_validation(self, multiclass=False, cv=3, **kwargs):
+        """K-fold stratified validation by StratifiedKFold from scikit-learn"""
 
-        self.y_test_pred_prob = estimator.predict_proba(self.X_test)[:, 1]
-        fp, tp, _ = roc_curve(self.y_test, self.y_test_pred_prob)
-        roc_area = auc(fp, tp)
-        sample_size = self.y_test.shape[0]
-        ax_roc.plot(
-            fp, tp, color='r',
-            label=' '.join([
-                'Testing:',
-                'area={:.3f}, sample_size={}'.format(roc_area, sample_size)
-            ])
+        skf = StratifiedKFold(n_splits=cv, **kwargs)
+        self.setup_pipeline(
+            estimators=self.estimators_list, multi_class=multiclass
         )
 
-        # if there is a validating data set
-        if self.X_val is not None:
-            self.y_val_pred_prob = estimator.predict_proba(self.X_val)[:, 1]
-            fp, tp, _ = roc_curve(self.y_val, self.y_val_pred_prob)
-            roc_area = auc(fp, tp)
-            sample_size = self.y_val.shape[0]
-            ax_roc.plot(
-                fp, tp, color='g', 
-                label=' '.join([
-                    'Validating:',
-                    'area={:.3f}, sample_size={}'.format(roc_area, sample_size)
-                ])
+        auc_fpr_tpr_pool = []
+        feature_pool = {}
+        for idx, (train_idx, test_idx) in enumerate(skf.split(self.X, self.y)):
+            self.X_train = self.X.iloc[train_idx]
+            self.X_test = self.X.iloc[test_idx]
+            self.y_train = self.y.iloc[train_idx]
+            self.y_test = self.y.iloc[test_idx]
+
+            self.random_search_opt(
+                self.pipeline,
+                **self.random_search_opt_params
             )
 
-        ax_roc.set(
-            xlabel='False positive rage', ylabel='True positive rate',
-            title='ROC curve'
-        )
-        ax_roc.legend(loc='best')
+            y_test_pred_prob = self.rsf.predict_proba(self.X_test)[:, 1]
+            fpr, tpr, _ = roc_curve(self.y_test, y_test_pred_prob)
+            roc_auc = auc(fpr, tpr)
+            auc_fpr_tpr_pool.append([roc_auc, fpr, tpr])
 
-        prefix = 'roc_curve_' + model_index
-        fig.savefig(make_file_name(prefix=prefix, suffix='png'))
+            ftr_slc_est = self.rsf.best_estimator_.steps[0][-1]
+            slc_ftr_idc = ftr_slc_est.get_support(True)
+            rfc_ftr_ipt = self.rsf.best_estimator_.steps[-1][-1]
+            rfc_ftr_ipt = rfc_ftr_ipt.feature_importances_
+            ftr_nms = self.X_train.columns[slc_ftr_idc]
+            for name, importance in zip(ftr_nms, rfc_ftr_ipt):
+                if name in feature_pool:
+                    feature_pool[name][idx] = importance
+                else:
+                    feature_pool[name] = [0] * cv
+                    feature_pool[name][0] = importance
 
-    @timmer
-    def draw_k_main_features(self, estimator, model_index, k=20, **kwargs):
-        """Draw feature importance for the model"""
-        ftr_slc_est = estimator.best_estimator_.steps[0][-1]
-        slc_ftr_idc = ftr_slc_est.get_support(True)
+        draw_roc_curve_cv(auc_fpr_tpr_pool)
+        draw_k_main_features_cv(feature_pool)
 
-        rfc_ftr_ipt = estimator.best_estimator_.steps[-1][-1]
-        rfc_ftr_ipt = rfc_ftr_ipt.feature_importances_
-
-        ftr_nms = self.X_train.columns[slc_ftr_idc]
-        ftr_ipt_mtx = list(zip(ftr_nms, rfc_ftr_ipt))
-
-        ftr_ipt_mtx = sorted(ftr_ipt_mtx, key=lambda x: -x[-1])
-        ftr_ipt_mtx = ftr_ipt_mtx[:k]
-
-        rfc_ftr_ipt = [x[-1] for x in ftr_ipt_mtx]
-        ftr_nms = [x[0] for x in ftr_ipt_mtx]
-
-        fig, ax_features = plt.subplots(figsize=(10, 10))
-        ax_features.bar(ftr_nms, rfc_ftr_ipt)
-
-        ax_features.set_xticklabels(
-            ftr_nms, rotation_mode='anchor', rotation=45,
-            horizontalalignment='right'
-        )
-        ax_features.set(
-            title='Feature importances', xlabel='Features', ylabel='Importance'
+        self.training_reporter()
+        self.draw_learning_curve(
+            self.rsf, model_index='random', strategy="pipe"
         )
 
-        prefix = 'feature_importance_' + model_index
-        fig.savefig(make_file_name(prefix=prefix, suffix='png'))
+@timmer
+def draw_k_main_features_cv(feature_pool, first_k=20, model_index="random"):
+    """Draw feature importance for the model with cross-validation"""
+    name_mean_std_pool = []
+    for name, importances in feature_pool.items():
+        mean = np.mean(importances)
+        std = np.std(importances, ddof=1)
+        name_mean_std_pool.append([name, mean, std])
 
-    @timmer
-    def draw_figures(self, **kwargs):
-        """Draw learning curve, ROC curve, and feature importance bar graph"""
-        model_indexs = {0: 'grid', 1: 'random'}
-        for index, estimator in enumerate([self.rsf, self.gsf]):
-            if estimator is None:
-                continue
+    name_mean_std_pool = sorted(name_mean_std_pool, key=lambda x: -x[1])
 
-            model_index = model_indexs[index]
-            self.draw_roc_curve(estimator, model_index)
-            self.draw_k_main_features(estimator, model_index)
-            self.draw_learning_curve(estimator, model_index, strategy="pipe")
+    name_pool, mean_pool, std_pool = [], [], []
+    for name, mean, std in name_mean_std_pool[:first_k]:
+        name_pool.append(name)
+        mean_pool.append(mean)
+        std_pool.append(std)
 
+    fig, ax_features = plt.subplots(figsize=(10, 10))
+    ax_features.bar(name_pool, mean_pool, yerr=std_pool)
+    ax_features.set_xticklabels(
+        name_pool, rotation_mode='anchor', rotation=45,
+        horizontalalignment='right'
+    )
+    ax_features.set(
+        title="Feature importances(with stand deviation as error bar)",
+        xlabel='Feature name', ylabel='Importance'
+    )
+
+    prefix = 'feature_importance_' + model_index
+    fig.savefig(make_file_name(prefix=prefix, suffix='png'))
+
+
+@timmer
+def draw_roc_curve_cv(auc_fpr_tpr_pool, model_index='random'):
+    """Draw ROC curve with cross-validation"""
+    fig, ax_roc = plt.subplots(figsize=(10, 10))
+    auc_pool, fpr_pool, tpr_pool = [], [], []
+    space_len = 0
+    for auc, fpr, tpr in auc_fpr_tpr_pool:
+        auc_pool.append(auc)
+        fpr_pool.append(fpr)
+        tpr_pool.append(tpr)
+
+        if len(fpr) > space_len:
+            space_len = len(fpr)
+
+    lspace = np.linspace(0, 1, space_len)
+    interp_fpr_pool, interp_tpr_pool = [], []
+    for fpr, tpr in zip(fpr_pool, tpr_pool):
+        fpr_interped = interp(lspace, fpr, fpr)
+        fpr_interped[0], fpr_interped[-1] = 0, 1
+        interp_fpr_pool.append(fpr_interped)
+
+        tpr_interped = interp(lspace, tpr, fpr)
+        tpr_interped[0], tpr_interped[-1] = 0, 1
+        interp_tpr_pool.append(tpr_interped)
+
+    for fpr, tpr in zip(interp_fpr_pool, interp_tpr_pool):
+        ax_roc.plot(fpr, tpr, lw=0.5)
+
+    fpr_mean = np.mean(interp_fpr_pool, axis=0)
+    fpr_std = np.std(interp_fpr_pool, axis=0)
+    tpr_mean = np.mean(interp_tpr_pool, axis=0)
+    tpr_std = np.std(interp_tpr_pool, axis=0)
+
+    # A 95% confidence interval for the mean of AUC by Bayesian mvs
+    mean, *_ = stats.bayes_mvs(auc_pool)
+    auc_mean, (auc_min, auc_max) = mean.statistic, mean.minmax
+
+    ax_roc.plot(
+        fpr_mean, tpr_mean, color="r", lw=2,
+        label="Mean: AUC={:0.3}, [{:0.3}, {:0.3}]".format(
+            auc_mean, auc_min, auc_max
+        )
+    )
+
+    mean_upper = np.minimum(tpr_mean + tpr_std, 1)
+    mean_lower = np.maximum(tpr_mean - tpr_std, 0)
+    ax_roc.fill_between(
+        fpr_mean, mean_upper, mean_lower, color='green', alpha=0.1,
+        label="Standard deviation"
+    )
+
+    ax_roc.legend(loc="best")
+
+    prefix = 'roc_curve_cv_' + model_index
+    fig.savefig(make_file_name(prefix=prefix, suffix='png'))
 
 def save_ap_obj(ob, file_name=None):
     """Save ASEPredictor instance by pickle"""
