@@ -23,6 +23,9 @@
 # Ignore all starting with _
 **/_*
 
+# Ignore all backup dirs
+**/backup
+
 # Ignore pycharm project directory
 .idea/
 
