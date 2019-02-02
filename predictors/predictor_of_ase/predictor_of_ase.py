@@ -21,81 +21,59 @@ TODO:
 
 import os
 import copy
-import json
 import time
 import pickle
-import statistics
 
-from collections import defaultdict
 from functools import wraps
-from sys import stderr
-from sys import stdout
+from sys import stderr, stdout
 
 # numpy
-import numpy as np
+import numpy
 from numpy import dtype
 
 # pandas
-import pandas as pd
+import pandas
 from pandas import DataFrame
 
 # scipy
-import scipy
-from scipy import stats
-from scipy import interp
+from scipy import stats, interp
 
 # scikit-learn modules
-from sklearn.feature_selection import mutual_info_classif
-from sklearn.feature_selection import SelectKBest
-from sklearn.model_selection import RandomizedSearchCV
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import learning_curve
-from sklearn.model_selection import GridSearchCV
+from sklearn.feature_selection import mutual_info_classif, SelectKBest
 from sklearn.preprocessing import LabelEncoder
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import precision_score
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import make_scorer
-from sklearn.metrics import roc_curve
-from sklearn.metrics import auc
-
-# from sklearn.feature_selection import SelectFromModel
-# from sklearn.preprocessing import RobustScaler
-# from sklearn.preprocessing import StandardScaler
-# from sklearn.preprocessing import Normalizer
-# from sklearn.pipeline import FeatureUnion
-# from sklearn.ensemble import AdaBoostClassifier
-# from sklearn.metrics import roc_auc_score
-# from sklearn.impute import SimpleImputer
-# from sklearn.impute import MissingIndicator
+from sklearn.metrics import (precision_score, accuracy_score, make_scorer,
+                             roc_curve, auc)
+from sklearn.model_selection import (RandomizedSearchCV, train_test_split,
+                                     StratifiedKFold, learning_curve)
 
 # maplotlib as visualization modules
-import matplotlib as mpl
-mpl.use('Agg')
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # global variables
-time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
+TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
 def timmer(func):
     """Print the runtime of the decorated function
 
     Args:
         func (callable): function to be decoreated
-    Returns: None
     """
-
     @wraps(func)
     def wrapper_timmer(*args, **kwargs):
         start_time = time.perf_counter()
         value = func(*args, **kwargs)
-        fn = func.__name__
-        rt = time.perf_counter() - start_time
-        #  st = time.perf_counter()
-        stderr.write('{} is done; elapsed: {:.5f} secs\n'.format(fn, rt))
+        function_name = func.__name__
+        elapsed_time = time.perf_counter() - start_time
+        stderr.write(
+            '{} is done; elapsed: {:.5f} secs\n'.format(
+                function_name, elapsed_time
+            )
+        )
         return value
 
     return wrapper_timmer
@@ -103,8 +81,8 @@ def timmer(func):
 
 def make_time_stamp():
     """Setup time stamp for the package"""
-    global time_stamp
-    time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
+    global TIME_STAMP
+    TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
 
 def make_file_name(file_name=None, prefix=None, suffix=None, _time_stamp=None):
@@ -124,8 +102,8 @@ def make_file_name(file_name=None, prefix=None, suffix=None, _time_stamp=None):
             The created filename.
     """
     if _time_stamp is None:
-        global time_stamp
-        _time_stamp = time_stamp
+        global TIME_STAMP
+        _time_stamp = TIME_STAMP
 
     if file_name is None:
         file_name = _time_stamp
@@ -165,7 +143,7 @@ class Config:
     """Config module for the ASEPredictor
 
 A class to configure the ASEPredictor class. You can use the default
-configuration by using arrtibutes estimators_list, grid_search_opt_params, and
+configuration by using arrtibutes estimators_list, and
 random_search_opt_params. You can also load your own configurations by
 laod_config(YOUR-FILE-NAME), but please note it will covert the current
 configurations(`set_default` will get you back to the default configs).
@@ -173,17 +151,15 @@ configurations(`set_default` will get you back to the default configs).
     Attributes:
         estimators_list (list): compulsory, no default
             A list of 2D-tuple, where tuple is (NAME, sklearn_estimator)
-        grid_search_opt_params (defaultdict): compulsory, default defaultdict()
-            A `defaultdict` from built-in `collections` module
-        random_search_opt_params (defaultdict): options, default defaultdict()
-            A `defaultdict` form built-in `collections` module
+        random_search_opt_params (dict): options, default dict()
+            A `dict` form built-in `collections` module
 
     Methods:
         set_default(self):
         get_configs(self):
         set_configs(self, **kwargs):
-        dump_config(self, fn=None): dump configurations into a pickle file
-        load_config(self, fn=None)
+        dump_config(self, file_name=None): dump configurations into a pickle file
+        load_config(self, file_name=None)
 
     Examples:
         >>> import Config
@@ -195,8 +171,7 @@ configurations(`set_default` will get you back to the default configs).
     def __init__(self):
         """Initializing configuration metrics"""
         self.estimators_list = None
-        self.grid_search_opt_params = defaultdict(None)
-        self.random_search_opt_params = defaultdict(None)
+        self.random_search_opt_params = {}
 
         self.set_default()
         self.config_file_name = make_file_name(prefix='config', suffix='pkl')
@@ -230,29 +205,10 @@ configurations(`set_default` will get you back to the default configs).
             accuracy=make_scorer(accuracy_score)
         )
 
-        self.grid_search_opt_params.update(
-            dict(
-                cv=5,
-                n_jobs=-1,  # Use all cores
-                iid=False,
-                refit="precision",
-                scoring=scoring_dict,
-                param_grid=dict(
-                    feature_selection__score_func=[mutual_info_classif],
-                    feature_selection__k=list(range(15, 81, 2)),
-                    rfc__n_estimators=list(range(50, 501, 20)),
-                    rfc__max_depth=list(range(50, 111, 10)),
-                    rfc__min_samples_split=[4, 6, 8, 10, 12],
-                    rfc__min_samples_leaf=[2, 4, 6, 8],
-                    rfc__bootstrap=[True, False]
-                ),
-                return_train_score=True,  # to suppress a warning
-            )
-        )
         self.random_search_opt_params.update(
             dict(
                 cv=5,
-                n_jobs=-1,  # Use all cores
+                n_jobs=8,  # Use all cores
                 n_iter=15,
                 iid=False,
                 refit="precision",
@@ -273,45 +229,42 @@ configurations(`set_default` will get you back to the default configs).
     def get_configs(self):
         """Get current configs"""
         return {'estimators': self.estimators_list,
-                'grid_search_parameters': self.grid_search_opt_params,
                 'random_search_parameters': self.random_search_opt_params
                 }
 
-    def set_configs(self, **kwargs):  # TODO: to finish this method
+    def set_configs(self, **kwargs):
         """Set configs"""
 
-    def dump_configs(self, fn=None):
+    def dump_configs(self, file_name=None):
         """Write the config into a file to make life easier.
 
         Args:
-            fn (str or None): optional; default None
+            file_name (str or None): optional; default None
         """
         config_dict = {
             'estimators': self.estimators_list,
-            'gs_params': self.grid_search_opt_params,
             'rs_params': self.random_search_opt_params
         }
 
-        with open(fn, 'wb') as fnh:
-            pickle.dump(config_dict, fnh)
+        with open(file_name, 'wb') as file_handler:
+            pickle.dump(config_dict, file_handler)
 
-    def load_configs(self, fn=None):
+    def load_configs(self, file_name=None):
         """Load saved config into memory
 
         Args:
-            fn (str or None): compulsory; default None
+            file_name (str or None): compulsory; default None
         Raises:
-            IOError: when argument fn is None, raise IOError.
+            IOError: when argument file_name is None, raise IOError.
         """
 
-        if fn is None:
+        if file_name is None:
             raise IOError('Need input file name')
 
-        with open(fn, 'rb') as fh:
-            config_dict = pickle.load(fh)
+        with open(file_name, 'rb') as file_handler:
+            config_dict = pickle.load(file_handler)
 
         self.estimators_list = config_dict['estimators']
-        self.grid_search_opt_params = config_dict['gs_params']
         self.random_search_opt_params = config_dict['rs_params']
 
 
@@ -338,41 +291,32 @@ class ASEPredictor:
 
         config = Config()
         self.estimators_list = config.estimators_list
-        self.grid_search_opt_params = config.grid_search_opt_params
         self.random_search_opt_params = config.random_search_opt_params
 
         self.raw_df = None
         self.work_df = None
-        self.raw_df_info = defaultdict(None)
-        self.work_df_info = defaultdict(None)
+        self.raw_df_info = {}
+        self.work_df_info = {}
 
         self.train_test_df = None
-        self.validating_df = None
-        self.X_val = None
-        self.y_val = None
 
-        self.X = None
-        self.y = None
+        self.x_vars = None
+        self.y_var = None
 
-        self.X_train = None
+        self.x_train = None
         self.y_train = None
-        self.X_test = None
+        self.x_test = None
         self.y_test = None
-
-        self.y_pred = None
 
         self.pipeline = None
 
-        self.grid_search = None
-        self.gsf = None
-
         self.random_search = None
-        self.rsf = None
+        self.random_search_fitted = None
 
     @timmer
     def run(self):
         """Execute a pre-designed construct pipeline"""
-        limit = 500
+        limit = None
         self.raw_df = self.read_file_to_dataframe(nrows=limit)
 
         sed = 1234
@@ -387,7 +331,7 @@ class ASEPredictor:
             "pval_tt_log2FC_adj", "pval_st_log2FC", "pval_st_log2FC_adj",
             "meta_FC_Mean", "FC_var", "FC_mean", "pval_tt_FC", "pval_tt_FC_adj",
             "pval_st_FC", "pval_st_FC_adj", "group_size", "mirSVR.Score",
-            "mirSVR.E", "mirSVR.Aln", "gnomad_AF", "Freq100bp"
+            "mirSVR.E", "mirSVR.Aln"
         ]
         self.work_df = self.slice_data_frame(
             fltout=flt, cols=[], rows=[], keep=False
@@ -397,8 +341,9 @@ class ASEPredictor:
         # change into binary classification.
         # need to change setup_pipeline multi_class into False
         multiclass = False
+        y_col = 'ASE'
         if not multiclass:
-            self.work_df.ASE = self.work_df.ASE.apply(abs)
+            self.work_df[y_col] = self.work_df[y_col].apply(abs)
 
         self.simple_imputer()
         self.label_encoder(remove=False)
@@ -408,7 +353,7 @@ class ASEPredictor:
             fltout=flt, cols=cols_discarded, rows=[], keep=False
         )
 
-        self.X, self.y = self.setup_xy(self.train_test_df, y_col='ASE')
+        self.x_vars, self.y_var = self.setup_xy(self.train_test_df, y_col=y_col)
 
         # flt = 'group_size < 2'
         # self.validating_df = self.slice_data_frame(
@@ -419,16 +364,17 @@ class ASEPredictor:
         self.setup_pipeline(
             estimators=self.estimators_list, multi_class=multiclass
         )
-
         self.k_fold_stratified_validation()
+        self.training_reporter()
+        self.draw_learning_curve(self.random_search_fitted, strategy="pipe")
 
     @staticmethod
     def set_seed(sed=None):
         """Set the random seed of numpy"""
         if sed:
-            np.random.seed(sed)
+            numpy.random.seed(sed)
         else:
-            np.random.seed(1234)
+            numpy.random.seed(1234)
 
     @staticmethod
     def check_keys(pool_a, pool_b):
@@ -457,31 +403,31 @@ class ASEPredictor:
         """Read input file into pandas DataFrame."""
         file_name = self.input_file_name
         try:
-            file_handle = open(file_name)
-        except PermissionError as e:
-            stderr.write('File IO error: ', e)
+            file_handler = open(file_name)
+        except PermissionError as err:
+            stderr.write('File IO error: ', err)
             return None
         else:
-            with file_handle:
-                return pd.read_table(file_handle, nrows=nrows)
+            with file_handler:
+                return pandas.read_table(file_handler, nrows=nrows)
 
-    def check_df(self, df='work_df'):
+    def check_df(self, dataframe='work_df'):
         """Check the sanity of input DataFrame.
 
         Args:
-            df (str): the data frame to be checked
+            dataframe (str): the data frame to be checked
         Raises:
             TypeError:
             ValueError:
         """
-        if df == 'work_df':
+        if dataframe == 'work_df':
             if not isinstance(self.work_df, DataFrame):
                 raise TypeError('Input was not a DataFrame of Pandas')
-        elif df == 'raw_df':
+        elif dataframe == 'raw_df':
             if not isinstance(self.raw_df, DataFrame):
                 raise TypeError('Input was not a DataFrame of Pandas')
         else:
-            raise ValueError('Unknown DataFrame {}...'.format(df))
+            raise ValueError('Unknown DataFrame {}...'.format(dataframe))
 
     def update_work_dataframe_info(self):
         """Update the information of working dataframe after modifying it"""
@@ -505,8 +451,7 @@ class ASEPredictor:
         self.setup_raw_dataframe_info()
         self.update_work_dataframe_info()
 
-    def slice_data_frame(self, rows=None, cols=None, keep=False, fltout=None,
-                         ax=1):
+    def slice_data_frame(self, rows=None, cols=None, keep=False, fltout=None):
         """Slice the DataFrame base on rows and cols.
 
         Args:
@@ -526,8 +471,6 @@ class ASEPredictor:
                 `apply` method of DataFrame will be used; if it's a `str`
                 object, `query` method will be called; otherwise, if it's
                 `None`, no filter will be applied.
-            ax (0, 1): optional, default 1
-                Axis along which the flt is applied. 0 for rows, 1 for column.
         """
         self.check_df()
 
@@ -543,7 +486,7 @@ class ASEPredictor:
             result_df = copy.deepcopy(self.work_df.query(fltout))
         elif callable(fltout):
             result_df = copy.deepcopy(
-                self.work_df[self.work_df.apply(fltout, axis=ax)]
+                self.work_df[self.work_df.apply(fltout, axis=1)]
             )
         else:
             result_df = copy.deepcopy(self.work_df)
@@ -588,9 +531,9 @@ class ASEPredictor:
             if skip in target_cols:
                 target_cols.remove(skip)
         elif isinstance(skip, (list, tuple)):
-            for s in skip:
+            for skipped in skip:
                 if skip in target_cols:
-                    target_cols.remove(s)
+                    target_cols.remove(skipped)
                 else:
                     stderr.write('{} isn\'t in list...'.format(skip))
         elif skip is not None:
@@ -599,16 +542,18 @@ class ASEPredictor:
         target_cols_encoded = [n + '_encoded' for n in target_cols]
 
         encoder = LabelEncoder()
-        for cn, cne in zip(target_cols, target_cols_encoded):
+        for col_tag, col_tag_encoded in zip(target_cols, target_cols_encoded):
             if remove is True:
-                del self.work_df[cn]
+                del self.work_df[col_tag]
                 continue
 
             try:
-                self.work_df[cne] = encoder.fit_transform(self.work_df[cn])
-                del self.work_df[cn]
-            except Exception as e:
-                print(e, file=stderr)
+                self.work_df[col_tag_encoded] = encoder.fit_transform(
+                    self.work_df[col_tag]
+                )
+                del self.work_df[col_tag]
+            except ValueError as err:
+                print(err, file=stderr)
 
         self.update_work_dataframe_info()
 
@@ -687,7 +632,7 @@ class ASEPredictor:
             'dbscSNV.ada_score': 0, 'dbscSNV.rf_score': 0
         }
 
-        to_replace_list = np.NaN
+        to_replace_list = numpy.NaN
 
         self.work_df = self.work_df.replace(
             to_replace_list, impute_values_dict
@@ -715,15 +660,15 @@ class ASEPredictor:
             if y_col in x_cols:
                 raise ValueError('Target column is in predictor columns')
 
-        X_cols = copy.deepcopy(dataframe.loc[:, x_cols])
-        y_col = copy.deepcopy(dataframe.loc[:, y_col])
-        return (X_cols, y_col)
+        x_cols_dataframe = copy.deepcopy(dataframe.loc[:, x_cols])
+        y_col_series = copy.deepcopy(dataframe.loc[:, y_col])
+        return (x_cols_dataframe, y_col_series)
 
     def train_test_slicer(self, **kwargs):
         """Set up training and testing data set by train_test_split"""
-        (self.X_train, self.X_test,
+        (self.x_train, self.x_test,
          self.y_train, self.y_test
-        ) = train_test_split(self.X, self.y, **kwargs)
+        ) = train_test_split(self.x_vars, self.y_var, **kwargs)
 
     def setup_pipeline(self, estimators=None, multi_class=False):
         """Setup a training pipeline
@@ -736,24 +681,6 @@ class ASEPredictor:
             self.pipeline = OneVsOneClassifier(Pipeline(estimators))
         else:
             self.pipeline = Pipeline(estimators)
-
-    @timmer
-    def grid_search_opt(self, estimator=None, **kwargs):
-        """Hyper-parameters optimization by GridSearchCV
-
-        Strategy 1. Exhaustive grid search
-
-        Args:
-            estimator (estimator): compulsory; scikit-learn estimator object
-                Machine learning algorithm to be used
-            **kwargs: optional, keyword argument
-                Any keyword argument suitable
-        """
-        if estimator is None:
-            estimator = self.pipeline
-
-        self.grid_search = GridSearchCV(estimator=estimator, **kwargs)
-        self.gsf = self.grid_search.fit(self.X_train, self.y_train)
 
     @timmer
     def random_search_opt(self, estimators=None, **kwargs):
@@ -771,49 +698,40 @@ class ASEPredictor:
             estimators = self.pipeline
 
         self.random_search = RandomizedSearchCV(estimators, **kwargs)
-        self.rsf = self.random_search.fit(self.X_train, self.y_train)
+        self.random_search_fitted = self.random_search.fit(self.x_train, self.y_train)
 
     @timmer
     def training_reporter(self):
         """Report the training information"""
-        model_index = {0: 'grid', 1: 'random'}
+        format_print('Work dataframe information', self.work_df_info)
+        format_print('Params', self.random_search_fitted.get_params())
+        format_print('Scorer', self.random_search_fitted.scorer_)
+        format_print('Best estimators', self.random_search_fitted.best_estimator_)
+        format_print('Best params', self.random_search_fitted.best_params_)
+        format_print('Best score', self.random_search_fitted.best_score_)
+        format_print('Best index', self.random_search_fitted.best_index_)
 
-        for index, fitted_model in enumerate([self.gsf, self.rsf]):
-            if fitted_model is None:
-                continue
+        prefix = 'cross_validation_random'
+        cv_result_file_name = make_file_name(
+            file_name='training', prefix=prefix, suffix='tvs'
+        )
 
-            # working dataframe information
-            format_print('Work dataframe information', self.work_df_info)
-            format_print('Params', fitted_model.get_params())
-            format_print('Scorer', fitted_model.scorer_)
-            format_print('Best estimators', fitted_model.best_estimator_)
-            format_print('Best params', fitted_model.best_params_)
-            format_print('Best score', fitted_model.best_score_)
-            format_print('Best index', fitted_model.best_index_)
+        cv_results = self.random_search_fitted.cv_results_
+        with open(cv_result_file_name, 'w') as cvof:
+            tmp_data_frame = pandas.DataFrame(cv_results)
+            tmp_data_frame.to_csv(cvof, sep='\t')
 
-            prefix = 'cross_validation_' + model_index[index]
-            cv_result_fn = make_file_name(
-                file_name='training', prefix=prefix, suffix='tvs')
+        format_print('Cross-validation results', cv_result_file_name)
 
-            cv_results = fitted_model.cv_results_
-            with open(cv_result_fn, 'w') as cvof:
-                tmp_data_frame = pd.DataFrame(cv_results)
-                tmp_data_frame.to_csv(cvof, sep='\t')
-
-            format_print('Cross-validation results', cv_result_fn)
-
-            self.y_pred = fitted_model.predict(self.X_test)
-            fitted_model_score = fitted_model.score(self.X_test, self.y_test)
-            format_print('Model score', fitted_model_score)
+        model_score = self.random_search_fitted.score(self.x_test, self.y_test)
+        format_print('Model score', model_score)
 
     @timmer
-    def draw_learning_curve(
-            self, estimator, model_index, strategy=None, **kwargs):
+    def draw_learning_curve(self, estimator, strategy=None, **kwargs):
         """Draw the learning curve of specific estimator or pipeline
 
         Args:
             estimator (sklearn estimators): compulsary
-            model_index (string): compulsary
             strategy (str or None): optional, default None
             **kwargs: optional; default empty
                 Keyword arguments for learning_curve from scikit-learn
@@ -829,28 +747,34 @@ class ASEPredictor:
             raise Exception('Valid strategy, (None, \'best\', or \'pipe\')')
 
         train_sizes, train_scores, test_scores = learning_curve(
-            estimator, X=self.X, y=self.y, cv=3,
-            train_sizes=np.linspace(.1, 1., 20), **kwargs
+            estimator, X=self.x_vars, y=self.y_var, cv=3, n_jobs=None,
+            train_sizes=numpy.linspace(.1, 1., 20), **kwargs
         )
 
-        train_scores_mean = np.mean(train_scores, axis=1)
-        train_scores_std = np.std(train_scores, axis=1)
-        test_scores_mean = np.mean(test_scores, axis=1)
-        test_scores_std = np.std(test_scores, axis=1)
+        train_scores_mean = numpy.mean(train_scores, axis=1)
+        train_scores_std = numpy.std(train_scores, axis=1)
+        test_scores_mean = numpy.mean(test_scores, axis=1)
+        test_scores_std = numpy.std(test_scores, axis=1)
 
         fig, ax_learning = plt.subplots(figsize=(10, 10))
 
-        upper = train_scores_mean + train_scores_std
-        lower = train_scores_mean - train_scores_std
-        ax_learning.fill_between(train_sizes, upper, lower, alpha=0.1)
+        ax_learning.fill_between(
+            train_sizes,
+            train_scores_mean + train_scores_std,
+            train_scores_mean - train_scores_std,
+            alpha=0.1
+        )
         ax_learning.plot(
-            train_sizes, train_scores_mean, color='r', 
+            train_sizes, train_scores_mean, color='r',
             label='Training score(precision)'
         )
 
-        upper = test_scores_mean + test_scores_std
-        lower = test_scores_mean - test_scores_std
-        ax_learning.fill_between(train_sizes, upper, lower, alpha=0.1)
+        ax_learning.fill_between(
+            train_sizes,
+            test_scores_mean + test_scores_std,
+            test_scores_mean - test_scores_std,
+            alpha=0.1
+        )
         ax_learning.plot(
             train_sizes, test_scores_mean, color='g',
             label='Cross-validation score(precision)'
@@ -862,62 +786,55 @@ class ASEPredictor:
         )
         ax_learning.legend(loc='best')
 
-        prefix = 'learning_curve_' + model_index
-        fig.savefig(make_file_name(prefix=prefix, suffix='png'))
-
-    def k_fold_stratified_validation(self, multiclass=False, cv=3, **kwargs):
-        """K-fold stratified validation by StratifiedKFold from scikit-learn"""
-
-        skf = StratifiedKFold(n_splits=cv, **kwargs)
-        self.setup_pipeline(
-            estimators=self.estimators_list, multi_class=multiclass
+        fig.savefig(
+            make_file_name(prefix='learning_curve_random', suffix='png')
         )
+
+    def k_fold_stratified_validation(self, cvs=3, **kwargs):
+        """K-fold stratified validation by StratifiedKFold from scikit-learn"""
+        skf = StratifiedKFold(n_splits=cvs, **kwargs)
 
         auc_fpr_tpr_pool = []
         feature_pool = {}
-        for idx, (train_idx, test_idx) in enumerate(skf.split(self.X, self.y)):
-            self.X_train = self.X.iloc[train_idx]
-            self.X_test = self.X.iloc[test_idx]
-            self.y_train = self.y.iloc[train_idx]
-            self.y_test = self.y.iloc[test_idx]
+        for idx, (train_idx, test_idx) in enumerate(skf.split(self.x_vars, self.y_var)):
+            self.x_train = self.x_vars.iloc[train_idx]
+            self.x_test = self.x_vars.iloc[test_idx]
+            self.y_train = self.y_var.iloc[train_idx]
+            self.y_test = self.y_var.iloc[test_idx]
 
             self.random_search_opt(
                 self.pipeline,
                 **self.random_search_opt_params
             )
 
-            y_test_pred_prob = self.rsf.predict_proba(self.X_test)[:, 1]
+            y_test_pred_prob = self.random_search_fitted.predict_proba(self.x_test)[:, 1]
             fpr, tpr, _ = roc_curve(self.y_test, y_test_pred_prob)
             roc_auc = auc(fpr, tpr)
             auc_fpr_tpr_pool.append([roc_auc, fpr, tpr])
 
-            ftr_slc_est = self.rsf.best_estimator_.steps[0][-1]
+            ftr_slc_est = self.random_search_fitted.best_estimator_.steps[0][-1]
             slc_ftr_idc = ftr_slc_est.get_support(True)
-            rfc_ftr_ipt = self.rsf.best_estimator_.steps[-1][-1]
+            rfc_ftr_ipt = self.random_search_fitted.best_estimator_.steps[-1][-1]
             rfc_ftr_ipt = rfc_ftr_ipt.feature_importances_
-            ftr_nms = self.X_train.columns[slc_ftr_idc]
+            ftr_nms = self.x_train.columns[slc_ftr_idc]
             for name, importance in zip(ftr_nms, rfc_ftr_ipt):
                 if name in feature_pool:
                     feature_pool[name][idx] = importance
                 else:
-                    feature_pool[name] = [0] * cv
+                    feature_pool[name] = [0] * cvs
                     feature_pool[name][0] = importance
 
         draw_roc_curve_cv(auc_fpr_tpr_pool)
         draw_k_main_features_cv(feature_pool)
 
-        self.training_reporter()
-        self.draw_learning_curve(
-            self.rsf, model_index='random', strategy="pipe"
-        )
 
 @timmer
-def draw_k_main_features_cv(feature_pool, first_k=20, model_index="random"):
+def draw_k_main_features_cv(feature_pool, first_k=20):
     """Draw feature importance for the model with cross-validation"""
     name_mean_std_pool = []
     for name, importances in feature_pool.items():
-        mean = np.mean(importances)
-        std = np.std(importances, ddof=1)
+        mean = numpy.mean(importances)
+        std = numpy.std(importances, ddof=1)
         name_mean_std_pool.append([name, mean, std])
 
     name_mean_std_pool = sorted(name_mean_std_pool, key=lambda x: -x[1])
@@ -939,42 +856,41 @@ def draw_k_main_features_cv(feature_pool, first_k=20, model_index="random"):
         xlabel='Feature name', ylabel='Importance'
     )
 
-    prefix = 'feature_importance_' + model_index
+    prefix = 'feature_importance_random_'
     fig.savefig(make_file_name(prefix=prefix, suffix='png'))
 
 
 @timmer
-def draw_roc_curve_cv(auc_fpr_tpr_pool, model_index='random'):
+def draw_roc_curve_cv(auc_fpr_tpr_pool):
     """Draw ROC curve with cross-validation"""
     fig, ax_roc = plt.subplots(figsize=(10, 10))
     auc_pool, fpr_pool, tpr_pool = [], [], []
     space_len = 0
-    for auc, fpr, tpr in auc_fpr_tpr_pool:
-        auc_pool.append(auc)
+    for auc_area, fpr, tpr in auc_fpr_tpr_pool:
+        auc_pool.append(auc_area)
         fpr_pool.append(fpr)
         tpr_pool.append(tpr)
 
         if len(fpr) > space_len:
             space_len = len(fpr)
 
-    lspace = np.linspace(0, 1, space_len)
+    lspace = numpy.linspace(0, 1, space_len)
     interp_fpr_pool, interp_tpr_pool = [], []
     for fpr, tpr in zip(fpr_pool, tpr_pool):
         fpr_interped = interp(lspace, fpr, fpr)
         fpr_interped[0], fpr_interped[-1] = 0, 1
         interp_fpr_pool.append(fpr_interped)
 
-        tpr_interped = interp(lspace, tpr, fpr)
+        tpr_interped = interp(lspace, fpr, tpr)
         tpr_interped[0], tpr_interped[-1] = 0, 1
         interp_tpr_pool.append(tpr_interped)
 
     for fpr, tpr in zip(interp_fpr_pool, interp_tpr_pool):
         ax_roc.plot(fpr, tpr, lw=0.5)
 
-    fpr_mean = np.mean(interp_fpr_pool, axis=0)
-    fpr_std = np.std(interp_fpr_pool, axis=0)
-    tpr_mean = np.mean(interp_tpr_pool, axis=0)
-    tpr_std = np.std(interp_tpr_pool, axis=0)
+    fpr_mean = numpy.mean(interp_fpr_pool, axis=0)
+    tpr_mean = numpy.mean(interp_tpr_pool, axis=0)
+    tpr_std = numpy.std(interp_tpr_pool, axis=0)
 
     # A 95% confidence interval for the mean of AUC by Bayesian mvs
     mean, *_ = stats.bayes_mvs(auc_pool)
@@ -987,8 +903,8 @@ def draw_roc_curve_cv(auc_fpr_tpr_pool, model_index='random'):
         )
     )
 
-    mean_upper = np.minimum(tpr_mean + tpr_std, 1)
-    mean_lower = np.maximum(tpr_mean - tpr_std, 0)
+    mean_upper = numpy.minimum(tpr_mean + tpr_std, 1)
+    mean_lower = numpy.maximum(tpr_mean - tpr_std, 0)
     ax_roc.fill_between(
         fpr_mean, mean_upper, mean_lower, color='green', alpha=0.1,
         label="Standard deviation"
@@ -996,17 +912,17 @@ def draw_roc_curve_cv(auc_fpr_tpr_pool, model_index='random'):
 
     ax_roc.legend(loc="best")
 
-    prefix = 'roc_curve_cv_' + model_index
+    prefix = 'roc_curve_cv_random'
     fig.savefig(make_file_name(prefix=prefix, suffix='png'))
 
-def save_ap_obj(ob, file_name=None):
+def save_ap_obj(obj, file_name=None):
     """Save ASEPredictor instance by pickle"""
     if file_name is None:
         file_name = 'ASEPre'
 
     pklf_name = make_file_name(file_name, prefix='training', suffix='pkl')
     with open(pklf_name, 'wb') as pklof:
-        pickle.dump(ob, pklof)
+        pickle.dump(obj, pklof)
 
 
 def load_asepredictor_obj(file_name):
@@ -1023,9 +939,9 @@ def main():
         'outputs', 'biosGavinOverlapCov10',
         'biosGavinOlCv10AntUfltCstLog2FCBin.tsv'
     )
-    ap = ASEPredictor(input_file)
-    ap.run()
-    save_ap_obj(ap)
+    asepredictor = ASEPredictor(input_file)
+    asepredictor.run()
+    save_ap_obj(asepredictor)
 
 
 if __name__ == '__main__':
