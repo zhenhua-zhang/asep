@@ -28,7 +28,7 @@ trans_into_bin <- function(rtb, cr, pv = 0.01){
     mutate(
       binom_p = binom.test(c(refCountsBios, altCountsBios))$p.value,
       FC = altCountsBios / refCountsBios,
-      log2FC = log2(altCountsBios / refCountsBios),
+      log2FC = log2(FC),
     ) %>%
     ungroup()
 
@@ -89,16 +89,33 @@ trans_into_bin <- function(rtb, cr, pv = 0.01){
         )
       ),
       pval_tt_FC_adj = p.adjust(pval_tt_FC),
+
+	  # Wilcoxon signed rank test for non-normal distritbuted FC=A/R
+      pval_wt_FC = ifelse(
+        length(FC) <= 2,
+        ifelse(FDRPerVariant <= 0.01 || abs(FC) >= 1, 0, 1),
+        ifelse(
+          max(FC) == min(FC),
+          ifelse(abs(max(FC)) > 1, 0, 1),
+          wilcox.test(FC, mu = meta_FC_mean[[1]])$p.value
+        )
+      ),
+	  pval_wt_FC_adj = p.adjust(pval_wt_FC),
     )
 
   cat("Mutate: ADD ASE ...\n")
   gp <- gp %>%
     ungroup() %>%
     mutate(
-       ASE_FC = ifelse(pval_tt_FC_adj <= 0.01, ifelse(log2FC_mean < 0, -1, 1), 0),
-       ASE_log2FC = ifelse(
-		   pval_tt_log2FC_adj <= 0.05, ifelse(log2FC_mean < 0, -1, 1), 0
-	   )
+      ASE_FC_tt = ifelse(
+	    pval_tt_FC_adj <= 0.01, ifelse(log2FC_mean < 0, -1, 1), 0
+	  ),
+      ASE_FC_wt = ifelse(
+	    pval_wt_FC_adj <= 0.01, ifelse(log2FC_mean < 0, -1, 1), 0
+      ),
+      ASE_log2FC_tt = ifelse(
+	    pval_tt_log2FC_adj <= 0.05, ifelse(log2FC_mean < 0, -1, 1), 0
+	  )
     )
 
   cat("SELECT, ARRANGE, DISTINCT, and Make dataframe ...\n")
@@ -135,7 +152,8 @@ rn <- c(
   colnames(rtb)[1:117], "meta_log2FC_mean", "log2FC_var", "log2FC_mean", 
   "pval_tt_log2FC", "pval_tt_log2FC_adj","pval_st_log2FC", 
   "pval_st_log2FC_adj", "meta_FC_Mean", "FC_var", "FC_mean", "pval_tt_FC", 
-  "pval_tt_FC_adj", "pval_st_FC", "pval_st_FC_adj", "group_size", "ASE"
+  "pval_tt_FC_adj", "pval_st_FC", "pval_st_FC_adj", "pval_wt_log2FC_adj", 
+  "pval_wt_log2FC", "group_size", "ASE_FC_tt", "ASE_FC_wt", "ASE_log2FC_tt"
  )
 odf <- trans_into_bin(rtb, rn)
 
