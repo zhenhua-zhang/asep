@@ -4,7 +4,7 @@ Allele-specific expression analysis
 Here is a allele-specific expression predictor.
 
 ## Background
-OO
+
 Allele-specific expression(ASE) is a phenomena that the abundance of allelic  
 copies from the same transcript are different. RNA sequencing gives a chance  
 to quantify the divergence between two alleles. 

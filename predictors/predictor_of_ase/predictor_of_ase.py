@@ -209,7 +209,7 @@ configurations(`set_default` will get you back to the default configs).
             dict(
                 cv=5,
                 n_jobs=8,  # Use all cores
-                n_iter=15,
+                n_iter=20,
                 iid=False,
                 refit="precision",
                 scoring=scoring_dict,
@@ -321,18 +321,9 @@ class ASEPredictor:
 
         sed = 1234
         self.set_seed(sed)
-
-        self.check_df('raw_df')
         self.setup_work_df()
 
         flt = None
-        cols_discarded = [
-            "meta_log2FC_mean", "log2FC_var", "log2FC_mean", "pval_tt_log2FC",
-            "pval_tt_log2FC_adj", "pval_st_log2FC", "pval_st_log2FC_adj",
-            "meta_FC_Mean", "FC_var", "FC_mean", "pval_tt_FC", "pval_tt_FC_adj",
-            "pval_st_FC", "pval_st_FC_adj", "group_size", "mirSVR.Score",
-            "mirSVR.E", "mirSVR.Aln"
-        ]
         self.work_df = self.slice_data_frame(
             fltout=flt, cols=[], rows=[], keep=False
         )
@@ -348,7 +339,8 @@ class ASEPredictor:
         self.simple_imputer()
         self.label_encoder(remove=False)
 
-        flt = 'group_size >= 5'
+        flt = None
+        cols_discarded = ["log2FC", "binom_p", "binom_p_adj", "group_size"]
         self.train_test_df = self.slice_data_frame(
             fltout=flt, cols=cols_discarded, rows=[], keep=False
         )
@@ -364,7 +356,7 @@ class ASEPredictor:
         self.setup_pipeline(
             estimators=self.estimators_list, multi_class=multiclass
         )
-        self.k_fold_stratified_validation()
+        self.k_fold_stratified_validation(cvs=2)
         self.training_reporter()
         self.draw_learning_curve(self.random_search_fitted, strategy="pipe")
 
@@ -411,24 +403,6 @@ class ASEPredictor:
             with file_handler:
                 return pandas.read_table(file_handler, nrows=nrows)
 
-    def check_df(self, dataframe='work_df'):
-        """Check the sanity of input DataFrame.
-
-        Args:
-            dataframe (str): the data frame to be checked
-        Raises:
-            TypeError:
-            ValueError:
-        """
-        if dataframe == 'work_df':
-            if not isinstance(self.work_df, DataFrame):
-                raise TypeError('Input was not a DataFrame of Pandas')
-        elif dataframe == 'raw_df':
-            if not isinstance(self.raw_df, DataFrame):
-                raise TypeError('Input was not a DataFrame of Pandas')
-        else:
-            raise ValueError('Unknown DataFrame {}...'.format(dataframe))
-
     def update_work_dataframe_info(self):
         """Update the information of working dataframe after modifying it"""
         self.work_df_info['shape'] = self.work_df.shape
@@ -472,8 +446,6 @@ class ASEPredictor:
                 object, `query` method will be called; otherwise, if it's
                 `None`, no filter will be applied.
         """
-        self.check_df()
-
         if not isinstance(keep, bool):
             raise TypeError('keep should be bool')
 
@@ -519,8 +491,6 @@ class ASEPredictor:
         Raises:
             TypeError:
         """
-        self.check_df()
-
         if target_cols is None:
             col_types = self.work_df.dtypes
             target_cols = [n for n, t in col_types.items() if t is dtype('O')]
@@ -629,7 +599,8 @@ class ASEPredictor:
             'Grantham': 0, 'Dist2Mutation': 0, 'Freq100bp': 0, 'Rare100bp': 0,
             'Sngl100bp': 0, 'Freq1000bp': 0, 'Rare1000bp': 0, 'Sngl1000bp': 0,
             'Freq10000bp': 0, 'Rare10000bp': 0, 'Sngl10000bp': 0,
-            'dbscSNV.ada_score': 0, 'dbscSNV.rf_score': 0
+            'dbscSNV.ada_score': 0, 'dbscSNV.rf_score': 0, "mirSVR.Score": 0,
+            "mirSVR.E": 0, "mirSVR.Aln": 0
         }
 
         to_replace_list = numpy.NaN
@@ -742,12 +713,12 @@ class ASEPredictor:
         elif strategy == 'best':
             estimator = estimator.best_estimator_
         elif strategy == 'pipe':
-            estimator.set_params(n_iter=3, cv=3, iid=False)
+            estimator.set_params(n_iter=10, cv=6, iid=False)
         else:
             raise Exception('Valid strategy, (None, \'best\', or \'pipe\')')
 
         train_sizes, train_scores, test_scores = learning_curve(
-            estimator, X=self.x_vars, y=self.y_var, cv=3, n_jobs=None,
+            estimator, X=self.x_vars, y=self.y_var, cv=2, n_jobs=8,
             train_sizes=numpy.linspace(.1, 1., 20), **kwargs
         )
 
@@ -909,7 +880,11 @@ def draw_roc_curve_cv(auc_fpr_tpr_pool):
         fpr_mean, mean_upper, mean_lower, color='green', alpha=0.1,
         label="Standard deviation"
     )
-
+    ax_roc.set(
+        title="ROC curve",
+        xlabel='False positive rate', ylabel='True positive rate'
+    )
+    ax_roc.plot([0, 1], color='grey', linestyle='--')
     ax_roc.legend(loc="best")
 
     prefix = 'roc_curve_cv_random'
@@ -935,9 +910,8 @@ def main():
     """Main function to run the module """
     make_time_stamp()
     input_file = os.path.join(
-        '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEpredictor',
-        'outputs', 'biosGavinOverlapCov10',
-        'biosGavinOlCv10AntUfltCstLog2FCBin.tsv'
+        "/home", "umcg-zzhang", "Documents", "projects", "ASEpredictor",
+        "outputs", "biosGavinOverlapCov10", "biosGavinOlCv10AntUfltCstBin.tsv"
     )
     asepredictor = ASEPredictor(input_file)
     asepredictor.run()

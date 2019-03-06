@@ -1,0 +1,1 @@
+- Path to genotypes: `/groups/umcg-bios/prm02/projects/BIOS_RNA/genotypeFromMergedGvcfs/genotypes`

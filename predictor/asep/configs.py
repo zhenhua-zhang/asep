@@ -2,10 +2,8 @@
 # -*- coding: utf-8 -*-
 """configs module"""
 
-# built-in modules
 import pickle
 
-# scikit-learn
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.feature_selection import SelectKBest
 from sklearn.ensemble import RandomForestClassifier
@@ -13,7 +11,6 @@ from sklearn.metrics import precision_score
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import make_scorer
 
-# utilities.py
 from .utilities import make_file_name
 
 
@@ -21,8 +18,8 @@ class Config:
     """configs module for the ASEPredictor
 
     A class to configure the ASEPredictor class. You can use the default
-    configuration by using attributes estimators_list, grid_search_opt_params,
-    and random_search_opt_params. You can also load your own configurations by
+    configuration by using attributes estimators_list, and
+    optim_params. You can also load your own configurations by
     load_config(YOUR-FILE-NAME), but please note it will covert the current
     configurations(`set_default` will get you back to the default configs). If
     you want change the default settings, please make a instance and modify it
@@ -30,11 +27,9 @@ class Config:
     import essential modules either built-in or third-party ones.
 
     Attributes:
-        estimators_list (list): compulsory, no default
+        estimators_list (list): required, no default
             A list of 2D-tuple, where tuple is (NAME, sklearn_estimator)
-        grid_search_opt_params (dict): compulsory, default dict()
-            A `dict` from built-in `collections` module
-        random_search_opt_params (dict): options, default dict()
+        optim_params (dict): options, default dict()
             A `dict` form built-in `collections` module
 
     Methods:
@@ -50,13 +45,11 @@ class Config:
     def __init__(self):
         """Initializing configuration metrics"""
         self.estimators_list = None
-        self.grid_search_opt_params = dict()
-        self.random_search_opt_params = dict()
+        self.optim_params = dict()
 
         self.config_dict = dict(
             estimators_list=self.estimators_list,
-            grid_search_parameters=self.grid_search_opt_params,
-            random_search_parameters=self.random_search_opt_params
+            random_search_parameters=self.optim_params
         )
 
         self.set_default()
@@ -71,7 +64,7 @@ class Config:
         """Set up default configuration"""
         self.estimators_list = [
             ('feature_selection', SelectKBest()),
-            ('rfc', RandomForestClassifier())  # Random forest classifier
+            ('rfc', RandomForestClassifier())
         ]
 
         scoring_dict = dict(
@@ -79,36 +72,13 @@ class Config:
             accuracy=make_scorer(accuracy_score)
         )
 
-        self.grid_search_opt_params.update(
-            dict(
-                cv=10,
-                n_jobs=3,
-                iid=False,
-                refit="accuracy",  # by default is True
-                scoring=scoring_dict,
-                param_grid=[
-                    dict(
-                        feature_selection__score_func=[mutual_info_classif],
-                        feature_selection__k=list(range(3, 110, 2)),
-                        rfc__n_estimators=list(range(100, 1000, 10)),
-                        rfc__max_features=['auto', 'sqrt'],
-                        rfc__max_depth=list(range(10, 110, 11)),
-                        rfc__min_samples_split=[2, 5, 10],
-                        rfc__min_samples_leaf=[1, 2, 4],
-                        rfc__bootstrap=[True, False]
-                    ),
-                ],
-                return_train_score=True,
-            )
-        )
-
-        self.random_search_opt_params.update(
+        self.optim_params.update(
             dict(
                 cv=10,
                 n_jobs=3,
                 n_iter=15,
                 iid=False,
-                refit="accuracy",  # by default is True
+                refit="accuracy",
                 scoring=scoring_dict,
                 param_distributions=dict(
                     feature_selection__score_func=[mutual_info_classif],
@@ -120,7 +90,7 @@ class Config:
                     rfc__min_samples_leaf=[2, 4, 6, 8],
                     rfc__bootstrap=[True, False]
                 ),
-                return_train_score=True,  # to suppress a warning
+                return_train_score=True,
             )
         )
 
@@ -132,7 +102,7 @@ class Config:
         """Write the config into a file to make life easier.
 
         Args:
-            file_name (str or None): compulsory; default None
+            file_name (str or None): required; default None
         """
         with open(file_name, 'wb') as fnh:
             pickle.dump(self.config_dict, fnh)
@@ -141,7 +111,7 @@ class Config:
         """Load saved configurations into memory
 
         Args:
-            file_name (str): compulsory; default None
+            file_name (str): required; default None
 
         Raises:
             IOError: when argument fn is None, raise IOError.
@@ -151,7 +121,6 @@ class Config:
 
             self.config_dict = config_dict
             self.estimators_list = config_dict['estimators_list']
-            self.grid_search_opt_params = config_dict['grid_search_opt_params']
-            self.random_search_opt_params = config_dict['random_search_opt_params']
+            self.optim_params = config_dict['optim_params']
 
             self.config_file_name = file_name

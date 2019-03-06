@@ -1,0 +1,255 @@
+---
+title: "ASE_Beta-Binomial_test"
+author: "Zhenhua Zhang"
+date: "February 11, 2019"
+output:
+  html_document:
+    theme: sandstone
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+# ASE Beta-Binomial test
+To solve one of the key problem how to model ASE. There are several published 
+methods to model ASE, such as *Binomial dist'n* and *Beta-binomial dist'n*, 
+while the former is **more aggressive** and the later is less.
+
+Abstract an integrated variable to represent the observed loci. For each locus,
+there is a bunch of random variables representing the alterative prone from
+their corresponding trials of which *p* and *n* are respect to Beta dist'n and
+xxx dist'n, respectively,
+
+// Setup of R
+```{r setup}
+rm(list=ls())
+library(ggplot2)
+```
+
+#### Beta-Binomial probability mass function
+A function to calculate the probability of specific amount of successes using 
+logarithm transformation.
+```{r}
+bb_pmf <- function(success, trials, alpha=2, beta=3){
+  if(success>trials){ return(NULL) }
+  numerator <- sum(c(lgamma(trials+1), lgamma(success+alpha), 
+                     lgamma(trials-success+beta), lgamma(alpha+beta))
+                   )
+  denominator <- sum(c(lgamma(success+1), lgamma(trials-success+1),
+                       lgamma(trials+alpha+beta), lgamma(alpha), lgamma(beta))
+                     )
+  return(exp(numerator - denominator))  # the exact probability
+}
+```
+
+#### Beta-Binomial cumulative distribution function
+```{r}
+bb_cdf <- function(success, trials, alpha=2, beta=3, init=0){
+  if (success < init){ return(NULL) }
+  return(sum(sapply(init:success, bb_pmf, trials, alpha, beta)))
+}
+```
+
+#### Estimation of alpha and beta for Beta-distribution
+```{r}
+estimate_alpha_beta <- function(p_vec){
+  # The input is a vector of estimated p
+  e <- mean(p_vec)
+  v <- var(p_vec)
+  alpha <- ((1-e)/v - 1/e) * (e^2)
+  beta <- alpha*(1/e-1)
+  return(c(alpha, beta))
+}
+```
+
+#### A in progress function to do beta Beta-binomial test
+```{r}
+bb_test <- function(successes, trials, target=0.5){
+  p_vec <- c(successes / trials)
+  ab <- estimate_alpha_beta(p_vec)
+  alpha <- ab[[1]]
+  beta <- ab[[2]]
+  
+  cdf <- bb_cdf(successes, trials, alpha, beta)
+}
+```
+
+#### A function to fetch minimum successes for specific probability
+```{r}
+min_size <- function(p_val, trials, upper, lower=0, alpha=2, beta=3, prec=0.01){
+  if(abs(upper-lower) <= 1) {return((upper+lower)/2)}
+  area <- bb_cdf((upper+lower)/2, trials, alpha, beta)
+  if(abs(area-p_val) <= prec) {
+    return((upper+lower)/2)
+  } else if(area<p_val) {
+    lower <- round((upper+lower)/2)
+    min_size(p_val, trials, upper, lower, alpha, beta)
+  } else {
+    upper <- round((upper+lower)/2)
+    min_size(p_val, trials, upper, lower, alpha, beta)
+  }
+}
+```
+
+#### Visualizing *Binomial dist'n*
+```{r}
+draw_binom_pmf <- function(trials){
+  bars_df <- data.frame(k=0:trials, p=sapply(0:trials, dbinom, trials, 0.5))
+  p <- ggplot(data=bars_df, aes(x=k, y=p)) + theme_bw()
+  p <- p + geom_line(stat="identity", color='red')
+  p
+}
+```
+
+#### Visualizing Beta-Binomial dist'n
+```{r}
+draw_bb_pmf <- function(trials, p_vec=c(), alpha=2, beta=3){
+  bars_df <- data.frame(
+    k=0:trials, p=sapply(0:trials, bb_pmf, trials, alpha, beta)
+    )
+  p <- ggplot(data=bars_df, aes(x=k, y=p)) + theme_bw()
+  for(p_value in p_vec){
+    p <- p + geom_vline(
+      xintercept=min_size(p_value, trials, trials, 0, alpha, beta))
+  }
+  p <- p + geom_line(stat="identity", color='red')
+  p
+}
+```
+
+#### A demo
+```{r}
+home <- path.expand("~")
+input_file <- paste(
+  home, "Documents/projects/ASEpredictor/outputs/biosGavinOverlapCov10/NOC2L",
+  sep="/"
+)
+df <- read.csv(input_file, sep="\t")
+df$p <- df$altCountsBios / (df$refCountsBios + df$altCountsBios)
+
+ab <- estimate_alpha_beta(df$p)
+alpha <- ab[[1]]
+beta <- ab[[2]]
+succ <- sum(df$altCountsBios)
+tria <- sum(df$refCountsBios + df$altCountsBios)
+estp <- bb_cdf(tria/2, tria, alpha, beta)
+draw_bb_pmf(tria, p_vec=c(), alpha=alpha, beta=beta)
+dbinom(succ, tria, p=0.5)
+pbinom(succ, tria, p=0.5)
+binom.test(succ+2000, tria, alternative = "less")  # Min. p-value is 2.2e-16.
+draw_binom_pmf(tria)
+```
+
+#### The joint dist'n is indeed a beta-binomial dist'n.  
+
+> I think you mean the sum of several binomial random variables
+
+In general, the joint distribution of multiple binomial random variables is
+still a binomial random variable, when the variables are i.i.d.
+
+Assuming a vector *D* of *i.i.d.* variables from *m* trials:
+$$ D = (X_1..X_i..X_m), where X_i \sim Binom(n_i, p), where \space i=1..m$$
+
+For each $X_i$, while *p* is identical.
+$$ \begin{align}
+P(X_i=k|p, n_i) & = L(p|k) \\
+                & = \binom{n}{k}p^k(1-p)^{n_i-k} \\
+\end{align} $$
+where *k* denotes successes.
+
+Then the joint dist'n is:
+$$ P(X=\sum{k_i}|p, \sum{n_i}) \sim Binom(\sum{n_i}, p) $$
+
+While if the *p* is various, which is the exact case for ASE, then assuming *p* is
+respect to *Beta dist'n*. The joint distribution is *Beta-Binomial dist'n*,
+where *n* is the sum of all trials and *k* are the sum of all successful trials.
+
+Assuming *p* is respect to a *Beta dist'n* with shape parameters $\alpha, \beta$.
+$$ P = (p_1..p_i..p_m), where \space p_i \sim Beta(\alpha, \beta) $$
+
+The dist'n is:
+$$ \begin{align}
+\pi(p|\alpha,\beta) & = Beta(\alpha, \beta) \\
+                    & = \frac{p^{(\alpha-1)}(1-p)^{(\beta-1)}}{B(\alpha, \beta)}
+\end{align} $$
+
+The dist'n of *X* is Beta-Binomial
+$$ X(k|\sum{n_i}, \alpha, \beta) \sim BetaBinom(\sum{n_i}, \alpha, \beta)$$
+
+The PMF of Beta-Binomial dist'n is :
+$$ \begin{align}
+f(k|\sum{n_i}, \alpha, \beta)
+&= \binom{n}{k}\frac{B(k+\alpha, \sum{n_i}-k+\beta)}{B(\alpha, \beta)} \\
+&= \frac{\Gamma(n+1)}{\Gamma(k+1)\Gamma(n-k+1)}\frac{\Gamma(k+\alpha)\Gamma(n-k+\beta)}{\Gamma(n+\alpha+\beta)}\frac{\Gamma(\alpha+\beta)}{\Gamma(\alpha)\Gamma(\beta)} \\
+\end{align}
+$$
+
+Alpha and beta for the Beta part can be estimated by the vector of p using 
+formula as the follow[1](#references).
+
+$$ \begin{align}
+\alpha &= \left(\frac{1-\mu}{\sigma^2} - \frac{1}{\mu}\right) \mu^2\\
+\beta &= \alpha\left(\frac{1}{\mu} - 1\right)
+\end{align} $$
+
+> Note: dbinom() is the PMF, while pbinom() is CDF
+
+The joint probability is calculated by formula, take Bernoulli trials as exp.:
+$$L(\theta)= P(X=X_1, X=X_2, ..., X=X_n) = f(x_1;\theta)*f(x_2;\theta)*...*f(x_n;\theta) = \prod^n_{i=1}f(x_i, \theta)$$
+
+
+### Problems
+The joint probability density functions **do not** have expected values; random
+variables do. Given a unconscious statistician law if $Y=g(X)$, then expected 
+value of *Y* can be found from the disctibution of *X* via:
+$$ E[Y] = \int^\infty_{-\infty}g(x)f_X(x)dx $$
+
+Here in my case, assuming the observed value $Y=g(X_1, X_2, ..., X_{n-1}, X_n)$
+$$ E[Y] = \idotsint^{\infty}_{-\infty}g(x_1, x_2,..., x_n)f_{x_1,x_2,...,x_n}(x_1, x_2, ..., x_n)dx_1dx_2...dx_n$$
+
+## Methods in literatures
+
+### Testing allelic imbalance
+  - Testing a single SNP for allelic imbalance uses a $\chi^2$ goodness-of-fit 
+	test for even frequencies of both alleles. When more than one heterozygous 
+	SNP are present in the same transcript and the phase is known, the counts 
+	can be summed across heterozygous SNPs, counting only once reads overlapping
+	multiple SNPs. This phasing information can be obtained directly from the 
+	RNA-seq data, provided that at least one read pair overlaps both 
+	heterozygous SNPs. Tools for phasing data from short PE reads (novoPhase, 
+	available at <http://www.gene.cimr.cam.ac.uk/todd>). Alternatively, SNPs in 
+	high linkage disequilibrium can be phased in silico, provided that this 
+	information is available.[2](#references)
+  - To study the effect of allelic differences between the sequence reads and
+	the reference genome they were mapped against, we classified all calls in
+	the dataset as matching the reference allele or the non-reference allele.
+	For each individual, in order to include a SNP in our analysis, we required
+	that at least 20 reads mapped to that SNP position in that individual. The
+	two sequenced individuals were analyzed independently such that two separate
+	tests were performed if both individuals had >20 reads overlapping the same
+	SNP. Foe each individual, we compared the observed distribution of the 
+	proportion of mapped reads coming form the reference allele to the expected
+	distribution assuming symmetric binomial sampling. Two one-sided binomial 
+	tests were applied to each SNP, to test the complementary alternative
+	hypotheses that expression of the reference allele was greater than or less
+	than 0.5.[3](#references)
+
+### Adjust mapping bias
+  - In an attempt to correct for the bias toward preferentially mapping the 
+	reference allele, we created a copy of the human genome in which all SNP
+	positions were masked. SNP locations were obtained from the February 2009
+	releases of the 1000 Genomes project(). Since currently available mapping
+	algorithms do not allow for ambiguity codes in the reference sequence, 
+	masking was accomplished by changing the nucleotide at each SNP position
+	to a third allele that is not known segregate in humans(e.g. changint A->T
+	in the reference sequence at the position of an A/G SNP).[3](#references)
+
+### Adjusting multiple test
+  - False discovery rate(FDR) corrections were applied across both
+	individuals to correct for multiple testing such that we allowed an overall
+	FDR of 1%, 5% and 10%.[3](#references)
+
+### References:  
+[1] For more information about the Beta-distribution, visit <https://en.wikipedia.org/wiki/Beta-binomial_distribution>  
+[2] Genome-wide analysis of allelic expression imbalance in human primary cells by high-throughput transcriptome resequencing  
+[3] Effect of read-mapping biases on detecting allele-specific expression from RNA-sequencing data  
