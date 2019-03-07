@@ -104,7 +104,6 @@ def main():
         'biosGavinOlCv10AntUfltCstBin.tsv'
     )
 
-    limit = 1000
     mask = 'group_size < 2'
     biclass = True
     response = 'bb_ASE'
@@ -115,11 +114,10 @@ def main():
     asep = ASEPredictor(input_file)
 
     set_sed()
-    asep.read_file_to_dataframe(nrows=limit)
+    asep.read_file_to_dataframe()
     asep.setup_work_dataframe()
 
     asep.slice_dataframe(mask=mask, cols=cols_discarded)
-    print(asep.work_dataframe['bb_ASE'])
 
     asep.work_dataframe[response] = asep.work_dataframe[response].apply(abs)
 
@@ -136,8 +134,4 @@ def main():
     save_obj_into_pickle(obj=asep, file_name="train_obj")
 
 if __name__ == '__main__':
-    try:
-        main()
-    except RuntimeError as err:
-        print(err)
-        os.removedirs(TIME_STAMP)
+    main()

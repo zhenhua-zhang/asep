@@ -2,8 +2,10 @@
 # -*- coding: utf-8 -*-
 """Unit test"""
 
-def main():  # TODO: Create unit test file
+import unittest
+
+class TestAsep(unittest.TestCase):
     pass
 
 if  __name__ == "__main__":
-    main()
+    unittest.main()
