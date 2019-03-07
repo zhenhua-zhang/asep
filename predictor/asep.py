@@ -4,15 +4,7 @@
 """Main interface for asep"""
 
 import os
-import copy
-
 from argparse import ArgumentParser
-
-from asep.utilities import save_obj_into_pickle
-from asep.utilities import TIME_STAMP
-from asep.utilities import setup_xy
-from asep.utilities import set_sed
-
 from asep.predictor import ASEPredictor
 
 
@@ -72,13 +64,18 @@ def get_args():
     group = parser.add_argument_group("Configuration")
     group.add_argument(
         "-c", "--config-file", dest="config_file", default=None,
-        help="The path to configuration file"
+        help="""The path to configuration file, all configuration will be get
+        from it, and overwrite values from command line except -i"""
     )
 
     group = parser.add_argument_group("Misc")
     group.add_argument(
         "--test-size", dest="test_size", default=None,
-        help="The proportion of dataset for testing"
+        help="the proportion of dataset for testing"
+    )
+    group.add_argument(
+        "--run-flag", dest="run_flag", default=None,
+        help="Flags for current run"
     )
 
     return parser
@@ -97,6 +94,7 @@ def main():
     # output_dir = arguments.output_dir
     # target_col = arguments.target_col
     # test_size = arguments.test_size
+    # run_flag = arguments.run_flag
 
     input_file = os.path.join(
         '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEPrediction',
@@ -104,34 +102,31 @@ def main():
         'biosGavinOlCv10AntUfltCstBin.tsv'
     )
 
-    mask = 'group_size < 2'
-    biclass = True
-    response = 'bb_ASE'
-    cols_discarded = [
+    MASK = 'group_size < 2'
+
+    # Use Beta-Binomial
+    RESPONSE = 'bb_ASE'
+    TRIM = [
         "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bn_ASE"
     ]
-
     asep = ASEPredictor(input_file)
+    asep.run(
+        limit=600, mask=MASK, trim_cols=TRIM, response=RESPONSE,
+        cvs_=2
+    )
+    asep.save_to()
 
-    set_sed()
-    asep.read_file_to_dataframe()
-    asep.setup_work_dataframe()
-
-    asep.slice_dataframe(mask=mask, cols=cols_discarded)
-
-    asep.work_dataframe[response] = asep.work_dataframe[response].apply(abs)
-
-    asep.simple_imputer()
-    asep.label_encoder()
-
-    asep.x_matrix, asep.y_vector = setup_xy(asep.work_dataframe, y_col=response)
-
-    asep.setup_pipeline(estimator=asep.estimators_list, biclass=biclass)
-    asep.k_fold_stratified_validation(cvs=2)
-    asep.training_reporter()
-    asep.draw_learning_curve(asep.model, strategy="pipe")
-
-    save_obj_into_pickle(obj=asep, file_name="train_obj")
+    # Use Bionmial
+    RESPONSE = 'bn_ASE'
+    TRIM = [
+        "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bb_ASE"
+    ]
+    asep = ASEPredictor(input_file)
+    asep.run(
+        limit=600, mask=MASK, trim_cols=TRIM, response=RESPONSE,
+        cvs_=2
+    )
+    asep.save_to()
 
 if __name__ == '__main__':
     main()

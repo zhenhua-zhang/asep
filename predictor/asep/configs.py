@@ -11,8 +11,6 @@ from sklearn.metrics import precision_score
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import make_scorer
 
-from .utilities import make_file_name
-
 
 class Config:
     """configs module for the ASEPredictor
@@ -44,6 +42,7 @@ class Config:
     """
     def __init__(self):
         """Initializing configuration metrics"""
+        self.config_file_name = None
         self.estimators_list = None
         self.optim_params = dict()
 
@@ -51,14 +50,7 @@ class Config:
             estimators_list=self.estimators_list,
             random_search_parameters=self.optim_params
         )
-
         self.set_default()
-        self.config_file_name = make_file_name(prefix='config', suffix='pkl')
-        self.dump_configs(self.config_file_name)
-
-    def get_config_file_name(self):
-        """Get the name of configuration file"""
-        return self.config_file_name
 
     def set_default(self):
         """Set up default configuration"""

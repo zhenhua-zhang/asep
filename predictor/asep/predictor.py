@@ -16,15 +16,18 @@ TODO:
     * Add more input file type
 """
 
+import pickle
 import copy
+import time
 import sys
+import os
 
 import pandas
 import numpy
+import scipy
 
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import train_test_split
 from sklearn.model_selection import learning_curve
 from sklearn.preprocessing import LabelEncoder
 from sklearn.multiclass import OneVsOneClassifier
@@ -40,14 +43,19 @@ except ImportError as err:
     matplotlib.use('Agg')
     from matplotlib import pyplot
 
-from .utilities import draw_k_main_features_cv
-from .utilities import draw_roc_curve_cv
-from .utilities import make_file_name
 from .utilities import format_print
-from .utilities import setup_xy
 from .utilities import set_sed
 from .utilities import timmer
 from .configs import Config
+
+def save_file(filename, target):
+    """Save your file smartly"""
+
+    with open(filename, "wb") as opfh:
+        if hasattr(target, "savefig"):
+            target.savefig(opfh)
+        else:
+            pickle.dump(target, opfh)
 
 
 class ASEPredictor:
@@ -67,12 +75,13 @@ class ASEPredictor:
             file_name (str): input data set
         """
         set_sed(sed)
+        self.TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
         self.input_file_name = file_name
 
-        config = Config()
-        self.estimators_list = config.estimators_list
-        self.optim_params = config.optim_params
+        self.configuration = Config()
+        self.estimators_list = self.configuration.estimators_list
+        self.optim_params = self.configuration.optim_params
 
         self.raw_dataframe = None
         self.work_dataframe = None
@@ -87,8 +96,19 @@ class ASEPredictor:
         self.pipeline = None
         self.model = None
 
+        self.feature_importance_pool = None
+        self.feature_importance_hist = None
+
+        self.auc_false_true_pool = None
+        self.auc_false_true_curve = None
+
+        self.learning_line = None
+        self.learning_report = None
+
     @timmer
-    def run(self, limit=100, mask=None, response='bb_ASE'):
+    def run(self, limit=None, mask=None, response="bb_ASE", trim_cols=None,
+            biclass_=True, cvs_=2, learning_curve_strategy="pipe",
+            output_dir=None):
         """Execute a pre-designed construct pipeline"""
 
         self.read_file_to_dataframe(nrows=limit)
@@ -99,20 +119,15 @@ class ASEPredictor:
 
         self.simple_imputer()
         self.label_encoder()
-
-        cols_discarded = (
-            "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size",
-            "bn_ASE"
-        )
-        self.slice_dataframe(cols=cols_discarded)
-
-        self.x_matrix, self.y_vector = setup_xy(
-            self.work_dataframe, y_col=response
-        )
-        self.setup_pipeline(estimator=self.estimators_list)
-        self.k_fold_stratified_validation(cvs=2)
+        self.slice_dataframe(cols=trim_cols)
+        self.setup_xy(y_col=response)
+        self.setup_pipeline(estimator=self.estimators_list, biclass=biclass_)
+        self.k_fold_stratified_validation(cvs=cvs_)
         self.training_reporter()
-        self.draw_learning_curve(self.model, strategy="pipe")
+        self.draw_roc_curve_cv()
+        self.draw_k_main_features_cv()
+        self.draw_learning_curve(self.model, strategy=learning_curve_strategy)
+        self.save_to()
 
     def read_file_to_dataframe(self, nrows=None):
         """Read input file into pandas DataFrame."""
@@ -120,7 +135,7 @@ class ASEPredictor:
         try:
             file_hand = open(file_name)
         except PermissionError as err:
-            sys.stderr.write('File IO error: ', err)
+            print('File IO error: ', err, file=sys.stderr)
         else:
             self.raw_dataframe = pandas.read_table(file_hand, nrows=nrows)
 
@@ -161,8 +176,8 @@ class ASEPredictor:
 
         TODO:
             Remove and mask can be conflict with each other. For instance, if
-            you want to do mask first then do remove second, after one or more 
-            rows were masked by `mask`, the method won't check whether the 
+            you want to do mask first then do remove second, after one or more
+            rows were masked by `mask`, the method won't check whether the
             masked rows in those to be removed.
         """
         if not isinstance(remove, bool):
@@ -176,7 +191,7 @@ class ASEPredictor:
                 else:
                     self.work_dataframe.query(mask, inplace=True)
             else:
-                print("Mask is empty, skip mask", file=std.err)
+                print("\nMask is empty, skip mask\n", file=sys.stderr)
 
         def do_trim(cols, rows, remove):
             if remove:
@@ -197,6 +212,30 @@ class ASEPredictor:
         else:
             do_trim(cols=cols, rows=rows, remove=remove)
             do_mask(mask=mask, remove=remove)
+
+    def setup_xy(self, x_cols=None, y_col=None):
+        """Set up predictor variables and target variables.
+
+        Args:
+            x_cols(list, tuple, None):
+            y_col(string, None):
+        Raises:
+            ValueError:
+        """
+        cols = self.work_dataframe.columns
+        if x_cols is None and y_col is None:
+            x_cols, y_col = cols[:-1], cols[-1]
+        elif x_cols is None:
+            x_cols = cols.drop(y_col)
+        elif y_col is None:
+            y_col = cols[-1]
+            if y_col in x_cols:
+                raise ValueError('Target column is in predictor columns')
+
+        x_matrix = copy.deepcopy(self.work_dataframe.loc[:, x_cols])
+        y_vector = copy.deepcopy(self.work_dataframe.loc[:, y_col])
+
+        self.x_matrix, self.y_vector = x_matrix, y_vector
 
     def label_encoder(self, target_cols=None, skip=None, remove=False):
         """Encode category columns
@@ -228,13 +267,13 @@ class ASEPredictor:
                 if skip in target_cols:
                     target_cols.remove(skipped)
                 else:
-                    sys.stderr.write('{} isn\'t in list...'.format(skip))
+                    print('{} isn\'t in list...'.format(skip), file=sys.stderr)
 
         if remove:
-            format_print("Deleted columns (require encode)", target_cols)
+            format_print("Deleted columns (require encode)", "\n".join(target_cols))
             self.work_dataframe.drop(columns=target_cols, inplace=True)
         else:
-            format_print("Encoded columns", target_cols)
+            format_print("Encoded columns", "\n".join(target_cols))
             target_cols_encod = [n + '_encoded' for n in target_cols]
 
             encoder = LabelEncoder()
@@ -289,12 +328,6 @@ class ASEPredictor:
         targets = numpy.NaN
         self.work_dataframe = self.work_dataframe.replace(targets, defaults)
 
-    def train_test_slicer(self, **kwargs):
-        """Set up training and testing data set by train_test_split"""
-        (self.x_train_matrix, self.x_test_matrix,
-         self.y_train_vector, self.y_test_vector
-        ) = train_test_split(self.x_matrix, self.y_vector, **kwargs)
-
     def setup_pipeline(self, estimator=None, biclass=True):
         """Setup a training pipeline
 
@@ -323,33 +356,21 @@ class ASEPredictor:
             estimator = self.pipeline
 
         random_search = RandomizedSearchCV(estimator, **kwargs)
-        self.model = random_search.fit(
-            self.x_train_matrix, self.y_train_vector
-        )
+        self.model = random_search.fit(self.x_train_matrix, self.y_train_vector)
 
     @timmer
     def training_reporter(self):
         """Report the training information"""
-        format_print('Params', self.model.get_params())
-        format_print('Scorer', self.model.scorer_)
-        format_print('Best estimator', self.model.best_estimator_)
-        format_print('Best params', self.model.best_params_)
-        format_print('Best score', self.model.best_score_)
-        format_print('Best index', self.model.best_index_)
-
-        prefix = 'cross_validation_random'
-        cv_result_file_name = make_file_name(
-            file_name='training', prefix=prefix, suffix='tvs'
+        self.learning_report = dict(
+            Params=self.model.get_params(),
+            Scorer=self.model.scorer_,
+            Best_estimator=self.model.best_estimator_,
+            Best_params=self.model.best_params_,
+            Best_score=self.model.best_score_,
+            Best_index=self.model.best_index_,
+            Cross_validations=self.model.cv_results_,
+            Model_score=self.model.score(self.x_test_matrix, self.y_test_vector)
         )
-
-        cv_results = self.model.cv_results_
-        with open(cv_result_file_name, 'w') as cvof:
-            pandas.DataFrame(cv_results).to_csv(cvof, sep='\t')
-
-        format_print('Cross-validation results', cv_result_file_name)
-
-        model_score = self.model.score(self.x_test_matrix, self.y_test_vector)
-        format_print('Model score', model_score)
 
     @timmer
     def draw_learning_curve(self, estimator, strategy=None, **kwargs):
@@ -411,11 +432,9 @@ class ASEPredictor:
         )
         ax_learning.legend(loc='best')
 
-        fig.savefig(
-            make_file_name(prefix='learning_curve_random', suffix='png')
-        )
+        self.learning_line = (fig, ax_learning)
 
-    def k_fold_stratified_validation(self, cvs=10, **kwargs):
+    def k_fold_stratified_validation(self, cvs=8, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
         skf = StratifiedKFold(n_splits=cvs, **kwargs)
 
@@ -450,5 +469,122 @@ class ASEPredictor:
                     feature_pool[name] = [0] * cvs
                     feature_pool[name][0] = importance
 
-        draw_roc_curve_cv(auc_fpr_tpr_pool)
-        draw_k_main_features_cv(feature_pool)
+        self.auc_false_true_pool = auc_fpr_tpr_pool
+        self.feature_importance_pool = feature_pool
+
+    def draw_roc_curve_cv(self):
+        """Draw ROC curve with cross-validation"""
+        fig, ax_roc = pyplot.subplots(figsize=(10, 10))
+        auc_pool, fpr_pool, tpr_pool = [], [], []
+        space_len = 0
+        for auc_area, fpr, tpr in self.auc_false_true_pool:
+            auc_pool.append(auc_area)
+            fpr_pool.append(fpr)
+            tpr_pool.append(tpr)
+
+            if len(fpr) > space_len:
+                space_len = len(fpr)
+
+        lspace = numpy.linspace(0, 1, space_len)
+        interp_fpr_pool, interp_tpr_pool = [], []
+        for fpr, tpr in zip(fpr_pool, tpr_pool):
+            fpr_interped = scipy.interp(lspace, fpr, fpr)
+            fpr_interped[0], fpr_interped[-1] = 0, 1
+            interp_fpr_pool.append(fpr_interped)
+
+            tpr_interped = scipy.interp(lspace, fpr, tpr)
+            tpr_interped[0], tpr_interped[-1] = 0, 1
+            interp_tpr_pool.append(tpr_interped)
+
+        for fpr, tpr in zip(interp_fpr_pool, interp_tpr_pool):
+            ax_roc.plot(fpr, tpr, lw=0.5)
+
+        fpr_mean = numpy.mean(interp_fpr_pool, axis=0)
+        tpr_mean = numpy.mean(interp_tpr_pool, axis=0)
+        tpr_std = numpy.std(interp_tpr_pool, axis=0)
+
+        # A 95% confidence interval for the mean of AUC by Bayesian mvs
+        mean, *_ = scipy.stats.bayes_mvs(auc_pool)
+        auc_mean, (auc_min, auc_max) = mean.statistic, mean.minmax
+
+        ax_roc.plot(
+            fpr_mean, tpr_mean, color="r", lw=2,
+            label="Mean: AUC={:0.3}, [{:0.3}, {:0.3}]".format(
+                auc_mean, auc_min, auc_max
+            )
+        )
+
+        mean_upper = numpy.minimum(tpr_mean + tpr_std, 1)
+        mean_lower = numpy.maximum(tpr_mean - tpr_std, 0)
+        ax_roc.fill_between(
+            fpr_mean, mean_upper, mean_lower, color='green', alpha=0.1,
+            label="Standard deviation"
+        )
+        ax_roc.set(
+            title="ROC curve",
+            xlabel='False positive rate', ylabel='True positive rate'
+        )
+        ax_roc.plot([0, 1], color='grey', linestyle='--')
+        ax_roc.legend(loc="best")
+
+        self.auc_false_true_curve = (fig, ax_roc)
+
+    def draw_k_main_features_cv(self, first_k=20):
+        """Draw feature importance for the model with cross-validation"""
+        name_mean_std_pool = []
+        for name, importances in self.feature_importance_pool.items():
+            mean = numpy.mean(importances)
+            std = numpy.std(importances, ddof=1)
+            name_mean_std_pool.append([name, mean, std])
+
+        name_mean_std_pool = sorted(name_mean_std_pool, key=lambda x: -x[1])
+
+        name_pool, mean_pool, std_pool = [], [], []
+        for name, mean, std in name_mean_std_pool[:first_k]:
+            name_pool.append(name)
+            mean_pool.append(mean)
+            std_pool.append(std)
+
+        fig, ax_features = pyplot.subplots(figsize=(10, 10))
+        ax_features.bar(name_pool, mean_pool, yerr=std_pool)
+        ax_features.set_xticklabels(
+            name_pool, rotation_mode='anchor', rotation=45,
+            horizontalalignment='right'
+        )
+        ax_features.set(
+            title="Feature importances(with stand deviation as error bar)",
+            xlabel='Feature name', ylabel='Importance'
+        )
+
+        self.feature_importance_hist = (fig, ax_features)
+
+    def save_to(self, save_path="."):
+        """Save configs, results and etc. to disk"""
+
+        time_stamp = self.TIME_STAMP
+        save_path = os.path.join(save_path, time_stamp)
+
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        file_path = os.path.join(save_path, "feature_importances.pkl")
+        save_file(file_path, self.feature_importance_pool)
+
+        file_path = os.path.join(save_path, "feature_importances_hist.png")
+        save_file(file_path, self.feature_importance_hist[0])
+
+        file_path = os.path.join(save_path, "AUC_false_true_positive_matrix.pkl")
+        save_file(file_path, self.auc_false_true_pool)
+
+        file_path = os.path.join(save_path, "roc_curve.png")
+        save_file(file_path, self.auc_false_true_curve[0])
+
+        file_path = os.path.join(save_path, "training_report.pkl")
+        save_file(file_path, self.learning_report)
+
+        file_path = os.path.join(save_path, "learning_curve.png")
+        save_file(file_path, self.learning_line[0])
+
+        file_path = os.path.join(save_path, time_stamp + "_object.pkl")
+        with open(file_path, 'wb') as opfh:
+            pickle.dump(self, opfh)
