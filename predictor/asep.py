@@ -4,12 +4,14 @@
 """Main interface for asep"""
 
 import os
+import copy
 
 from argparse import ArgumentParser
 
 from asep.utilities import save_obj_into_pickle
 from asep.utilities import TIME_STAMP
 from asep.utilities import setup_xy
+from asep.utilities import set_sed
 
 from asep.predictor import ASEPredictor
 
@@ -85,17 +87,16 @@ def get_args():
 def main():
     """Main function to run the module """
     parser = get_args()
-    parser.print_help()
-    arguments = parser.parse_args()
+    arguments = vars(parser.parse_args())
 
-    validation_file = arguments.validation_file
-    skip_columns = arguments.skip_columns
-    config_file = arguments.config_file
-    group_size = arguments.group_size
-    input_file = arguments.input_file
-    output_dir = arguments.output_dir
-    target_col = arguments.target_col
-    test_size = arguments.test_size
+    # validation_file = arguments.validation_file
+    # skip_columns = arguments.skip_columns
+    # config_file = arguments.config_file
+    # group_size = arguments.group_size
+    # input_file = arguments.input_file
+    # output_dir = arguments.output_dir
+    # target_col = arguments.target_col
+    # test_size = arguments.test_size
 
     input_file = os.path.join(
         '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEPrediction',
@@ -104,26 +105,28 @@ def main():
     )
 
     limit = 1000
-    mask = None
+    mask = 'group_size < 2'
     biclass = True
-    reponse = 'ASE'
-    cols_discarded = ["log2FC", "binom_p", "binom_p_adj", "group_size"]
+    response = 'bb_ASE'
+    cols_discarded = [
+        "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bn_ASE"
+    ]
 
     asep = ASEPredictor(input_file)
 
-    asep.set_sed()
+    set_sed()
     asep.read_file_to_dataframe(nrows=limit)
     asep.setup_work_dataframe()
-    asep.slice_dataframe(mask=mask, cols=cols_discarded)
 
-    asep.work_dataframe[reponse] = asep.work_dataframe[reponse].apply(abs)
+    asep.slice_dataframe(mask=mask, cols=cols_discarded)
+    print(asep.work_dataframe['bb_ASE'])
+
+    asep.work_dataframe[response] = asep.work_dataframe[response].apply(abs)
 
     asep.simple_imputer()
     asep.label_encoder()
 
-    asep.x_matrix, asep.y_vector = setup_xy(
-        asep.work_dataframe, y_col=target_col
-    )
+    asep.x_matrix, asep.y_vector = setup_xy(asep.work_dataframe, y_col=response)
 
     asep.setup_pipeline(estimator=asep.estimators_list, biclass=biclass)
     asep.k_fold_stratified_validation(cvs=2)

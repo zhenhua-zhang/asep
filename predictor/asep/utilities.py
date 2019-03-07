@@ -4,8 +4,9 @@
 
 import functools
 import pickle
-import time
+import copy
 import json
+import time
 import sys
 import os
 
@@ -246,6 +247,15 @@ def setup_xy(dataframe, x_cols=None, y_col=None):
     x_matrix = copy.deepcopy(dataframe.loc[:, x_cols])
     y_vector = copy.deepcopy(dataframe.loc[:, y_col])
     return (x_matrix, y_vector)
+
+
+def set_sed(sed=None):
+    """Set the random seed of numpy"""
+    if sed:
+        numpy.random.seed(sed)
+    else:
+        numpy.random.seed(3142)
+
 
 # TODO: finish it into a standalone function
 def feature_pre_selection_by_spearman(

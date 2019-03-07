@@ -45,6 +45,7 @@ from .utilities import draw_roc_curve_cv
 from .utilities import make_file_name
 from .utilities import format_print
 from .utilities import setup_xy
+from .utilities import set_sed
 from .utilities import timmer
 from .configs import Config
 
@@ -59,12 +60,14 @@ class ASEPredictor:
         >>> ap.run()
     """
 
-    def __init__(self, file_name):
+    def __init__(self, file_name, sed=3142):
         """Set up basic variables
 
         Args:
             file_name (str): input data set
         """
+        set_sed(sed)
+
         self.input_file_name = file_name
 
         config = Config()
@@ -85,10 +88,9 @@ class ASEPredictor:
         self.model = None
 
     @timmer
-    def run(self, sed=3142, limit=100, mask=None, response='ASE'):
+    def run(self, limit=100, mask=None, response='bb_ASE'):
         """Execute a pre-designed construct pipeline"""
 
-        self.set_sed(sed)
         self.read_file_to_dataframe(nrows=limit)
         self.setup_work_dataframe()
         self.slice_dataframe(mask=mask)
@@ -96,9 +98,12 @@ class ASEPredictor:
         self.work_dataframe[response] = self.work_dataframe[response].apply(abs)
 
         self.simple_imputer()
-        self.label_encoder(remove=False)
+        self.label_encoder()
 
-        cols_discarded = ["log2FC", "binom_p", "binom_p_adj", "group_size"]
+        cols_discarded = (
+            "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size",
+            "bn_ASE"
+        )
         self.slice_dataframe(cols=cols_discarded)
 
         self.x_matrix, self.y_vector = setup_xy(
@@ -108,14 +113,6 @@ class ASEPredictor:
         self.k_fold_stratified_validation(cvs=2)
         self.training_reporter()
         self.draw_learning_curve(self.model, strategy="pipe")
-
-    @staticmethod
-    def set_sed(sed=None):
-        """Set the random seed of numpy"""
-        if sed:
-            numpy.random.seed(sed)
-        else:
-            numpy.random.seed(3142)
 
     def read_file_to_dataframe(self, nrows=None):
         """Read input file into pandas DataFrame."""
@@ -134,21 +131,23 @@ class ASEPredictor:
         except Exception('Failed to deepcopy raw_df to work_df') as exp:
             raise exp
 
-    def slice_dataframe(self, rows=None, cols=None, mask=None, remove=True):
-        """Slice the DataFrame base on rows and cols.
+    def slice_dataframe(self, rows=None, cols=None, mask=None, remove=True,
+                        mask_first=True):
+        """Slice the DataFrame base on rows, columns, and mask.
 
-        This method will remove or keep rows, columns or any cells match the
+        This method will remove or keep rows, columns or any fields match the
         `mask` in place meaning change the dataframe directly, which is time
-        and memory sufficient.
+        and memory sufficient. NOTE: rows or columns will be removed first,
+        then the dataframe will be masked.
 
         Args:
-            rows (list, tuple, None): optional, default None
-                Rows retained for the downstream. If it's None, all rows will
+            rows (`list`, `tuple`, `None`): optional, default `None`
+                Rows retained for the downstream. If it's `None`, all rows will
                 be retained.
-            cols (list, tuple, None): optional, default None
-                Columns retained for the downstream. If it's None, all columns
+            cols (list, tuple, None): optional, default `None`
+                Columns retained for the downstream. If it's `None`, all columns
                 will be retained.
-            mask (str, None): optional, default None
+            mask (str, None): optional, default `None`
                 A filter to screen dataframe. If it's a `str` object, `query`
                 method will be called; otherwise, if it's `None`, no filter
                 will be applied.
@@ -157,29 +156,47 @@ class ASEPredictor:
                 discarded. If True, cells coorderated by `rows` and `cols` will
                 be keep and the exclusive will be discarded, otherwise the way
                 around.
+            mask_first (bool): optional, defautl `True`
+                Do mask first or not.
+
+        TODO:
+            Remove and mask can be conflict with each other. For instance, if
+            you want to do mask first then do remove second, after one or more 
+            rows were masked by `mask`, the method won't check whether the 
+            masked rows in those to be removed.
         """
         if not isinstance(remove, bool):
             raise TypeError('remove should be bool')
 
-        if remove:
-            if rows is not None or cols is not None:
-                self.work_dataframe.drop(
-                    index=rows, columns=cols, inplace=True
-                )
-
+        def do_mask(mask, remove):
             if mask is not None:
-                self.work_dataframe.query(mask, inplace=True)
+                if remove:
+                    reverse_mask = "~({})".format(mask)  # reverse of mask
+                    self.work_dataframe.query(reverse_mask, inplace=True)
+                else:
+                    self.work_dataframe.query(mask, inplace=True)
+            else:
+                print("Mask is empty, skip mask", file=std.err)
 
+        def do_trim(cols, rows, remove):
+            if remove:
+                if cols is not None or rows is not None:
+                    self.work_dataframe.drop(
+                        index=rows, columns=cols, inplace=True
+                    )
+            else:
+                if rows is None:
+                    rows = self.work_dataframe.index
+                if cols is None:
+                    cols = self.work_dataframe.columns
+                self.work_dataframe = self.work_dataframe.loc[rows, cols]
+
+        if mask_first:
+            do_mask(mask=mask, remove=remove)
+            do_trim(cols=cols, rows=rows, remove=remove)
         else:
-            if rows is None:
-                rows = self.work_dataframe.index
-            if cols is None:
-                cols = self.work_dataframe.columns
-            self.work_dataframe = self.work_dataframe.loc[rows, cols]
-
-            if mask is not None:
-                reverse_mask = "~({})".format(mask)  # reverse of mask
-                self.work_dataframe.query(reverse_mask, inplace=True)
+            do_trim(cols=cols, rows=rows, remove=remove)
+            do_mask(mask=mask, remove=remove)
 
     def label_encoder(self, target_cols=None, skip=None, remove=False):
         """Encode category columns
