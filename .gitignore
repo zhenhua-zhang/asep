@@ -19,6 +19,7 @@
 **/*.tbi
 **/*.vcf
 **/*.docx
+**/*.html
 
 # Ignore all starting with _
 **/_*
