@@ -101,6 +101,7 @@ def main():
         'training', 'outputs', 'biosGavinOverlapCov10',
         'biosGavinOlCv10AntUfltCstBin.tsv'
     )
+    asep = ASEPredictor(input_file)
 
     MASK = 'group_size < 2'
 
@@ -109,11 +110,7 @@ def main():
     TRIM = [
         "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bn_ASE"
     ]
-    asep = ASEPredictor(input_file)
-    asep.run(
-        limit=600, mask=MASK, trim_cols=TRIM, response=RESPONSE,
-        cvs_=2
-    )
+    asep.run(limit=600, mask=MASK, trim_cols=TRIM, response=RESPONSE, cvs_=2)
     asep.save_to()
 
     # Use Bionmial
@@ -121,11 +118,7 @@ def main():
     TRIM = [
         "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bb_ASE"
     ]
-    asep = ASEPredictor(input_file)
-    asep.run(
-        limit=600, mask=MASK, trim_cols=TRIM, response=RESPONSE,
-        cvs_=2
-    )
+    asep.run(limit=600, mask=MASK, trim_cols=TRIM, response=RESPONSE, cvs_=2)
     asep.save_to()
 
 if __name__ == '__main__':

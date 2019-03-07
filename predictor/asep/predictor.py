@@ -75,7 +75,7 @@ class ASEPredictor:
             file_name (str): input data set
         """
         set_sed(sed)
-        self.TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
+        self.TIME_STAMP = None
 
         self.input_file_name = file_name
 
@@ -110,6 +110,8 @@ class ASEPredictor:
             biclass_=True, cvs_=2, learning_curve_strategy="pipe",
             output_dir=None):
         """Execute a pre-designed construct pipeline"""
+
+        self.TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
         self.read_file_to_dataframe(nrows=limit)
         self.setup_work_dataframe()
