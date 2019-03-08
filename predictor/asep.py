@@ -92,7 +92,7 @@ def get_args():
 def main():
     """Main function to run the module """
     parser = get_args()
-    arguments = vars(parser.parse_args())
+    arguments = parser.parse_args()
 
     # config_file = arguments.config_file
     # cross_validations = arguments.cross_validations
