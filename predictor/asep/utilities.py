@@ -14,50 +14,6 @@ import scipy
 
 # Global variable
 # time stamp
-TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
-
-def make_time_stamp():
-    """Setup time stamp for the package"""
-    global TIME_STAMP
-    TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
-
-
-def make_file_name(file_name=None, prefix=None, suffix=None, _time_stamp=None):
-    """Create file name based on timestamp
-
-    Args:
-        file_name (str or None): optional; defualt None
-            The file name, if need.
-        prefix (str or None): optional; default None
-            The prefix of the dumped file
-        suffix (str or None): optional; default None
-            The suffix of the dumped file
-        _time_stamp (str or None): optional; default None
-            Time stamp used in file name
-    Returns:
-        file_name (str):
-            The created filename.
-    """
-    if _time_stamp is None:
-        global TIME_STAMP
-        _time_stamp = TIME_STAMP
-
-    if file_name is None:
-        file_name = _time_stamp
-    else:
-        file_name += '_' + _time_stamp
-
-    if prefix:
-        file_name = prefix + '_' + file_name
-
-    if suffix:
-        file_name += '.' + suffix
-
-    if not os.path.exists(_time_stamp):
-        os.mkdir(_time_stamp)
-
-    return os.path.join(".", _time_stamp, file_name)
-
 
 def timmer(func):
     """Print the runtime of the decorated function
@@ -84,24 +40,6 @@ def format_print(title, main_content, pipe=sys.stdout):
     head = '-' * 3
     flag = ' '.join([head, title, ": "])
     print(flag, '\n   ', main_content, "\n\n", file=pipe)
-
-
-def save_obj_into_pickle(obj, file_name):
-    """Save Object instance by pickle
-
-    Args:
-        obj (object): required;
-        file_name (str): required;
-    """
-    pklf_name = make_file_name(file_name, prefix='training', suffix='pkl')
-    with open(pklf_name, 'wb') as pklof:
-        pickle.dump(obj, pklof)
-
-
-def load_obj_from_pickle(file_name):
-    """Load ASEPredictor instance by pickle"""
-    with open(file_name, 'wb') as pklif:
-        return pickle.load(pklif)
 
 
 def check_keys(pool_a, pool_b):

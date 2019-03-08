@@ -274,7 +274,7 @@ class ASEPredictor:
             format_print("Deleted columns (require encode)", "\n".join(target_cols))
             self.work_dataframe.drop(columns=target_cols, inplace=True)
         else:
-            format_print("Encoded columns", "\n".join(target_cols))
+            format_print("Encoded columns", ", ".join(target_cols))
             target_cols_encod = [n + '_encoded' for n in target_cols]
 
             encoder = LabelEncoder()
