@@ -1,8 +1,45 @@
-/.settings
-/.pydevproject
-/predictor_of_log2FC_variance/.settings
-/predictor_of_log2FC_variance/.pydevproject
-/predictor_of_log2FC_variance/.project
-/transform_log2FC_into_variance/.settings
-/transform_log2FC_into_variance/.pydevproject
-/transform_log2FC_into_variance/.project
+# Ignore all ipython notebook checkpoints directories
+**/.ipynb_checkpoints/
+
+# Ignore all rope project directories
+**/.ropeproject/
+
+# Ignore all python cache directories
+**/__pycache__/
+
+# Ignore all '.png', '.tsv', '.sam', '.bam', '.vcf', '.tbi', '.docx' files
+**/*.bai
+**/*.bam
+**/*.bed
+**/*.fa
+**/*.fai
+**/*.png
+**/*.sam
+**/*.tsv
+**/*.tbi
+**/*.vcf
+**/*.docx
+**/*.html
+
+# Ignore all starting with _
+**/_*
+
+# Ignore all backup dirs
+**/backup
+
+# Ignore pycharm project directory
+.idea/
+
+# Ignore Python virtual environment files
+_asep_env
+
+# Ignore archived files
+_archived
+
+# Ignore all syntax test files
+_syntax_test/
+
+# Misc
+_notes.md
+_explore_log2FC
+**/2019*

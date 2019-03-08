@@ -1,25 +1,13 @@
-
 # Asep
 Allele-specific expression analysis
 
-## 
-biosCadd
-biosGavinOverlap
-distPathNonpathASE
-getGenotype
-LICENSE
-misc
-predictor
-README.md
-utls
+Here is a allele-specific expression predictor.
 
+## Background
 
-##  checkLog2FCDistribution
-Type: directory  
-Comments: check the log2 fold change of different groups(BENIGN, POPULATION, PATHOGENIC)  
+Allele-specific expression(ASE) is a phenomena that the abundance of allelic  
+copies from the same transcript are different. RNA sequencing gives a chance  
+to quantify the divergence between two alleles. 
 
-### checkLog2FCDistribution/check_log2fc_distribution.py
-Type: python script  
-Comments: python script to check the log2 fold change of different groups(BENIGN, POPULATION, PATHOGENIC)  
+### ASE is cell type specific
 
-### 
