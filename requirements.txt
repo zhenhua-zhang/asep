@@ -1,0 +1,12 @@
+# Requirements for _asep_env vritual environment
+# Using python version Python/3.5.1-foss-2015b on `boxy`
+
+six == 1.12.0
+pytz == 2018.9
+pyparsing == 2.3.1
+python-dateutil == 2.7.5
+numpy == 1.15.3
+scipy == 1.1.0
+pandas == 0.23.4
+matplotlib == 3.0.0
+scikit-learn == 0.20.0
