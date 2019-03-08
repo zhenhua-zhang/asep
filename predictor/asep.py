@@ -12,7 +12,7 @@ from asep.predictor import ASEPredictor
 def get_args():
     """A method to get arguments from the command line"""
 
-    head = """
+    __head = """
         ##############################################\n
         #    Allele-specific expression predictor    #\n
         #                                            #\n
@@ -20,7 +20,7 @@ def get_args():
         ##############################################\n
     """
 
-    foot = """
+    __foot = """
         GitHub: https://github.com/zhenhua-zhang/asep
     """
 
@@ -51,7 +51,7 @@ def get_args():
     )
     group.add_argument(
         "-S", "--skip-column", dest="skip_columns", default=None,
-        help="""The columns will be skipped. Seperated by semi-colon and quote 
+        help="""The columns will be skipped. Seperated by semi-colon and quote
         them by ','. if there are more than one columns."""
     )
     group.add_argument(
@@ -91,23 +91,23 @@ def get_args():
 
 def main():
     """Main function to run the module """
-    parser    = get_args()
+    parser = get_args()
     arguments = vars(parser.parse_args())
     print(arguments)
     sys.exit()
 
-    config_file       = arguments.config_file
-    cross_validations = arguments.cross_validations
-    first_k_rows      = arguments.first_k_rows
-    group_size        = arguments.group_size
-    input_file        = arguments.input_file
-    mask              = arguments.mask
-    output_dir        = arguments.output_dir
-    run_flag          = arguments.run_flag
-    skip_columns      = arguments.skip_columns
-    target_col        = arguments.target_col
-    test_size         = arguments.test_size
-    validation_file   = arguments.validation_file
+    # config_file = arguments.config_file
+    # cross_validations = arguments.cross_validations
+    # first_k_rows = arguments.first_k_rows
+    # group_size = arguments.group_size
+    # input_file = arguments.input_file
+    # mask = arguments.mask
+    output_dir = arguments.output_dir
+    # run_flag = arguments.run_flag
+    # skip_columns = arguments.skip_columns
+    # target_col = arguments.target_col
+    # test_size = arguments.test_size
+    # validation_file = arguments.validation_file
 
     input_file = os.path.join(
         '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEPrediction',
@@ -116,22 +116,22 @@ def main():
     )
     asep = ASEPredictor(input_file)
 
-    MASK = 'group_size < 2'
+    mask = 'group_size < 2'
 
     # Use Beta-Binomial
-    RESPONSE = 'bb_ASE' # target_col
-    TRIM = [
+    response = 'bb_ASE' # target_col
+    trim = [
         "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bn_ASE"
     ]
-    asep.run(limit=600, mask=MASK, trim_cols=TRIM, response=RESPONSE, cvs_=2)
+    asep.run(mask=mask, trim_cols=trim, response=response, cvs_=10)
     asep.save_to(output_dir)
 
     # Use Bionmial
-    RESPONSE = 'bn_ASE'
-    TRIM = [
+    response = 'bn_ASE'
+    trim = [
         "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bb_ASE"
     ]
-    asep.run(limit=600, mask=MASK, trim_cols=TRIM, response=RESPONSE, cvs_=2)
+    asep.run(mask=mask, trim_cols=trim, response=response, cvs_=10)
     asep.save_to(output_dir)
 
 if __name__ == '__main__':
