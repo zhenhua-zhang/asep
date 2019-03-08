@@ -1,0 +1,243 @@
+#!/usr/bin/env Rscript
+#
+# File Name  : transform_log2fc_into_binary_by_ttest.R
+# Author     : zhzhang
+# E-mail     : zhzhang2015@sina.com
+# Created on : Fri 25 Jan 2019 10:51:30 AM CET
+# Version    : v0.0.2
+# License    : MIT
+#
+
+rm(list = ls())
+
+library(dplyr)
+
+#
+# Customized paste function
+#
+ppaste <- function(...){ paste(..., sep = "/") }
+
+#
+# Log-likelihood function under Binomial distritbution
+#
+bn_llik <- function(p, alts, refs) {
+  totals <- alts + refs
+  r <- -sum(lchoose(totals, alts) + alts * log(p) + refs * log(1 - p))
+
+  if (r == -Inf){
+    return(-.Machine$integer.max)
+  } else if (r == Inf){
+    return(.Machine$integer.max)
+  } else {
+    return(r)
+  }
+}
+
+#
+# Likelihood ratio test under binomial likelihood
+#
+bn_lrt <- function(alt_counts, ref_counts) {
+
+  nul_p <- 0.5
+  nul_llik <- bn_llik(nul_p, alt_counts, ref_counts)  # Filter out alt == ref
+
+  alt_p <- exp(mean(log(alt_counts / ref_counts)))
+  alt_llik_opt <- optim(
+    par = alt_p, fn = bn_llik, NULL,
+      method = "L-BFGS-B", lower = c(1e-12), upper = c(1),
+      control = list(maxit = 10000),
+      alts = alt_counts, refs = ref_counts
+  )
+
+  alt_p <- alt_llik_opt$par
+  alt_llik <- alt_llik_opt$value
+
+  dof <- length(alt_counts) - 1
+
+  if (dof == 0) {
+    chisq <- NA
+    chisq_p <- NA
+  } else {
+    chisq <- - 2 * (alt_llik - nul_llik)
+    chisq_p <- 1 - pchisq(chisq, dof)
+  }
+
+  r <- list(nul_bn_llik=nul_llik, alt_bn_llik=alt_llik, p_value = chisq_p)
+  return(r)
+}
+
+#
+# Log-likelihood function under Beta-Binomial distribution
+#
+bb_llik <- function(p_od, alts, refs){
+  alts_len <- length(alts)
+  refs_len <- length(refs)
+  if(alts_len != refs_len) {
+    stop("alts and refs should have identical length...")
+  }
+
+  if (length(p_od) == 1){
+    p <- 0.5
+    od <- p_od[[1]]
+  } else if (length(p_od) == 2){
+    p <- p_od[[1]]
+    od <- p_od[[2]]
+  } else {
+    stop("p_od should be no more than 2 elements")
+  }
+
+  if (p > 1 || p < 0){
+    stop("The first element of p_od should be a decimal between 0 to 1")
+  }
+
+  if (od <= 0) { 
+	stop("The second element of p_od should be positive, but get ", od) 
+  }
+
+  a <- od * p
+  b <- od * (1 - p)
+  r <- -sum(lbeta(alts + a, refs + b) - lbeta(a, b) + lchoose(alts + refs, alts))
+
+  if (r == -Inf){
+    return(-.Machine$integer.max)
+  } else if (r == Inf){
+    return(.Machine$integer.max)
+  } else {
+    return(r)
+  }
+}
+
+#
+# Likelihood ratio test under Beta-Binomial distribution
+#
+bb_lrt <- function(alt_counts, ref_counts){
+  alts_len <- length(alt_counts)
+  refs_len <- length(ref_counts)
+
+  if(alts_len != refs_len) {
+    stop("alt_counts and ref_counts should have identical length...")
+  }
+
+  alt_od_init <- sum(alt_counts + ref_counts)  # Using total reads counts
+  alt_p_init <- exp(mean(log(alt_counts / ref_counts)))
+  alt_opt <- optim(
+    par = c(alt_p_init, alt_od_init), fn = bb_llik, NULL,
+    method = "L-BFGS-B", lower = c(1e-12, 1e-10), upper = c(1, 1e10),
+    control = list(maxit = 10000),
+    alts = alt_counts, refs = ref_counts
+  )
+
+  alt_par <- alt_opt$par
+  alt_llik <- alt_opt$val
+
+  # Using optim to find the over-dispersion parameter under null model
+  # nul_opt <- optim(
+  #   par = c(10), fn = bb_llik, NULL,
+  #     method = "L-BFGS-B", lower = c(1e-12), upper = c(1e12),
+  #     control = list(maxit = 10000),
+  #     alts = alt_counts, refs = ref_counts
+  # )
+  # nul_par <- nul_opt$par
+  # nul_llik <- nul_opt$val
+
+  # nul_par <- alt_par[[2]]  # Using the over-dispersion parameter derived from samples 
+  nul_par <- sum(alt_counts + ref_counts)  # Using average total reads counts
+  nul_llik <- bb_llik(c(0.5, nul_par), alt_counts, ref_counts)
+  nul_llik <- nul_llik
+
+  dof <- alts_len - 1
+  if (dof == 0) {
+    chisq <- NA
+    chisq_p <- NA
+  } else {
+    chisq <- - 2 * (alt_llik - nul_llik)
+    chisq_p <- 1 - pchisq(chisq, dof)
+  }
+
+  r <- list(
+    nul_p=0.5, nul_od=nul_par, nul_llik_bb=nul_llik,
+    alt_p=alt_par[[1]], alt_od=alt_par[[2]], alt_llik_bb=alt_llik,
+    p_value = chisq_p
+  )
+
+  return(r)
+}
+
+
+trans_into_bin <- function(rtb, cr, pv = 0.05, min_depth = 5){
+  cat("FILTER: BY refCountsBios and altCountsBios ...\n")
+  gp <- rtb %>% 
+    filter(
+    refCountsBios >= min_depth 
+    & altCountsBios >= min_depth 
+    & refCountsBios != altCountsBios
+  )
+
+  cat("MUTATE: ADD binom_p, group_size, and binom_p_adj ...\n")
+  gp <- gp %>%
+    group_by(chr, pos, ref, alt) %>%
+    mutate(
+      log2FC = log2(sum(altCountsBios) / sum(refCountsBios)),
+	  bn_p = bn_lrt(altCountsBios, refCountsBios)$p_value, 
+	  bb_p = bb_lrt(altCountsBios, refCountsBios)$p_value,
+	  group_size = length(log2FC)
+    )
+
+  cat("MUTATE: ADD binom_p_adj, ASE ...\n")
+  gp <- gp %>%
+    ungroup() %>%
+    mutate(
+      bn_p_adj = p.adjust(bn_p, method = "fdr"),
+      bb_p_adj = p.adjust(bb_p, method = "fdr"),
+      bn_ASE = ifelse(bn_p_adj < pv, ifelse(log2FC < 0, -1, 1), 0),
+      bb_ASE = ifelse(bb_p_adj < pv, ifelse(log2FC < 0, -1, 1), 0)
+    ) %>%
+    select(rn) %>%
+    arrange(chr, pos, ref, alt) %>%
+    distinct() %>%
+    as.data.frame()
+
+  return(gp)
+}
+
+#
+# Deal with input and output
+#
+hmd <- path.expand("~")
+pjd <- ppaste(hmd, "Documents", "projects", "ASEPrediction")
+opd <- ppaste(pjd, "training", "outputs", "biosGavinOverlapCov10")
+ipd <- ppaste(pjd, "training", "outputs", "biosGavinOverlapCov10")
+
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) == 0){
+  ipf <- ppaste(ipd, "biosGavinOverlapCov10Anno.tsv")
+  opf <- ppaste(opd, "biosGavinOlCv10AntUfltCstBin.tsv")
+} else if(length(args) == 1){
+  ipf <- args[1]
+  opf <- ppaste(opd, "biosGavinOlCv10AntUfltCstBin.tsv")
+} else if(length(args) == 2){
+  ipf <- args[1]
+  opf <- args[2]
+}
+
+#
+# Deal with `tar` compressed files
+#
+if (endsWith(ipf, '.tar.gz') || endsWith(ipf, '.tgz')){ ipf <- untar(ipf) }
+rtb <- read.csv(ipf, header = TRUE, sep = "\t")
+rn <- c(
+  colnames(rtb)[1:117], "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj",
+  "group_size", "bn_ASE", "bb_ASE"
+)
+
+#
+# Calculate
+#
+odf <- trans_into_bin(rtb, rn)
+cat(dim(odf[which(abs(odf$bn_ASE)==1), ]), " in bn_ASE(1, -1)\n")
+cat(dim(odf[which(abs(odf$bb_ASE)==1), ]), " in bb_ASE(1, -1)\n")
+
+#
+# Dump out results
+#
+write.table(odf, file = opf, quote = FALSE, sep = "\t", row.names = FALSE)
