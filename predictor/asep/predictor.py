@@ -129,7 +129,6 @@ class ASEPredictor:
         self.draw_roc_curve_cv()
         self.draw_k_main_features_cv()
         self.draw_learning_curve(self.model, strategy=learning_curve_strategy)
-        self.save_to()
 
     def read_file_to_dataframe(self, nrows=None):
         """Read input file into pandas DataFrame."""
@@ -560,7 +559,7 @@ class ASEPredictor:
 
         self.feature_importance_hist = (fig, ax_features)
 
-    def save_to(self, save_path="."):
+    def save_to(self, save_path="./"):
         """Save configs, results and etc. to disk"""
 
         time_stamp = self.TIME_STAMP
