@@ -11,3 +11,10 @@ to quantify the divergence between two alleles.
 
 ### ASE is cell type specific
 
+<<<<<<< HEAD
+=======
+### 
+
+
+# PLEASE DON'T USE THIS `master` BRANCH DIRECTLY, BECAUSE IT'S NOT STABLE ENOUGH!!!!
+>>>>>>> 1f9fc32479a33720650197cdd7626985bfe70aae
