@@ -33,6 +33,9 @@
 # Ignore Python virtual environment files
 _asep_env
 
+# Ignore archived files
+_archived
+
 # Ignore all syntax test files
 _syntax_test/
 
