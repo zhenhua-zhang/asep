@@ -161,8 +161,8 @@ class ASEPredictor:
                 Rows retained for the downstream. If it's `None`, all rows will
                 be retained.
             cols (list, tuple, None): optional, default `None`
-                Columns retained for the downstream. If it's `None`, all columns
-                will be retained.
+                Columns retained for the downstream. If it's `None`, all
+                columns will be retained.
             mask (str, None): optional, default `None`
                 A filter to screen dataframe. If it's a `str` object, `query`
                 method will be called; otherwise, if it's `None`, no filter
@@ -245,10 +245,10 @@ class ASEPredictor:
             target_cols (list or None):
                 name of columns to be encoded
             skip (str, list, tuple, None):
-                list of names of columns
-                skipped encoded. string represents only the specific column
-                will be skipped; list or tuple means all contained elements
-                will be skipped; None means no columns will be skipped.
+                list of names of columns skipped encoded. string represents
+                only the specific column will be skipped; list or tuple means
+                all contained elements will be skipped; None means no columns
+                will be skipped.
             remove (bool):
                 remove columns need to be encoded.
         Raises:
@@ -293,30 +293,29 @@ class ASEPredictor:
         The columns information are derived from Dannis
         """
         defaults = {
-            'motifEName': 'unknown', 'GeneID': 'unknown', 'GeneName': 'unknown',
-            'CCDS': 'unknown', 'Intron': 'unknown', 'Exon': 'unknown',
-            'ref': 'N', 'alt': 'N', 'Consequence': 'UNKNOWN', 'GC': 0.42,
-            'CpG': 0.02, 'motifECount': 0, 'motifEScoreChng': 0,
+            'motifEName': 'unknown', 'GeneID': 'unknown', 'GeneName':
+            'unknown', 'CCDS': 'unknown', 'Intron': 'unknown', 'Exon':
+            'unknown', 'ref': 'N', 'alt': 'N', 'Consequence': 'UNKNOWN', 'GC':
+            0.42, 'CpG': 0.02, 'motifECount': 0, 'motifEScoreChng': 0,
             'motifEHIPos': 0, 'oAA': 'unknown', 'nAA': 'unknown', 'cDNApos': 0,
             'relcDNApos': 0, 'CDSpos': 0, 'relCDSpos': 0, 'protPos': 0,
-            'relProtPos': 0, 'Domain': 'UD', 'Dst2Splice': 0,
-            'Dst2SplType': 'unknown', 'minDistTSS': 5.5, 'minDistTSE': 5.5,
-            'SIFTcat': 'UD', 'SIFTval': 0, 'PolyPhenCat': 'unknown',
-            'PolyPhenVal': 0, 'priPhCons': 0.115, 'mamPhCons': 0.079,
-            'verPhCons': 0.094, 'priPhyloP': -0.033, 'mamPhyloP': -0.038,
-            'verPhyloP': 0.017, 'bStatistic': 800, 'targetScan': 0,
-            'mirSVR-Score': 0, 'mirSVR-E': 0, 'mirSVR-Aln': 0,
-            'cHmmTssA': 0.0667, 'cHmmTssAFlnk': 0.0667, 'cHmmTxFlnk': 0.0667,
-            'cHmmTx': 0.0667, 'cHmmTxWk': 0.0667, 'cHmmEnhG': 0.0667,
-            'cHmmEnh': 0.0667, 'cHmmZnfRpts': 0.0667, 'cHmmHet': 0.667,
-            'cHmmTssBiv': 0.667, 'cHmmBivFlnk': 0.0667, 'cHmmEnhBiv': 0.0667,
-            'cHmmReprPC': 0.0667, 'cHmmReprPCWk': 0.0667, 'cHmmQuies': 0.0667,
-            'GerpRS': 0, 'GerpRSpval': 0, 'GerpN': 1.91, 'GerpS': -0.2,
-            'TFBS': 0, 'TFBSPeaks': 0, 'TFBSPeaksMax': 0, 'tOverlapMotifs': 0,
-            'motifDist': 0, 'Segway': 'unknown', 'EncH3K27Ac': 0,
-            'EncH3K4Me1': 0, 'EncH3K4Me3': 0, 'EncExp': 0, 'EncNucleo': 0,
-            'EncOCC': 5, 'EncOCCombPVal': 0, 'EncOCDNasePVal': 0,
-            'EncOCFairePVal': 0, 'EncOCpolIIPVal': 0, 'EncOCctcfPVal': 0,
+            'relProtPos': 0, 'Domain': 'UD', 'Dst2Splice': 0, 'Dst2SplType':
+            'unknown', 'minDistTSS': 5.5, 'minDistTSE': 5.5, 'SIFTcat': 'UD',
+            'SIFTval': 0, 'PolyPhenCat': 'unknown', 'PolyPhenVal': 0,
+            'priPhCons': 0.115, 'mamPhCons': 0.079, 'verPhCons': 0.094,
+            'priPhyloP': -0.033, 'mamPhyloP': -0.038, 'verPhyloP': 0.017,
+            'bStatistic': 800, 'targetScan': 0, 'mirSVR-Score': 0, 'mirSVR-E':
+            0, 'mirSVR-Aln': 0, 'cHmmTssA': 0.0667, 'cHmmTssAFlnk': 0.0667,
+            'cHmmTxFlnk': 0.0667, 'cHmmTx': 0.0667, 'cHmmTxWk': 0.0667,
+            'cHmmEnhG': 0.0667, 'cHmmEnh': 0.0667, 'cHmmZnfRpts': 0.0667,
+            'cHmmHet': 0.667, 'cHmmTssBiv': 0.667, 'cHmmBivFlnk': 0.0667,
+            'cHmmEnhBiv': 0.0667, 'cHmmReprPC': 0.0667, 'cHmmReprPCWk': 0.0667,
+            'cHmmQuies': 0.0667, 'GerpRS': 0, 'GerpRSpval': 0, 'GerpN': 1.91,
+            'GerpS': -0.2, 'TFBS': 0, 'TFBSPeaks': 0, 'TFBSPeaksMax': 0,
+            'tOverlapMotifs': 0, 'motifDist': 0, 'Segway': 'unknown',
+            'EncH3K27Ac': 0, 'EncH3K4Me1': 0, 'EncH3K4Me3': 0, 'EncExp': 0,
+            'EncNucleo': 0, 'EncOCC': 5, 'EncOCCombPVal': 0, 'EncOCDNasePVal':
+            0, 'EncOCFairePVal': 0, 'EncOCpolIIPVal': 0, 'EncOCctcfPVal': 0,
             'EncOCmycPVal': 0, 'EncOCDNaseSig': 0, 'EncOCFaireSig': 0,
             'EncOCpolIISig': 0, 'EncOCctcfSig': 0, 'EncOCmycSig': 0,
             'Grantham': 0, 'Dist2Mutation': 0, 'Freq100bp': 0, 'Rare100bp': 0,
@@ -363,14 +362,15 @@ class ASEPredictor:
     def training_reporter(self):
         """Report the training information"""
         self.learning_report = dict(
-            Params=self.model.get_params(),
             Scorer=self.model.scorer_,
-            Best_estimator=self.model.best_estimator_,
+            Params=self.model.get_params(),
             Best_params=self.model.best_params_,
             Best_score=self.model.best_score_,
             Best_index=self.model.best_index_,
             Cross_validations=self.model.cv_results_,
-            Model_score=self.model.score(self.x_test_matrix, self.y_test_vector)
+            Best_estimator=self.model.best_estimator_,
+            Model_score=self.model.score(self.x_test_matrix,
+                                         self.y_test_vector)
         )
 
     @timmer

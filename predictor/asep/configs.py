@@ -16,13 +16,13 @@ class Config:
     """configs module for the ASEPredictor
 
     A class to configure the ASEPredictor class. You can use the default
-    configuration by using attributes estimators_list, and
-    optim_params. You can also load your own configurations by
-    load_config(YOUR-FILE-NAME), but please note it will covert the current
-    configurations(`set_default` will get you back to the default configs). If
-    you want change the default settings, please make a instance and modify it
-    like modifying a Python dict object, but please note the structure and
-    import essential modules either built-in or third-party ones.
+    configuration by using attributes estimators_list, and optim_params. You
+    can also load your own configurations by load_config(YOUR-FILE-NAME), but
+    please note it will covert the current configurations(`set_default` will
+    get you back to the default configs). If you want change the default
+    settings, please make a instance and modify it like modifying a Python dict
+    object, but please note the structure and import essential modules either
+    built-in or third-party ones.
 
     Attributes:
         estimators_list (list): required, no default
