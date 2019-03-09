@@ -130,6 +130,7 @@ class ASEPredictor:
         self.draw_k_main_features_cv()
         self.draw_learning_curve(self.model, strategy=learning_curve_strategy)
 
+    @timmer
     def read_file_to_dataframe(self, nrows=None):
         """Read input file into pandas DataFrame."""
         file_name = self.input_file_name
@@ -140,6 +141,7 @@ class ASEPredictor:
         else:
             self.raw_dataframe = pandas.read_table(file_hand, nrows=nrows)
 
+    @timmer
     def setup_work_dataframe(self):
         """Deep copy the raw DataFrame into work DataFrame"""
         try:
@@ -147,6 +149,7 @@ class ASEPredictor:
         except Exception('Failed to deepcopy raw_df to work_df') as exp:
             raise exp
 
+    @timmer
     def slice_dataframe(self, rows=None, cols=None, mask=None, remove=True,
                         mask_first=True):
         """Slice the DataFrame base on rows, columns, and mask.
@@ -214,6 +217,7 @@ class ASEPredictor:
             do_trim(cols=cols, rows=rows, remove=remove)
             do_mask(mask=mask, remove=remove)
 
+    @timmer
     def setup_xy(self, x_cols=None, y_col=None):
         """Set up predictor variables and target variables.
 
@@ -238,6 +242,7 @@ class ASEPredictor:
 
         self.x_matrix, self.y_vector = x_matrix, y_vector
 
+    @timmer
     def label_encoder(self, target_cols=None, skip=None, remove=False):
         """Encode category columns
 
@@ -287,6 +292,7 @@ class ASEPredictor:
                 except ValueError as err:
                     print(err, file=sys.stderr)
 
+    @timmer
     def simple_imputer(self):
         """A simple imputater based on pandas DataFrame.replace method.
 
@@ -328,6 +334,7 @@ class ASEPredictor:
         targets = numpy.NaN
         self.work_dataframe = self.work_dataframe.replace(targets, defaults)
 
+    @timmer
     def setup_pipeline(self, estimator=None, biclass=True):
         """Setup a training pipeline
 
@@ -435,6 +442,7 @@ class ASEPredictor:
 
         self.learning_line = (fig, ax_learning)
 
+    @timmer
     def k_fold_stratified_validation(self, cvs=8, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
         skf = StratifiedKFold(n_splits=cvs, **kwargs)
@@ -473,6 +481,7 @@ class ASEPredictor:
         self.auc_false_true_pool = auc_fpr_tpr_pool
         self.feature_importance_pool = feature_pool
 
+    @timmer
     def draw_roc_curve_cv(self):
         """Draw ROC curve with cross-validation"""
         fig, ax_roc = pyplot.subplots(figsize=(10, 10))
@@ -530,6 +539,7 @@ class ASEPredictor:
 
         self.auc_false_true_curve = (fig, ax_roc)
 
+    @timmer
     def draw_k_main_features_cv(self, first_k=20):
         """Draw feature importance for the model with cross-validation"""
         name_mean_std_pool = []
@@ -559,6 +569,7 @@ class ASEPredictor:
 
         self.feature_importance_hist = (fig, ax_features)
 
+    @timmer
     def save_to(self, save_path="./"):
         """Save configs, results and etc. to disk"""
 
