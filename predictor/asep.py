@@ -121,7 +121,7 @@ def main():
     trim = [
         "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bn_ASE"
     ]
-    asep.run(mask=mask, trim_cols=trim, response=response, cvs_=10)
+    asep.run(mask=mask, trim_cols=trim, response=response, cvs_=6)
     asep.save_to(output_dir)
 
     # Use Bionmial
@@ -129,7 +129,7 @@ def main():
     trim = [
         "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bb_ASE"
     ]
-    asep.run(mask=mask, trim_cols=trim, response=response, cvs_=10)
+    asep.run(mask=mask, trim_cols=trim, response=response, cvs_=6)
     asep.save_to(output_dir)
 
 if __name__ == '__main__':
