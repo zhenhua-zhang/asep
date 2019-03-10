@@ -68,13 +68,13 @@ class Config:
             dict(
                 cv=10,
                 n_jobs=3,
-                n_iter=15,
+                n_iter=20,
                 iid=False,
                 refit="accuracy",
                 scoring=scoring_dict,
                 param_distributions=dict(
                     feature_selection__score_func=[mutual_info_classif],
-                    feature_selection__k=list(range(3, 110, 2)),
+                    feature_selection__k=list(range(3, 80, 2)),
                     rfc__n_estimators=list(range(50, 1000, 10)),
                     rfc__max_features=['auto', 'sqrt'],
                     rfc__max_depth=list(range(10, 111, 10)),

@@ -368,17 +368,34 @@ class ASEPredictor:
     @timmer
     def training_reporter(self):
         """Report the training information"""
-        self.learning_report = dict(
-            Scorer=self.model.scorer_,
-            Params=self.model.get_params(),
-            Best_params=self.model.best_params_,
-            Best_score=self.model.best_score_,
-            Best_index=self.model.best_index_,
-            Cross_validations=self.model.cv_results_,
-            Best_estimator=self.model.best_estimator_,
-            Model_score=self.model.score(self.x_test_matrix,
-                                         self.y_test_vector)
-        )
+        if self.learning_report:
+            self.learning_report.append(
+                dict(
+                    Scorer=self.model.scorer_,
+                    Params=self.model.get_params(),
+                    Best_params=self.model.best_params_,
+                    Best_score=self.model.best_score_,
+                    Best_index=self.model.best_index_,
+                    Cross_validations=self.model.cv_results_,
+                    Best_estimator=self.model.best_estimator_,
+                    Model_score=self.model.score(self.x_test_matrix,
+                                                 self.y_test_vector)
+                )
+            )
+        else:
+            self.learning_report = [
+                dict(
+                    Scorer=self.model.scorer_,
+                    Params=self.model.get_params(),
+                    Best_params=self.model.best_params_,
+                    Best_score=self.model.best_score_,
+                    Best_index=self.model.best_index_,
+                    Cross_validations=self.model.cv_results_,
+                    Best_estimator=self.model.best_estimator_,
+                    Model_score=self.model.score(self.x_test_matrix,
+                                                 self.y_test_vector)
+                )
+            ]
 
     @timmer
     def draw_learning_curve(self, estimator, strategy=None, **kwargs):
@@ -457,6 +474,7 @@ class ASEPredictor:
             self.y_test_vector = self.y_vector.iloc[test_idx]
 
             self.random_search(self.pipeline, **self.optim_params)
+            self.training_reporter()
 
             fpr, tpr, _ = roc_curve(
                 self.y_test_vector,

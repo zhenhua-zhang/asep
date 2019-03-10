@@ -46,7 +46,7 @@ def get_args():
         help="Pattern will be masked or kept"
     )
     group.add_argument(
-        "-s", "--group-size", dest="group_size", default=None,
+        "-s", "--group-size", dest="group_size", default=5,
         help="The least number of individuals bearing the same variant"
     )
     group.add_argument(
@@ -72,7 +72,7 @@ def get_args():
         from it, and overwrite values from command line except -i"""
     )
     group.add_argument(
-        "-C", "--cross_validations", dest="cross_validations", default=6,
+        "-C", "--cross_validations", dest="cross_validations", default=8,
         help="How many folds of cross-validation will be done"
     )
 
@@ -95,10 +95,10 @@ def main():
     arguments = parser.parse_args()
 
     # config_file = arguments.config_file
-    # cross_validations = arguments.cross_validations
+    cross_validations = arguments.cross_validations
     # first_k_rows = arguments.first_k_rows
-    # group_size = arguments.group_size
-    # input_file = arguments.input_file
+    group_size = arguments.group_size
+    input_file = arguments.input_file
     # mask = arguments.mask
     output_dir = arguments.output_dir
     # run_flag = arguments.run_flag
@@ -107,21 +107,17 @@ def main():
     # test_size = arguments.test_size
     # validation_file = arguments.validation_file
 
-    input_file = os.path.join(
-        '/home', 'umcg-zzhang', 'Documents', 'projects', 'ASEPrediction',
-        'training', 'outputs', 'biosGavinOverlapCov10',
-        'biosGavinOlCv10AntUfltCstBin.tsv'
-    )
+#    /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/biosGavinOverlapCov10/biosGavinOlCv10AntUfltCstBin.tsv
     asep = ASEPredictor(input_file)
 
-    mask = 'group_size < 2'
+    mask = 'group_size < {}'.format(group_size)
 
     # Use Beta-Binomial
     response = 'bb_ASE' # target_col
     trim = [
         "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bn_ASE"
     ]
-    asep.run(mask=mask, trim_cols=trim, response=response, cvs_=6)
+    asep.run(mask=mask, trim_cols=trim, response=response, cvs_=cross_validations)
     asep.save_to(output_dir)
 
     # Use Bionmial
@@ -129,7 +125,7 @@ def main():
     trim = [
         "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bb_ASE"
     ]
-    asep.run(mask=mask, trim_cols=trim, response=response, cvs_=6)
+    asep.run(mask=mask, trim_cols=trim, response=response, cvs_=cross_validations)
     asep.save_to(output_dir)
 
 if __name__ == '__main__':
