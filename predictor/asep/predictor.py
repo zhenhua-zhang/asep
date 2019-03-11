@@ -120,12 +120,11 @@ class ASEPredictor:
         self.work_dataframe[response] = self.work_dataframe[response].apply(abs)
 
         self.simple_imputer()
-        self.label_encoder()
         self.slice_dataframe(cols=trim_cols)
+        self.label_encoder()
         self.setup_xy(y_col=response)
         self.setup_pipeline(estimator=self.estimators_list, biclass=biclass_)
         self.k_fold_stratified_validation(cvs=cvs_)
-        self.training_reporter()
         self.draw_roc_curve_cv()
         self.draw_k_main_features_cv()
         self.draw_learning_curve(self.model, strategy=learning_curve_strategy)
@@ -413,13 +412,13 @@ class ASEPredictor:
         elif strategy == 'best':
             estimator = estimator.best_estimator_
         elif strategy == 'pipe':
-            estimator.set_params(n_iter=10, cv=6, iid=False)
+            estimator.set_params(n_iter=5, cv=3, iid=False)
         else:
             raise Exception('Valid strategy, (None, \'best\', or \'pipe\')')
 
         train_sizes, train_scores, test_scores = learning_curve(
-            estimator, X=self.x_matrix, y=self.y_vector, cv=2, n_jobs=8,
-            train_sizes=numpy.linspace(.1, 1., 20), **kwargs
+            estimator, X=self.x_matrix, y=self.y_vector, cv=6, n_jobs=8,
+            train_sizes=numpy.linspace(.1, 1., 15), **kwargs
         )
 
         train_scores_mean = numpy.mean(train_scores, axis=1)
@@ -460,7 +459,7 @@ class ASEPredictor:
         self.learning_line = (fig, ax_learning)
 
     @timmer
-    def k_fold_stratified_validation(self, cvs=8, **kwargs):
+    def k_fold_stratified_validation(self, cvs=10, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
         skf = StratifiedKFold(n_splits=cvs, **kwargs)
 
@@ -476,11 +475,13 @@ class ASEPredictor:
             self.random_search(self.pipeline, **self.optim_params)
             self.training_reporter()
 
-            fpr, tpr, _ = roc_curve(
-                self.y_test_vector,
-                self.model.predict_proba(self.x_test_matrix)[:, 1]
+            y_test_score = self.model.predict_proba(self.x_test_matrix)[:, 1]
+            auc_fpr_tpr_pool.append(
+                [
+                    roc_auc_score(self.y_test_vector, y_test_score), 
+                    roc_curve(self.y_test_vector, y_test_score)
+                ]
             )
-            auc_fpr_tpr_pool.append([auc(fpr, tpr), fpr, tpr])
 
             name_importance = zip(
                 self.x_train_matrix.columns[
@@ -505,7 +506,7 @@ class ASEPredictor:
         fig, ax_roc = pyplot.subplots(figsize=(10, 10))
         auc_pool, fpr_pool, tpr_pool = [], [], []
         space_len = 0
-        for auc_area, fpr, tpr in self.auc_false_true_pool:
+        for auc_area, (fpr, tpr, _) in self.auc_false_true_pool:
             auc_pool.append(auc_area)
             fpr_pool.append(fpr)
             tpr_pool.append(tpr)

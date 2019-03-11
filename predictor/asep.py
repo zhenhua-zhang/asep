@@ -72,7 +72,7 @@ def get_args():
         from it, and overwrite values from command line except -i"""
     )
     group.add_argument(
-        "-C", "--cross_validations", dest="cross_validations", default=8, 
+        "-C", "--cross_validations", dest="cross_validations", default=8,
         type=int, help="How many folds of cross-validation will be done"
     )
 
@@ -107,23 +107,30 @@ def main():
     # test_size = arguments.test_size
     # validation_file = arguments.validation_file
 
-#    /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/biosGavinOverlapCov10/biosGavinOlCv10AntUfltCstBin.tsv
+    # /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/biosGavinOverlapCov10/biosGavinOlCv10AntUfltCstBin.tsv
+
     asep = ASEPredictor(input_file)
 
     mask = 'group_size < {}'.format(group_size)
 
     # Use Beta-Binomial
+    print("\First run on bb_ASE")
     response = 'bb_ASE' # target_col
     trim = [
-        "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bn_ASE"
+        "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size",
+        "bn_ASE", "CaddChrom", "CaddPos", "CaddRef", "CaddAlt", "GeneName",
+        "motifEName", "GeneID", "FeatureID", "GeneName", "targetScan"
     ]
     asep.run(mask=mask, trim_cols=trim, response=response, cvs_=cross_validations)
     asep.save_to(output_dir)
 
+    print("\nAnother run on bn_ASE")
     # Use Bionmial
     response = 'bn_ASE'
     trim = [
-        "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size", "bb_ASE"
+        "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size",
+        "bb_ASE", "CaddChrom", "CaddPos", "CaddRef", "CaddAlt", "GeneName",
+        "motifEName", "GeneID", "FeatureID", "GeneName", "targetScan"
     ]
     asep.run(mask=mask, trim_cols=trim, response=response, cvs_=cross_validations)
     asep.save_to(output_dir)

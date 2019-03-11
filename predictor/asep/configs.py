@@ -6,6 +6,7 @@ import pickle
 
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.feature_selection import SelectKBest
+from sklearn.model_selection import StratifiedKFold
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_score
 from sklearn.metrics import accuracy_score
@@ -68,16 +69,16 @@ class Config:
 
         self.optim_params.update(
             dict(
-                cv=2,
-                n_jobs=2,
+                cv=StratifiedKFold(n_splits=10, shuffle=True),
+                n_jobs=3,
                 n_iter=20,
                 iid=False,
-                refit="accuracy",
+                refit="roc_auc_score",
                 scoring=scoring_dict,
                 param_distributions=dict(
                     feature_selection__score_func=[mutual_info_classif],
-                    feature_selection__k=list(range(3, 80, 2)),
-                    rfc__n_estimators=list(range(50, 1000, 10)),
+                    feature_selection__k=list(range(3, 50, 2)),
+                    rfc__n_estimators=list(range(50, 1000, 50)),
                     rfc__max_features=['auto', 'sqrt'],
                     rfc__max_depth=list(range(10, 111, 10)),
                     rfc__min_samples_split=[2, 4, 6, 8, 10],
