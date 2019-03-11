@@ -597,23 +597,29 @@ class ASEPredictor:
         if not os.path.exists(save_path):
             os.makedirs(save_path)
 
-        file_path = os.path.join(save_path, "feature_importances.pkl")
-        save_file(file_path, self.feature_importance_pool)
+        if self.feature_importance_pool:
+            file_path = os.path.join(save_path, "feature_importances.pkl")
+            save_file(file_path, self.feature_importance_pool)
 
-        file_path = os.path.join(save_path, "feature_importances_hist.png")
-        save_file(file_path, self.feature_importance_hist[0])
+        if self.feature_importance_hist:
+            file_path = os.path.join(save_path, "feature_importances_hist.png")
+            save_file(file_path, self.feature_importance_hist[0])
 
-        file_path = os.path.join(save_path, "AUC_false_true_positive_matrix.pkl")
-        save_file(file_path, self.auc_false_true_pool)
+        if self.auc_false_true_pool:
+            file_path = os.path.join(save_path, "AUC_false_true_positive_matrix.pkl")
+            save_file(file_path, self.auc_false_true_pool)
 
-        file_path = os.path.join(save_path, "roc_curve.png")
-        save_file(file_path, self.auc_false_true_curve[0])
+        if self.auc_false_true_curve:
+            file_path = os.path.join(save_path, "roc_curve.png")
+            save_file(file_path, self.auc_false_true_curve[0])
 
-        file_path = os.path.join(save_path, "training_report.pkl")
-        save_file(file_path, self.learning_report)
+        if self.learning_report:
+            file_path = os.path.join(save_path, "training_report.pkl")
+            save_file(file_path, self.learning_report)
 
-        file_path = os.path.join(save_path, "learning_curve.png")
-        save_file(file_path, self.learning_line[0])
+        if self.learning_line:
+            file_path = os.path.join(save_path, "learning_curve.png")
+            save_file(file_path, self.learning_line[0])
 
         file_path = os.path.join(save_path, time_stamp + "_object.pkl")
         with open(file_path, 'wb') as opfh:
