@@ -10,6 +10,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_score
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import make_scorer
+from sklearn.metrics import roc_auc_score
 
 
 class Config:
@@ -61,13 +62,14 @@ class Config:
 
         scoring_dict = dict(
             precision=make_scorer(precision_score, average="micro"),
-            accuracy=make_scorer(accuracy_score)
+            accuracy=make_scorer(accuracy_score),
+            roc_auc_score=make_scorer(roc_auc_score, needs_proba=True)
         )
 
         self.optim_params.update(
             dict(
-                cv=10,
-                n_jobs=3,
+                cv=2,
+                n_jobs=2,
                 n_iter=20,
                 iid=False,
                 refit="accuracy",
