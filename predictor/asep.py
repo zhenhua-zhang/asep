@@ -38,7 +38,7 @@ def get_args():
 
     group = parser.add_argument_group("Filter")
     group.add_argument(
-        "-f", "--first-k-rows", dest="first_k_rows", default=None,
+        "-f", "--first-k-rows", dest="first_k_rows", default=None, type=int,
         help="Only read first k rows as input from input file"
     )
     group.add_argument(
@@ -46,7 +46,7 @@ def get_args():
         help="Pattern will be masked or kept"
     )
     group.add_argument(
-        "-s", "--group-size", dest="group_size", default=5,
+        "-s", "--group-size", dest="group_size", default=5, type=int,
         help="The least number of individuals bearing the same variant"
     )
     group.add_argument(
@@ -72,13 +72,13 @@ def get_args():
         from it, and overwrite values from command line except -i"""
     )
     group.add_argument(
-        "-C", "--cross_validations", dest="cross_validations", default=8,
-        help="How many folds of cross-validation will be done"
+        "-C", "--cross_validations", dest="cross_validations", default=8, 
+        type=int, help="How many folds of cross-validation will be done"
     )
 
     group = parser.add_argument_group("Misc")
     group.add_argument(
-        "--test-size", dest="test_size", default=None,
+        "--test-size", dest="test_size", default=None, type=int,
         help="the proportion of dataset for testing"
     )
     group.add_argument(
