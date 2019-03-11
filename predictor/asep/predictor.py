@@ -32,8 +32,8 @@ from sklearn.model_selection import learning_curve
 from sklearn.preprocessing import LabelEncoder
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.pipeline import Pipeline
+from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
-from sklearn.metrics import auc
 
 try:
     from matplotlib import pyplot
