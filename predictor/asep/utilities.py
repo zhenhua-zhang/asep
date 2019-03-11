@@ -28,7 +28,7 @@ def timmer(func):
         func_name = func.__name__
         used_time = time.perf_counter() - start_time
         sys.stderr.write(
-            '{} is done; elapsed: {:.5f} secs\n'.format(func_name, used_time)
+            '{}\t\t .... DONE, time: {:.5f} secs\n'.format(func_name, used_time)
         )
         return value
 
