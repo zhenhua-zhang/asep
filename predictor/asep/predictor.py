@@ -110,7 +110,8 @@ class ASEPredictor:
 
     @timmer
     def run(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
-            biclass_=True, cvs_=2, lc_strategy="pipe", mings=2, maxgs=None):
+            biclass_=True, outer_cvs=6, lc_strategy="pipe", mings=2,
+            maxgs=None, outer_n_jobs=5):
         """Execute a pre-designed construct pipeline"""
 
         self.TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
@@ -125,7 +126,7 @@ class ASEPredictor:
         else:
             gs_mask = "group_size >= {:n}".format(mings)
 
-        self.slice_dataframe(mask=gs_mask)
+        self.slice_dataframe(mask=gs_mask, remove=False)
 
         self.work_dataframe[response] = self.work_dataframe[response].apply(abs)
 
@@ -134,7 +135,7 @@ class ASEPredictor:
         self.label_encoder()
         self.setup_xy(y_col=response)
         self.setup_pipeline(estimator=self.estimators_list, biclass=biclass_)
-        self.outer_validation(cvs=cvs_)
+        self.outer_validation(n_jobs=outer_n_jobs, cvs=outer_cvs)
         self.draw_roc_curve_cv()
         self.draw_k_main_features_cv()
         # self.draw_learning_curve(self.model_pool[0], strategy=lc_strategy)

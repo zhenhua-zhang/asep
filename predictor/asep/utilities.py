@@ -39,7 +39,7 @@ def check_resources():
     """Chekc resources available"""
     cpus = os.cpu_count()  # Number of cpus physically
     cpus_per_task = os.environ['SLURM_CPUS_PER_TASK']
-    pass
+    math.root(cpus_per_task)
 
 
 def format_print(title, main_content, pipe=sys.stdout):

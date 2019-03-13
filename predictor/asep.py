@@ -169,12 +169,14 @@ def main():
     max_group_size = arguments.max_group_size
 
     first_k_rows = arguments.first_k_rows
+    outer_n_jobs = arguments.outer_n_jobs
     reponse_col = arguments.reponse_col
     outer_cvs = arguments.outer_cvs
     mask = arguments.mask
     asep.run(
-        mask=mask, cvs_=outer_cvs, mings=min_group_size, maxgs=max_group_size,
-        limit=first_k_rows, response=reponse_col, drop_cols=drop_cols,
+        mask=mask, outer_cvs=outer_cvs, mings=min_group_size, maxgs=max_group_size,
+        limit=first_k_rows, response=reponse_col, drop_cols=drop_cols, 
+        outer_n_jobs=outer_n_jobs,
     )
 
     output_dir = arguments.output_dir
