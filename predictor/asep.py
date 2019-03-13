@@ -101,7 +101,15 @@ def get_args():
         help="Number of jobs for outer_validation"
     )
     group.add_argument(
-        "--space-size", dest="space_size", default=10, type=int,
+        "--learning-curve-cvs", dest="lc_cvs", default=4, type=int, 
+        help="Number of folds to draw learning curve"
+    )
+    group.add_argument(
+        "--learning-curve-n-jobs", dest="lc_n_jobs", default=5, type=int,
+        help="Number of jobs to draw learning curves"
+    )
+    group.add_argument(
+        "--learning-curve-space-size", dest="lc_space_size", default=10, type=int,
         help="Number of splits will be create in learning curve"
     )
 
@@ -175,15 +183,18 @@ def main():
     max_group_size = arguments.max_group_size
 
     first_k_rows = arguments.first_k_rows
+    outer_cvs = arguments.outer_cvs
     outer_n_jobs = arguments.outer_n_jobs
     reponse_col = arguments.reponse_col
-    space_size = arguments.space_size
-    outer_cvs = arguments.outer_cvs
+    lc_space_size = arguments.lc_space_size
+    lc_n_jobs = arguments.lc_n_jobs
+    lc_cvs = arguments.lc_cvs
     mask = arguments.mask
     asep.run(
-        mask=mask, outer_cvs=outer_cvs, mings=min_group_size, maxgs=max_group_size,
+        mask=mask, outer_cvs=outer_cvs, mings=min_group_size, 
+        maxgs=max_group_size,
         limit=first_k_rows, response=reponse_col, drop_cols=drop_cols, 
-        outer_n_jobs=outer_n_jobs, space_size=space_size
+        outer_n_jobs=outer_n_jobs, lc_space_size=lc_space_size, lc_n_jobs=lc_n_jobs, lc_cvs=lc_cvs
     )
 
     output_dir = arguments.output_dir

@@ -111,7 +111,8 @@ class ASEPredictor:
     @timmer
     def run(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
             biclass_=True, outer_cvs=6, lc_strategy="pipe", mings=2,
-            maxgs=None, outer_n_jobs=5, space_size=10):
+            maxgs=None, outer_n_jobs=5, lc_space_size=10, lc_n_jobs=lc_n_jobs,
+            lc_cvs=lc_cvs):
         """Execute a pre-designed construct pipeline"""
 
         self.TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
@@ -138,7 +139,10 @@ class ASEPredictor:
         self.outer_validation(cv=outer_cvs, n_jobs=outer_n_jobs)
         self.draw_roc_curve_cv()
         self.draw_k_main_features_cv()
-        self.draw_learning_curve(cv=outer_cvs, n_jobs=outer_n_jobs, space_size=space_size)
+        self.draw_learning_curve(
+            cv=outer_cvs, n_jobs=outer_n_jobs, lc_space_size=lc_space_size,
+            lc_n_jobs=lc_n_jobs, lc_cvs=lc_cvs
+        )
         print
 
     @timmer
@@ -393,11 +397,11 @@ class ASEPredictor:
             ]
 
     @timmer
-    def draw_learning_curve(self, cv=10, n_jobs=5, space_size=10, **kwargs):
+    def draw_learning_curve(self, cv=10, n_jobs=5, lc_space_size=10, **kwargs):
         """Draw the learning curve of specific estimator or pipeline"""
         train_sizes, train_scores, test_scores = learning_curve(
             estimator=self.model, X=self.x_matrix, y=self.y_vector,
-            train_sizes=numpy.linspace(.1, 1., space_size), cv=cv,
+            train_sizes=numpy.linspace(.1, 1., lc_space_size), cv=cv,
             n_jobs=n_jobs, **kwargs
         )
 
@@ -503,6 +507,7 @@ class ASEPredictor:
 
         result_queue = Queue()
         for _ in range(n_jobs):
+            time.sleep(20)
             p = Process(target=worker, args=(task_queue, result_queue))
             p.start()
 
