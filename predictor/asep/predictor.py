@@ -111,7 +111,7 @@ class ASEPredictor:
     @timmer
     def run(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
             biclass_=True, outer_cvs=6, lc_strategy="pipe", mings=2,
-            maxgs=None, outer_n_jobs=5):
+            maxgs=None, outer_n_jobs=5, space_size=10):
         """Execute a pre-designed construct pipeline"""
 
         self.TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
@@ -135,10 +135,11 @@ class ASEPredictor:
         self.label_encoder()
         self.setup_xy(y_col=response)
         self.setup_pipeline(estimator=self.estimators_list, biclass=biclass_)
-        self.outer_validation(n_jobs=outer_n_jobs, cvs=outer_cvs)
+        self.outer_validation(cv=outer_cvs, n_jobs=outer_n_jobs)
         self.draw_roc_curve_cv()
         self.draw_k_main_features_cv()
-        # self.draw_learning_curve(self.model_pool[0], strategy=lc_strategy)
+        self.draw_learning_curve(cv=outer_cvs, n_jobs=outer_n_jobs, space_size=space_size)
+        print
 
     @timmer
     def read_file_to_dataframe(self, nrows=None):
@@ -392,28 +393,12 @@ class ASEPredictor:
             ]
 
     @timmer
-    def draw_learning_curve(self, estimator, strategy=None, **kwargs):
-        """Draw the learning curve of specific estimator or pipeline
-
-        Args:
-            estimator (sklearn estimator): compulsary
-            strategy (str or None): optional, default None
-            **kwargs: optional; default empty
-                Keyword arguments for learning_curve from scikit-learn
-        """
-        if strategy is None:
-            estimator = copy.deepcopy(self.estimators_list[-1][-1])
-            estimator.set_params(n_estimators=100)
-        elif strategy == 'best':
-            estimator = estimator.best_estimator_
-        elif strategy == 'pipe':
-            estimator.set_params(n_iter=10, iid=False)
-        else:
-            raise Exception('Valid strategy, (None, \'best\', or \'pipe\')')
-
+    def draw_learning_curve(self, cv=10, n_jobs=5, space_size=10, **kwargs):
+        """Draw the learning curve of specific estimator or pipeline"""
         train_sizes, train_scores, test_scores = learning_curve(
-            estimator, X=self.x_matrix, y=self.y_vector, cv=10, n_jobs=20,
-            train_sizes=numpy.linspace(.1, 1., 10), **kwargs
+            estimator=self.model, X=self.x_matrix, y=self.y_vector,
+            train_sizes=numpy.linspace(.1, 1., space_size), cv=cv,
+            n_jobs=n_jobs, **kwargs
         )
 
         train_scores_mean = numpy.mean(train_scores, axis=1)
@@ -496,19 +481,19 @@ class ASEPredictor:
         return (training_report, auc, feature_importance, model)
 
     @timmer
-    def outer_validation(self, n_jobs=5, cvs=6, **kwargs):
+    def outer_validation(self, cv=6, n_jobs=5, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
 
         def worker(input, output):
             for func, model, split in iter(input.get, 'STOP'):
                 output.put(func(model, split))
 
-        skf = StratifiedKFold(n_splits=cvs, **kwargs)
+        skf = StratifiedKFold(n_splits=cv, **kwargs)
         split_pool = skf.split(self.x_matrix, self.y_vector)
 
-        model = RandomizedSearchCV(self.pipeline, **self.optim_params)
+        self.model = RandomizedSearchCV(self.pipeline, **self.optim_params)
         task_pool = [ 
-            (self.random_searcher, copy.deepcopy(model), split)
+            (self.random_searcher, copy.deepcopy(self.model), split)
             for split in split_pool 
         ]  # XXX: Deepcopy model, memory intensive but much safer ??
 
@@ -532,10 +517,10 @@ class ASEPredictor:
 
         if self.feature_importance_pool is None:
             self.feature_importance_pool = {
-                name: [0] * cvs for name in self.x_matrix.columns
+                name: [0] * cv for name in self.x_matrix.columns
             }
 
-        for cv_idx in range(cvs):
+        for cv_idx in range(cv):
             training_report, auc, feature_importance, model = result_queue.get()
 
             self.model_pool.append(model)
@@ -663,9 +648,9 @@ class ASEPredictor:
             file_path = os.path.join(save_path, "roc_curve.png")
             save_file(file_path, self.area_under_curve_curve[0])
 
-        if self.learning_report:
+        if self.training_report_pool:
             file_path = os.path.join(save_path, "training_report.pkl")
-            save_file(file_path, self.learning_report)
+            save_file(file_path, self.training_report_pool)
 
         if self.learning_line:
             file_path = os.path.join(save_path, "learning_curve.png")

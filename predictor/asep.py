@@ -5,7 +5,11 @@
 
 import os
 import sys
+
 from argparse import ArgumentParser
+
+from sklearn.model_selection import StratifiedKFold
+
 from asep.predictor import ASEPredictor
 from asep.configs import Config
 
@@ -96,6 +100,10 @@ def get_args():
         "--outer-n-jobs", dest="outer_n_jobs", default=5, type=int,
         help="Number of jobs for outer_validation"
     )
+    group.add_argument(
+        "--space-size", dest="space_size", default=10, type=int,
+        help="Number of splits will be create in learning curve"
+    )
 
     group = parser.add_argument_group("Misc")
     group.add_argument(
@@ -103,7 +111,7 @@ def get_args():
         help="the proportion of dataset for testing"
     )
     group.add_argument(
-        "--run-flag", dest="run_flag", default="New task",
+        "--run-flag", dest="run_flag", default="New_task",
         help="Flags for current run"
     )
 
@@ -121,7 +129,6 @@ def main():
 
     # /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/biosGavinOverlapCov10/biosGavinOlCv10AntUfltCstBin.tsv
 
-    # HEAD::Config for model training
     my_config = Config()
     inner_cvs = arguments.inner_cvs
     if inner_cvs != 6:
@@ -142,7 +149,6 @@ def main():
         my_config.optim_params['n_iter'] = inner_n_iters
     else:
         pass
-    # TAIL::Config for model training
 
     input_file = arguments.input_file
     asep = ASEPredictor(input_file, my_config)
@@ -171,16 +177,19 @@ def main():
     first_k_rows = arguments.first_k_rows
     outer_n_jobs = arguments.outer_n_jobs
     reponse_col = arguments.reponse_col
+    space_size = arguments.space_size
     outer_cvs = arguments.outer_cvs
     mask = arguments.mask
     asep.run(
         mask=mask, outer_cvs=outer_cvs, mings=min_group_size, maxgs=max_group_size,
         limit=first_k_rows, response=reponse_col, drop_cols=drop_cols, 
-        outer_n_jobs=outer_n_jobs,
+        outer_n_jobs=outer_n_jobs, space_size=space_size
     )
 
     output_dir = arguments.output_dir
     asep.save_to(output_dir)
+
+    print("{:-^80}".format(run_flag))
 
 if __name__ == '__main__':
     main()

@@ -80,7 +80,7 @@ class Config:
                 n_iter=20,
                 iid=False,  # TODO: need more knowledge to understand iid here
                 scoring=scoring_dict,
-                refit="roc_auc_score",
+                refit="accuracy",
                 return_train_score=True,
                 param_distributions=dict(
                     feature_selection__score_func=[mutual_info_classif],
