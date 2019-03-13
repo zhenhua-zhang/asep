@@ -25,14 +25,21 @@ def timmer(func):
     def wrapper_timmer(*args, **kwargs):
         start_time = time.perf_counter()
         value = func(*args, **kwargs)
-        func_name = func.__name__
+        func_name = func.__name__ + " "
         used_time = time.perf_counter() - start_time
-        sys.stderr.write(
-            '{}\t\t .... DONE, time: {:.5f} secs\n'.format(func_name, used_time)
+        print('{:.<40} DONE, time: {:.5f} secs'.format(func_name, used_time),
+            file=sys.stderr
         )
         return value
 
     return wrapper_timmer
+
+
+def check_resources():
+    """Chekc resources available"""
+    cpus = os.cpu_count()  # Number of cpus physically
+    cpus_per_task = os.environ['SLURM_CPUS_PER_TASK']
+    pass
 
 
 def format_print(title, main_content, pipe=sys.stdout):
