@@ -16,11 +16,15 @@ TODO:
     * Add more input file type
 """
 
+import pprint
 import pickle
 import copy
 import time
 import sys
 import os
+
+from multiprocessing import Process
+from multiprocessing import Queue
 
 import pandas
 import numpy
@@ -58,6 +62,7 @@ def save_file(filename, target):
             pickle.dump(target, opfh)
 
 
+
 class ASEPredictor:
     """A class implementing prediction of ASE variance of a variant
 
@@ -68,7 +73,7 @@ class ASEPredictor:
         >>> ap.run()
     """
 
-    def __init__(self, file_name, sed=3142):
+    def __init__(self, file_name, config, sed=3142):
         """Set up basic variables
 
         Args:
@@ -79,55 +84,60 @@ class ASEPredictor:
 
         self.input_file_name = file_name
 
-        self.configuration = Config()
-        self.estimators_list = self.configuration.estimators_list
-        self.optim_params = self.configuration.optim_params
+        self.estimators_list = config.estimators_list
+        self.optim_params = config.optim_params
 
         self.raw_dataframe = None
         self.work_dataframe = None
 
         self.x_matrix = None
         self.y_vector = None
-        self.x_train_matrix = None
-        self.y_train_vector = None
-        self.x_test_matrix = None
-        self.y_test_vector = None
 
         self.pipeline = None
         self.model = None
 
+        self.model_pool = None
+        self.training_report_pool = None
+
         self.feature_importance_pool = None
         self.feature_importance_hist = None
 
-        self.auc_false_true_pool = None
-        self.auc_false_true_curve = None
+        self.area_under_curve_pool = None
+        self.area_under_curve_curve = None
 
         self.learning_line = None
         self.learning_report = None
 
     @timmer
-    def run(self, limit=None, mask=None, response="bb_ASE", trim_cols=None,
-            biclass_=True, cvs_=2, learning_curve_strategy="pipe",
-            output_dir=None):
+    def run(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
+            biclass_=True, cvs_=2, lc_strategy="pipe", mings=2, maxgs=None):
         """Execute a pre-designed construct pipeline"""
 
         self.TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
         self.read_file_to_dataframe(nrows=limit)
         self.setup_work_dataframe()
-        self.slice_dataframe(mask=mask)
+
+        if maxgs:
+            gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))".format(
+                mings, maxgs
+            )
+        else:
+            gs_mask = "group_size >= {:n}".format(mings)
+
+        self.slice_dataframe(mask=gs_mask)
 
         self.work_dataframe[response] = self.work_dataframe[response].apply(abs)
 
         self.simple_imputer()
-        self.slice_dataframe(cols=trim_cols)
+        self.slice_dataframe(cols=drop_cols)
         self.label_encoder()
         self.setup_xy(y_col=response)
         self.setup_pipeline(estimator=self.estimators_list, biclass=biclass_)
-        self.k_fold_stratified_validation(cvs=cvs_)
+        self.outer_validation(cvs=cvs_)
         self.draw_roc_curve_cv()
         self.draw_k_main_features_cv()
-        self.draw_learning_curve(self.model, strategy=learning_curve_strategy)
+        # self.draw_learning_curve(self.model_pool[0], strategy=lc_strategy)
 
     @timmer
     def read_file_to_dataframe(self, nrows=None):
@@ -349,22 +359,6 @@ class ASEPredictor:
             self.pipeline = OneVsOneClassifier(Pipeline(estimator))
 
     @timmer
-    def random_search(self, estimator=None, **kwargs):
-        """Hyper-parameters optimization by RandomizedSearchCV
-
-        Args:
-            estimator (estimator): compulsory; scikit-learn estimator object
-                An object
-            **kwargs: keyword arguments
-                Any keyword argument suitable
-        """
-        if estimator is None:
-            estimator = self.pipeline
-
-        random_search = RandomizedSearchCV(estimator, **kwargs)
-        self.model = random_search.fit(self.x_train_matrix, self.y_train_vector)
-
-    @timmer
     def training_reporter(self):
         """Report the training information"""
         if self.learning_report:
@@ -412,13 +406,13 @@ class ASEPredictor:
         elif strategy == 'best':
             estimator = estimator.best_estimator_
         elif strategy == 'pipe':
-            estimator.set_params(n_iter=5, cv=3, iid=False)
+            estimator.set_params(n_iter=10, iid=False)
         else:
             raise Exception('Valid strategy, (None, \'best\', or \'pipe\')')
 
         train_sizes, train_scores, test_scores = learning_curve(
-            estimator, X=self.x_matrix, y=self.y_vector, cv=6, n_jobs=8,
-            train_sizes=numpy.linspace(.1, 1., 15), **kwargs
+            estimator, X=self.x_matrix, y=self.y_vector, cv=10, n_jobs=20,
+            train_sizes=numpy.linspace(.1, 1., 10), **kwargs
         )
 
         train_scores_mean = numpy.mean(train_scores, axis=1)
@@ -459,46 +453,100 @@ class ASEPredictor:
         self.learning_line = (fig, ax_learning)
 
     @timmer
-    def k_fold_stratified_validation(self, cvs=10, **kwargs):
+    def random_searcher(self, model, split):
+        """Hyper-parameters optimization by RandomizedSearchCV
+
+        Args:
+            model (estimator): compulsory; scikit-learn estimator object
+                An object
+            split (iterable): required;
+        """
+        train_idx, test_idx = split
+        x_train_matrix = copy.deepcopy(self.x_matrix.iloc[train_idx])
+        y_train_vector = copy.deepcopy(self.y_vector.iloc[train_idx])
+        x_test_matrix = copy.deepcopy(self.x_matrix.iloc[test_idx])
+        y_test_vector = copy.deepcopy(self.y_vector.iloc[test_idx])
+
+        model.fit(x_train_matrix, y_train_vector)
+        training_report = dict(
+            Scorer=model.scorer_, Params=model.get_params(),
+            Best_params=model.best_params_, Best_score=model.best_score_,
+            Best_index=model.best_index_, Cross_validations=model.cv_results_,
+            Best_estimator=model.best_estimator_,
+            Model_score=model.score(x_test_matrix, y_test_vector)
+        )
+
+        y_test_scores = model.predict_proba(x_test_matrix)[:, 1]
+        auc = [
+            roc_auc_score(y_test_vector, y_test_scores), 
+            roc_curve(y_test_vector, y_test_scores)
+        ]
+
+        estimator = model.best_estimator_
+        first_k_name = x_train_matrix.columns[
+            estimator.steps[0][-1].get_support(True)
+        ]
+        first_k_importance = estimator.steps[-1][-1].feature_importances_
+        feature_importance = {
+            name: importance 
+            for name, importance in zip(first_k_name, first_k_importance)
+        }
+
+        return (training_report, auc, feature_importance, model)
+
+    @timmer
+    def outer_validation(self, n_jobs=5, cvs=6, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
+
+        def worker(input, output):
+            for func, model, split in iter(input.get, 'STOP'):
+                output.put(func(model, split))
+
         skf = StratifiedKFold(n_splits=cvs, **kwargs)
+        split_pool = skf.split(self.x_matrix, self.y_vector)
 
-        auc_fpr_tpr_pool = []
-        feature_pool = {}
-        for idx, (train_idx, test_idx) in enumerate(
-                skf.split(self.x_matrix, self.y_vector)):
-            self.x_train_matrix = self.x_matrix.iloc[train_idx]
-            self.x_test_matrix = self.x_matrix.iloc[test_idx]
-            self.y_train_vector = self.y_vector.iloc[train_idx]
-            self.y_test_vector = self.y_vector.iloc[test_idx]
+        model = RandomizedSearchCV(self.pipeline, **self.optim_params)
+        task_pool = [ 
+            (self.random_searcher, copy.deepcopy(model), split)
+            for split in split_pool 
+        ]  # XXX: Deepcopy model, memory intensive but much safer ??
 
-            self.random_search(self.pipeline, **self.optim_params)
-            self.training_reporter()
+        task_queue = Queue()
+        for task in task_pool:
+            task_queue.put(task)
 
-            y_test_score = self.model.predict_proba(self.x_test_matrix)[:, 1]
-            auc_fpr_tpr_pool.append(
-                [
-                    roc_auc_score(self.y_test_vector, y_test_score), 
-                    roc_curve(self.y_test_vector, y_test_score)
-                ]
-            )
+        result_queue = Queue()
+        for _ in range(n_jobs):
+            p = Process(target=worker, args=(task_queue, result_queue))
+            p.start()
 
-            name_importance = zip(
-                self.x_train_matrix.columns[
-                    self.model.best_estimator_.steps[0][-1].get_support(True)
-                ],
-                self.model.best_estimator_.steps[-1][-1].feature_importances_
-            )
+        if self.model_pool is None:
+            self.model_pool = []
 
-            for name, importance in name_importance:
-                if name in feature_pool:
-                    feature_pool[name][idx] = importance
-                else:
-                    feature_pool[name] = [0] * cvs
-                    feature_pool[name][0] = importance
+        if self.area_under_curve_pool is None:
+            self.area_under_curve_pool = []
 
-        self.auc_false_true_pool = auc_fpr_tpr_pool
-        self.feature_importance_pool = feature_pool
+        if self.training_report_pool is None:
+            self.training_report_pool = []
+
+        if self.feature_importance_pool is None:
+            self.feature_importance_pool = {
+                name: [0] * cvs for name in self.x_matrix.columns
+            }
+
+        for cv_idx in range(cvs):
+            training_report, auc, feature_importance, model = result_queue.get()
+
+            self.model_pool.append(model)
+            self.area_under_curve_pool.append(auc)
+            self.training_report_pool.append(training_report)
+
+            for name, importance in feature_importance.items():
+                self.feature_importance_pool[name][cv_idx] = importance 
+
+
+        for _ in range(n_jobs):
+            task_queue.put('STOP')
 
     @timmer
     def draw_roc_curve_cv(self):
@@ -506,7 +554,7 @@ class ASEPredictor:
         fig, ax_roc = pyplot.subplots(figsize=(10, 10))
         auc_pool, fpr_pool, tpr_pool = [], [], []
         space_len = 0
-        for auc_area, (fpr, tpr, _) in self.auc_false_true_pool:
+        for auc_area, (fpr, tpr, _) in self.area_under_curve_pool:
             auc_pool.append(auc_area)
             fpr_pool.append(fpr)
             tpr_pool.append(tpr)
@@ -556,7 +604,7 @@ class ASEPredictor:
         ax_roc.plot([0, 1], color='grey', linestyle='--')
         ax_roc.legend(loc="best")
 
-        self.auc_false_true_curve = (fig, ax_roc)
+        self.area_under_curve_curve = (fig, ax_roc)
 
     @timmer
     def draw_k_main_features_cv(self, first_k=20):
@@ -606,13 +654,13 @@ class ASEPredictor:
             file_path = os.path.join(save_path, "feature_importances_hist.png")
             save_file(file_path, self.feature_importance_hist[0])
 
-        if self.auc_false_true_pool:
+        if self.area_under_curve_pool:
             file_path = os.path.join(save_path, "AUC_false_true_positive_matrix.pkl")
-            save_file(file_path, self.auc_false_true_pool)
+            save_file(file_path, self.area_under_curve_pool)
 
-        if self.auc_false_true_curve:
+        if self.area_under_curve_curve:
             file_path = os.path.join(save_path, "roc_curve.png")
-            save_file(file_path, self.auc_false_true_curve[0])
+            save_file(file_path, self.area_under_curve_curve[0])
 
         if self.learning_report:
             file_path = os.path.join(save_path, "training_report.pkl")
