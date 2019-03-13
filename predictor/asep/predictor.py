@@ -111,8 +111,8 @@ class ASEPredictor:
     @timmer
     def run(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
             biclass_=True, outer_cvs=6, lc_strategy="pipe", mings=2,
-            maxgs=None, outer_n_jobs=5, lc_space_size=10, lc_n_jobs=lc_n_jobs,
-            lc_cvs=lc_cvs):
+            maxgs=None, outer_n_jobs=5, lc_space_size=10, lc_n_jobs=5,
+            lc_cvs=5):
         """Execute a pre-designed construct pipeline"""
 
         self.TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
