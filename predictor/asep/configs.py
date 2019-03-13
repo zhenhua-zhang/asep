@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 """configs module"""
 
-import pickle
-
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.feature_selection import SelectKBest
 from sklearn.model_selection import StratifiedKFold
@@ -50,15 +48,12 @@ class Config:
 
     def insert_estimator(self, estimator, position=0):
         """Add more estimator in to estimators_list"""
-        pass
 
     def insert_scorer(self, estimator, position=0):
         """Add more scorer for end estimator"""
-        pass
 
     def set_params(self, param_name, param_value):
         """Set parameters in optim_params"""
-        pass
 
     def set_default(self):
         """Set up default configuration"""
@@ -100,12 +95,3 @@ class Config:
             estimators_list=self.estimators_list,
             random_search_parameters=self.optim_params
         )
-
-    def dump_configs(self, file_name):
-        """Write the config into a file to make life easier.
-
-        Args:
-            file_name (str or None): required; default None
-        """
-        with open(file_name, 'wb') as fnh:
-            pickle.dump(self.config_dict, fnh)

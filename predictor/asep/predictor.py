@@ -16,7 +16,6 @@ TODO:
     * Add more input file type
 """
 
-import pprint
 import pickle
 import copy
 import time
@@ -50,7 +49,6 @@ except ImportError as err:
 from .utilities import format_print
 from .utilities import set_sed
 from .utilities import timmer
-from .configs import Config
 
 def save_file(filename, target):
     """Save your file smartly"""
@@ -80,7 +78,7 @@ class ASEPredictor:
             file_name (str): input data set
         """
         set_sed(sed)
-        self.TIME_STAMP = None
+        self.time_stamp = None
 
         self.input_file_name = file_name
 
@@ -110,12 +108,11 @@ class ASEPredictor:
 
     @timmer
     def run(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
-            biclass_=True, outer_cvs=6, lc_strategy="pipe", mings=2,
-            maxgs=None, outer_n_jobs=5, lc_space_size=10, lc_n_jobs=5,
-            lc_cvs=5):
+            biclass_=True, outer_cvs=6, mings=2, maxgs=None, outer_n_jobs=5,
+            lc_space_size=10, lc_n_jobs=5, lc_cvs=5):
         """Execute a pre-designed construct pipeline"""
 
-        self.TIME_STAMP = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
+        self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
         self.read_file_to_dataframe(nrows=limit)
         self.setup_work_dataframe()
@@ -128,20 +125,17 @@ class ASEPredictor:
             gs_mask = "group_size >= {:n}".format(mings)
 
         self.slice_dataframe(mask=gs_mask, remove=False)
-
         self.work_dataframe[response] = self.work_dataframe[response].apply(abs)
-
         self.simple_imputer()
         self.slice_dataframe(cols=drop_cols)
         self.label_encoder()
         self.setup_xy(y_col=response)
         self.setup_pipeline(estimator=self.estimators_list, biclass=biclass_)
-        self.outer_validation(cv=outer_cvs, n_jobs=outer_n_jobs)
+        self.outer_validation(cvs=outer_cvs, n_jobs=outer_n_jobs)
         self.draw_roc_curve_cv()
         self.draw_k_main_features_cv()
         self.draw_learning_curve(
-            cv=outer_cvs, n_jobs=outer_n_jobs, lc_space_size=lc_space_size,
-            lc_n_jobs=lc_n_jobs, lc_cvs=lc_cvs
+            cvs=lc_cvs, n_jobs=lc_n_jobs, space_size=lc_space_size
         )
         print
 
@@ -365,7 +359,7 @@ class ASEPredictor:
             self.pipeline = OneVsOneClassifier(Pipeline(estimator))
 
     @timmer
-    def training_reporter(self):
+    def training_reporter(self, x_test_matrix, y_test_vector):
         """Report the training information"""
         if self.learning_report:
             self.learning_report.append(
@@ -377,8 +371,7 @@ class ASEPredictor:
                     Best_index=self.model.best_index_,
                     Cross_validations=self.model.cv_results_,
                     Best_estimator=self.model.best_estimator_,
-                    Model_score=self.model.score(self.x_test_matrix,
-                                                 self.y_test_vector)
+                    Model_score=self.model.score(x_test_matrix, y_test_vector)
                 )
             )
         else:
@@ -391,17 +384,16 @@ class ASEPredictor:
                     Best_index=self.model.best_index_,
                     Cross_validations=self.model.cv_results_,
                     Best_estimator=self.model.best_estimator_,
-                    Model_score=self.model.score(self.x_test_matrix,
-                                                 self.y_test_vector)
+                    Model_score=self.model.score(x_test_matrix, y_test_vector)
                 )
             ]
 
     @timmer
-    def draw_learning_curve(self, cv=10, n_jobs=5, lc_space_size=10, **kwargs):
+    def draw_learning_curve(self, cvs=5, n_jobs=5, space_size=10, **kwargs):
         """Draw the learning curve of specific estimator or pipeline"""
         train_sizes, train_scores, test_scores = learning_curve(
             estimator=self.model, X=self.x_matrix, y=self.y_vector,
-            train_sizes=numpy.linspace(.1, 1., lc_space_size), cv=cv,
+            train_sizes=numpy.linspace(.1, 1., space_size), cv=cvs,
             n_jobs=n_jobs, **kwargs
         )
 
@@ -468,7 +460,7 @@ class ASEPredictor:
 
         y_test_scores = model.predict_proba(x_test_matrix)[:, 1]
         auc = [
-            roc_auc_score(y_test_vector, y_test_scores), 
+            roc_auc_score(y_test_vector, y_test_scores),
             roc_curve(y_test_vector, y_test_scores)
         ]
 
@@ -478,27 +470,27 @@ class ASEPredictor:
         ]
         first_k_importance = estimator.steps[-1][-1].feature_importances_
         feature_importance = {
-            name: importance 
+            name: importance
             for name, importance in zip(first_k_name, first_k_importance)
         }
 
         return (training_report, auc, feature_importance, model)
 
     @timmer
-    def outer_validation(self, cv=6, n_jobs=5, **kwargs):
+    def outer_validation(self, cvs=6, n_jobs=5, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
 
-        def worker(input, output):
-            for func, model, split in iter(input.get, 'STOP'):
-                output.put(func(model, split))
+        def worker(input_queue, output_queue):
+            for func, model, split in iter(input_queue.get, 'STOP'):
+                output_queue.put(func(model, split))
 
-        skf = StratifiedKFold(n_splits=cv, **kwargs)
+        skf = StratifiedKFold(n_splits=cvs, **kwargs)
         split_pool = skf.split(self.x_matrix, self.y_vector)
 
         self.model = RandomizedSearchCV(self.pipeline, **self.optim_params)
-        task_pool = [ 
+        task_pool = [
             (self.random_searcher, copy.deepcopy(self.model), split)
-            for split in split_pool 
+            for split in split_pool
         ]  # XXX: Deepcopy model, memory intensive but much safer ??
 
         task_queue = Queue()
@@ -508,8 +500,8 @@ class ASEPredictor:
         result_queue = Queue()
         for _ in range(n_jobs):
             time.sleep(20)
-            p = Process(target=worker, args=(task_queue, result_queue))
-            p.start()
+            process = Process(target=worker, args=(task_queue, result_queue))
+            process.start()
 
         if self.model_pool is None:
             self.model_pool = []
@@ -522,10 +514,10 @@ class ASEPredictor:
 
         if self.feature_importance_pool is None:
             self.feature_importance_pool = {
-                name: [0] * cv for name in self.x_matrix.columns
+                name: [0] * cvs for name in self.x_matrix.columns
             }
 
-        for cv_idx in range(cv):
+        for cv_idx in range(cvs):
             training_report, auc, feature_importance, model = result_queue.get()
 
             self.model_pool.append(model)
@@ -533,7 +525,7 @@ class ASEPredictor:
             self.training_report_pool.append(training_report)
 
             for name, importance in feature_importance.items():
-                self.feature_importance_pool[name][cv_idx] = importance 
+                self.feature_importance_pool[name][cv_idx] = importance
 
 
         for _ in range(n_jobs):
@@ -631,7 +623,7 @@ class ASEPredictor:
     def save_to(self, save_path="./"):
         """Save configs, results and etc. to disk"""
 
-        time_stamp = self.TIME_STAMP
+        time_stamp = self.time_stamp
         save_path = os.path.join(save_path, time_stamp)
 
         if not os.path.exists(save_path):

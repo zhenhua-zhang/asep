@@ -6,6 +6,7 @@ import functools
 import pickle
 import json
 import time
+import math
 import sys
 import os
 
@@ -27,7 +28,8 @@ def timmer(func):
         value = func(*args, **kwargs)
         func_name = func.__name__ + " "
         used_time = time.perf_counter() - start_time
-        print('{:.<40} DONE, time: {:.5f} secs'.format(func_name, used_time),
+        print(
+            '{:.<40} DONE, time: {:.5f} secs'.format(func_name, used_time),
             file=sys.stderr
         )
         return value
@@ -39,7 +41,7 @@ def check_resources():
     """Chekc resources available"""
     cpus = os.cpu_count()  # Number of cpus physically
     cpus_per_task = os.environ['SLURM_CPUS_PER_TASK']
-    math.root(cpus_per_task)
+    math.sqrt(cpus_per_task)
 
 
 def format_print(title, main_content, pipe=sys.stdout):
