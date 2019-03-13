@@ -70,9 +70,9 @@ class Config:
         self.optim_params.update(
             dict(
                 cv=StratifiedKFold(n_splits=10, shuffle=True),
-                n_jobs=3,
+                n_jobs=5,
                 n_iter=20,
-                iid=False,
+                iid=False,  # TODO: need more knowledge to understand iid here
                 refit="roc_auc_score",
                 scoring=scoring_dict,
                 param_distributions=dict(
