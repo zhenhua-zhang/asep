@@ -89,8 +89,7 @@ def get_args():
         from it, and overwrite values from command line except -i"""
     )
     group.add_argument(
-        "--nested-cv", dest="nested_cv", default=False, type=bool,
-        action="store_true",
+        "--nested-cv", dest="nested_cv", default=False, action="store_true",
         help="Use nested cross validation or not. Default: False"
     )
     group.add_argument(
