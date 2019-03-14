@@ -131,7 +131,7 @@ def get_args():
         help="the proportion of dataset for testing"
     )
     group.add_argument(
-        "-v", "--verbose", dest="verbose_level", default=0, action="count",
+        "--verbose", dest="verbose_level", default=0, action="count",
         help="the proportion of dataset for testing"
     )
     group.add_argument(
