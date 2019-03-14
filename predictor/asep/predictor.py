@@ -109,7 +109,7 @@ class ASEPredictor:
     @timmer
     def run(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
             biclass_=True, outer_cvs=6, mings=2, maxgs=None, outer_n_jobs=5,
-            lc_space_size=10, lc_n_jobs=5, lc_cvs=5):
+            with_lc=False, lc_space_size=10, lc_n_jobs=5, lc_cvs=5):
         """Execute a pre-designed construct pipeline"""
 
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
@@ -134,9 +134,10 @@ class ASEPredictor:
         self.outer_validation(cvs=outer_cvs, n_jobs=outer_n_jobs)
         self.draw_roc_curve_cv()
         self.draw_k_main_features_cv()
-        self.draw_learning_curve(
-            cvs=lc_cvs, n_jobs=lc_n_jobs, space_size=lc_space_size
-        )
+        if with_lc:
+            self.draw_learning_curve(
+                cvs=lc_cvs, n_jobs=lc_n_jobs, space_size=lc_space_size
+            )
         print
 
     @timmer

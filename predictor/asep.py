@@ -71,6 +71,11 @@ def get_args():
         "-o", "--output-dir", dest="output_dir", default='./', type=str,
         help="The directory including output files. Default: ./"
     )
+    group.add_argument(
+        "--with-learning-curve", dest="with_lc", default=False,
+        action='store_true',
+        help="Whether to draw a learning curve. Default: False"
+    )
 
     group = parser.add_argument_group("Configuration")
     group.add_argument(
@@ -186,12 +191,13 @@ def main():
     reponse_col = arguments.reponse_col
     lc_space_size = arguments.lc_space_size
     lc_n_jobs = arguments.lc_n_jobs
+    with_lc = arguments.with_lc
     lc_cvs = arguments.lc_cvs
     mask = arguments.mask
     asep.run(
         mask=mask, outer_cvs=outer_cvs, mings=min_group_size,
         maxgs=max_group_size, limit=first_k_rows, response=reponse_col,
-        drop_cols=drop_cols, outer_n_jobs=outer_n_jobs,
+        drop_cols=drop_cols, outer_n_jobs=outer_n_jobs, with_lc=with_lc,
         lc_space_size=lc_space_size, lc_n_jobs=lc_n_jobs, lc_cvs=lc_cvs
     )
 
