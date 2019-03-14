@@ -48,12 +48,17 @@ def get_args():
         help="Pattern will be masked or kept"
     )
     group.add_argument(
-        "--min-group-size", dest="min_group_size", default=2, type=int,
-        help="The minimum number of individuals bearing the same variant (>=2)"
+        "--min-group-size", dest="min_group_size", default=2,
+        type=lambda x: int(x) > 1 and int(x) or parser.error(
+            "--min-group-size must be >= 2"),
+        help="The minimum number of individuals bearing the same variant (>= 2)"
     )
     group.add_argument(
-        "--max-group-size", dest="max_group_size", default=None, type=int,
-        help="The maximum number of individuals bearing the same variant"
+        "--max-group-size", dest="max_group_size", default=None,
+        type=lambda x: int(x) <= 1e4  and int(x) or parser.error(
+            "--max-group-size must be <= 10,000"),
+        help="""The maximum number of individuals bearing the same variant
+        (<= 10,000)"""
     )
     group.add_argument(
         "--drop-cols", dest="drop_cols", default=None,
@@ -82,6 +87,11 @@ def get_args():
         "-c", "--config-file", dest="config_file", default=None, type=str,
         help="""The path to configuration file, all configuration will be get
         from it, and overwrite values from command line except -i"""
+    )
+    group.add_argument(
+        "--nested-cv", dest="nested_cv", default=False, type=bool,
+        action="store_true",
+        help="Use nested cross validation or not. Default: False"
     )
     group.add_argument(
         "--inner-cvs", dest="inner_cvs", default=6, type=int,
@@ -120,6 +130,10 @@ def get_args():
     group.add_argument(
         "--test-size", dest="test_size", default=None, type=int,
         help="the proportion of dataset for testing"
+    )
+    group.add_argument(
+        "-v", "--verbose", dest="verbose_level", default=0, type=int,
+        action="count", help="the proportion of dataset for testing"
     )
     group.add_argument(
         "--run-flag", dest="run_flag", default="New_task",
@@ -178,27 +192,31 @@ def main():
         pass
 
     min_group_size = arguments.min_group_size
+    max_group_size = arguments.max_group_size
     if min_group_size < 2:
         raise "--min-group-size must be at least 2"
     else:
         pass
 
-    max_group_size = arguments.max_group_size
-
+    mask = arguments.mask
     first_k_rows = arguments.first_k_rows
+    reponse_col = arguments.reponse_col
+
+    nested_cv = arguments.nested_cv
     outer_cvs = arguments.outer_cvs
     outer_n_jobs = arguments.outer_n_jobs
-    reponse_col = arguments.reponse_col
+
+    with_lc = arguments.with_lc
     lc_space_size = arguments.lc_space_size
     lc_n_jobs = arguments.lc_n_jobs
-    with_lc = arguments.with_lc
     lc_cvs = arguments.lc_cvs
-    mask = arguments.mask
+
     asep.run(
-        mask=mask, outer_cvs=outer_cvs, mings=min_group_size,
-        maxgs=max_group_size, limit=first_k_rows, response=reponse_col,
-        drop_cols=drop_cols, outer_n_jobs=outer_n_jobs, with_lc=with_lc,
-        lc_space_size=lc_space_size, lc_n_jobs=lc_n_jobs, lc_cvs=lc_cvs
+        mask=mask, mings=min_group_size, maxgs=max_group_size,
+        limit=first_k_rows, response=reponse_col, drop_cols=drop_cols,
+        outer_cvs=outer_cvs, outer_n_jobs=outer_n_jobs, nested_cv=nested_cv,
+        with_lc=with_lc, lc_space_size=lc_space_size, lc_n_jobs=lc_n_jobs,
+        lc_cvs=lc_cvs
     )
 
     output_dir = arguments.output_dir

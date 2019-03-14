@@ -92,7 +92,7 @@ class ASEPredictor:
         self.y_vector = None
 
         self.pipeline = None
-        self.model = None
+        self.estimator = None
 
         self.model_pool = None
         self.training_report_pool = None
@@ -109,7 +109,8 @@ class ASEPredictor:
     @timmer
     def run(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
             biclass_=True, outer_cvs=6, mings=2, maxgs=None, outer_n_jobs=5,
-            with_lc=False, lc_space_size=10, lc_n_jobs=5, lc_cvs=5):
+            with_lc=False, lc_space_size=10, lc_n_jobs=5, lc_cvs=5,
+            nested_cv=False):
         """Execute a pre-designed construct pipeline"""
 
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
@@ -131,14 +132,16 @@ class ASEPredictor:
         self.label_encoder()
         self.setup_xy(y_col=response)
         self.setup_pipeline(estimator=self.estimators_list, biclass=biclass_)
-        self.outer_validation(cvs=outer_cvs, n_jobs=outer_n_jobs)
+        self.outer_validation(
+            cvs=outer_cvs, n_jobs=outer_n_jobs, nested_cv=nested_cv
+        )
         self.draw_roc_curve_cv()
         self.draw_k_main_features_cv()
         if with_lc:
             self.draw_learning_curve(
-                cvs=lc_cvs, n_jobs=lc_n_jobs, space_size=lc_space_size
+                estimator=self.estimator, cvs=lc_cvs, n_jobs=lc_n_jobs,
+                space_size=lc_space_size
             )
-        print
 
     @timmer
     def read_file_to_dataframe(self, nrows=None):
@@ -360,40 +363,11 @@ class ASEPredictor:
             self.pipeline = OneVsOneClassifier(Pipeline(estimator))
 
     @timmer
-    def training_reporter(self, x_test_matrix, y_test_vector):
-        """Report the training information"""
-        if self.learning_report:
-            self.learning_report.append(
-                dict(
-                    Scorer=self.model.scorer_,
-                    Params=self.model.get_params(),
-                    Best_params=self.model.best_params_,
-                    Best_score=self.model.best_score_,
-                    Best_index=self.model.best_index_,
-                    Cross_validations=self.model.cv_results_,
-                    Best_estimator=self.model.best_estimator_,
-                    Model_score=self.model.score(x_test_matrix, y_test_vector)
-                )
-            )
-        else:
-            self.learning_report = [
-                dict(
-                    Scorer=self.model.scorer_,
-                    Params=self.model.get_params(),
-                    Best_params=self.model.best_params_,
-                    Best_score=self.model.best_score_,
-                    Best_index=self.model.best_index_,
-                    Cross_validations=self.model.cv_results_,
-                    Best_estimator=self.model.best_estimator_,
-                    Model_score=self.model.score(x_test_matrix, y_test_vector)
-                )
-            ]
-
-    @timmer
-    def draw_learning_curve(self, cvs=5, n_jobs=5, space_size=10, **kwargs):
+    def draw_learning_curve(
+            self, estimator, cvs=5, n_jobs=5, space_size=10, **kwargs):
         """Draw the learning curve of specific estimator or pipeline"""
         train_sizes, train_scores, test_scores = learning_curve(
-            estimator=self.model, X=self.x_matrix, y=self.y_vector,
+            estimator=estimator, X=self.x_matrix, y=self.y_vector,
             train_sizes=numpy.linspace(.1, 1., space_size), cv=cvs,
             n_jobs=n_jobs, **kwargs
         )
@@ -436,7 +410,7 @@ class ASEPredictor:
         self.learning_line = (fig, ax_learning)
 
     @timmer
-    def random_searcher(self, model, split):
+    def randomized_searcher_cv(self, model, split):  # Nested cv
         """Hyper-parameters optimization by RandomizedSearchCV
 
         Args:
@@ -478,7 +452,7 @@ class ASEPredictor:
         return (training_report, auc, feature_importance, model)
 
     @timmer
-    def outer_validation(self, cvs=6, n_jobs=5, **kwargs):
+    def outer_validation(self, cvs=6, n_jobs=5, nested_cv=False, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
 
         def worker(input_queue, output_queue):
@@ -488,11 +462,17 @@ class ASEPredictor:
         skf = StratifiedKFold(n_splits=cvs, **kwargs)
         split_pool = skf.split(self.x_matrix, self.y_vector)
 
-        self.model = RandomizedSearchCV(self.pipeline, **self.optim_params)
+        model = RandomizedSearchCV(self.pipeline, **self.optim_params)
+        if nested_cv:
+            self.estimator = model
+        else:
+            model.fit(self.x_matrix, self.y_vector)
+            self.estimator = model.best_estimator_
+
         task_pool = [
-            (self.random_searcher, copy.deepcopy(self.model), split)
+            (self.randomized_searcher_cv, copy.deepcopy(self.estimator), split)
             for split in split_pool
-        ]  # XXX: Deepcopy model, memory intensive but much safer ??
+        ]  # XXX: Deepcopy estimator, memory intensive but much safer ??
 
         task_queue = Queue()
         for task in task_pool:
