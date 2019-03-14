@@ -131,8 +131,8 @@ def get_args():
         help="the proportion of dataset for testing"
     )
     group.add_argument(
-        "-v", "--verbose", dest="verbose_level", default=0, type=int,
-        action="count", help="the proportion of dataset for testing"
+        "-v", "--verbose", dest="verbose_level", default=0, action="count",
+        help="the proportion of dataset for testing"
     )
     group.add_argument(
         "--run-flag", dest="run_flag", default="New_task",
