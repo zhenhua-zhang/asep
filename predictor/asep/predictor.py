@@ -410,11 +410,11 @@ class ASEPredictor:
         self.learning_line = (fig, ax_learning)
 
     @timmer
-    def randomized_searcher_cv(self, model, split):  # Nested cv
+    def randomized_searcher_cv(self, estimator, split):  # Nested cv
         """Hyper-parameters optimization by RandomizedSearchCV
 
         Args:
-            model (estimator): compulsory; scikit-learn estimator object
+            estimator (estimator): compulsory; scikit-learn estimator object
                 An object
             split (iterable): required;
         """
@@ -424,22 +424,30 @@ class ASEPredictor:
         x_test_matrix = copy.deepcopy(self.x_matrix.iloc[test_idx])
         y_test_vector = copy.deepcopy(self.y_vector.iloc[test_idx])
 
-        model.fit(x_train_matrix, y_train_vector)
-        training_report = dict(
-            Scorer=model.scorer_, Params=model.get_params(),
-            Best_params=model.best_params_, Best_score=model.best_score_,
-            Best_index=model.best_index_, Cross_validations=model.cv_results_,
-            Best_estimator=model.best_estimator_,
-            Model_score=model.score(x_test_matrix, y_test_vector)
-        )
+        estimator.fit(x_train_matrix, y_train_vector)
 
-        y_test_scores = model.predict_proba(x_test_matrix)[:, 1]
+        y_test_scores = estimator.predict_proba(x_test_matrix)[:, 1]
         auc = [
             roc_auc_score(y_test_vector, y_test_scores),
             roc_curve(y_test_vector, y_test_scores)
         ]
 
-        estimator = model.best_estimator_
+        if isinstance(estimator, RandomizedSearchCV):
+            training_report = dict(
+                Scorer=estimator.scorer_,
+                Params=estimator.get_params(),
+                Best_params=estimator.best_params_,
+                Best_score=estimator.best_score_,
+                Best_index=estimator.best_index_,
+                Cross_validations=estimator.cv_results_,
+                Best_estimator=estimator.best_estimator_,
+                Estimator_score=estimator.score(x_test_matrix, y_test_vector)
+            )
+
+            estimator = estimator.best_estimator_
+        else:
+            training_report = None
+
         first_k_name = x_train_matrix.columns[
             estimator.steps[0][-1].get_support(True)
         ]
@@ -449,15 +457,15 @@ class ASEPredictor:
             for name, importance in zip(first_k_name, first_k_importance)
         }
 
-        return (training_report, auc, feature_importance, model)
+        return (training_report, auc, feature_importance, estimator)
 
     @timmer
     def outer_validation(self, cvs=6, n_jobs=5, nested_cv=False, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
 
         def worker(input_queue, output_queue):
-            for func, model, split in iter(input_queue.get, 'STOP'):
-                output_queue.put(func(model, split))
+            for func, estimator, split in iter(input_queue.get, 'STOP'):
+                output_queue.put(func(estimator, split))
 
         skf = StratifiedKFold(n_splits=cvs, **kwargs)
         split_pool = skf.split(self.x_matrix, self.y_vector)
@@ -468,6 +476,20 @@ class ASEPredictor:
         else:
             model.fit(self.x_matrix, self.y_vector)
             self.estimator = model.best_estimator_
+
+            if self.training_report_pool is None:
+                self.training_report_pool = [
+                    dict(
+                        Scorer=model.scorer_,
+                        Params=model.get_params(),
+                        Best_params=model.best_params_,
+                        Best_score=model.best_score_,
+                        Best_index=model.best_index_,
+                        Cross_validations=model.cv_results_,
+                        Best_estimator=model.best_estimator_,
+                        Estimator_score=None
+                    )
+                ]
 
         task_pool = [
             (self.randomized_searcher_cv, copy.deepcopy(self.estimator), split)
@@ -503,10 +525,13 @@ class ASEPredictor:
 
             self.model_pool.append(model)
             self.area_under_curve_pool.append(auc)
-            self.training_report_pool.append(training_report)
+
+            if training_report:
+                self.training_report_pool.append(training_report)
 
             for name, importance in feature_importance.items():
                 self.feature_importance_pool[name][cv_idx] = importance
+
 
 
         for _ in range(n_jobs):
