@@ -89,7 +89,7 @@ class Config:
                     rfc__class_weight=[
                         {0:x, 1:y}
                         for x in range(1, 4) for y in range(1, 4) if x != y
-                    ],
+                    ].append('balanced'),
                 ),
             )
         )
