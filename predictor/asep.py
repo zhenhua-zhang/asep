@@ -169,7 +169,7 @@ def main():
         pass
 
     inner_n_iters = arguments.inner_n_iters
-    if inner_n_iters != 20:
+    if inner_n_iters != 25:
         my_config.optim_params['n_iter'] = inner_n_iters
     else:
         pass

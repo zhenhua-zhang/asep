@@ -58,7 +58,7 @@ class Config:
     def set_default(self):
         """Set up default configuration"""
         self.estimators_list = [
-            ('feature_selection', SelectKBest()),
+            ('fs', SelectKBest()),
             ('rfc', RandomForestClassifier())
         ]
 
@@ -72,19 +72,24 @@ class Config:
             dict(
                 cv=StratifiedKFold(n_splits=10, shuffle=True),
                 n_jobs=5,
-                n_iter=20,
+                n_iter=25,
                 iid=False,  # TODO: need more knowledge to understand iid here
                 scoring=scoring_dict,
                 refit="accuracy",
                 return_train_score=True,
                 param_distributions=dict(
-                    feature_selection__score_func=[mutual_info_classif],
-                    feature_selection__k=list(range(3, 80, 2)),
+                    fs__k=list(range(3, 100)),
+                    fs__score_func=[mutual_info_classif],
                     rfc__n_estimators=list(range(50, 1000, 50)),
-                    rfc__max_features=['auto', 'sqrt'],
+                    rfc__max_features=['sqrt', 'log2', None],
                     rfc__max_depth=list(range(10, 111, 10)),
-                    rfc__min_samples_split=[2, 4, 6, 8, 10],
-                    rfc__min_samples_leaf=[2, 4, 6, 8, 10]
+                    rfc__min_samples_split=range(2, 10),
+                    rfc__min_samples_leaf=range(2, 10),
+                    rfc__bootstrap=[False, True],
+                    rfc__class_weight=[
+                        {0:x, 1:y}
+                        for x in range(1, 4) for y in range(1, 4) if x != y
+                    ],
                 ),
             )
         )
