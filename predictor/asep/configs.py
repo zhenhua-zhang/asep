@@ -86,10 +86,7 @@ class Config:
                     rfc__min_samples_split=range(2, 10),
                     rfc__min_samples_leaf=range(2, 10),
                     rfc__bootstrap=[False, True],
-                    rfc__class_weight=[
-                        {0:x, 1:y}
-                        for x in range(1, 4) for y in range(1, 4) if x != y
-                    ].append('balanced'),
+                    rfc__class_weight=['balanced'],
                 ),
             )
         )
