@@ -276,7 +276,7 @@ class ASEPredictor:
                 resampler = SMOTE()
             elif resampling == 'SMOTENC':
                 features = [
-                    self.x_matrix.columns.get_loc(x) for x in cg_features 
+                    x_matrix.columns.get_loc(x) for x in cg_features 
                 ]
                 resampler = SMOTENC(features)
             elif resampling == 'BorderlineSMOTE':
