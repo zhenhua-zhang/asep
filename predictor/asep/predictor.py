@@ -38,6 +38,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 
+from imblearn.over_sampling import SMOTENC
+
 try:
     from matplotlib import pyplot
 except ImportError as err:
@@ -231,7 +233,8 @@ class ASEPredictor:
             do_mask(mask=mask, remove=remove)
 
     @timmer
-    def setup_xy(self, x_cols=None, y_col=None):
+    def setup_xy(self, x_cols=None, y_col=None, resampling=True,
+                 cg_features=None):
         """Set up predictor variables and target variables.
 
         Args:
@@ -240,6 +243,18 @@ class ASEPredictor:
         Raises:
             ValueError:
         """
+        if cg_features is None:
+            cg_features = [
+                "chr", "ref_encoded", "alt_encoded", "oAA_encoded",
+                "nAA_encoded", "motifEHIPos", "CCDS_encoded", "Exon_encoded",
+                "gene_encoded", "Type_encoded", "group_encoded",
+                "Segway_encoded", "effect_encoded", "impact_encoded",
+                "Intron_encoded", "Domain_encoded", "SIFTcat_encoded",
+                "AnnoType_encoded", "ConsDetail_encoded", "motifEName_encoded",
+                "Dst2SplType_encoded", "Consequence_encoded",
+                "PolyPhenCat_encoded",
+            ]
+
         cols = self.work_dataframe.columns
         if x_cols is None and y_col is None:
             x_cols, y_col = cols[:-1], cols[-1]
@@ -252,8 +267,17 @@ class ASEPredictor:
 
         x_matrix = copy.deepcopy(self.work_dataframe.loc[:, x_cols])
         y_vector = copy.deepcopy(self.work_dataframe.loc[:, y_col])
-
+        
         self.x_matrix, self.y_vector = x_matrix, y_vector
+
+        if resampling:
+            features = [ self.x_matrix.columns.get_loc(x) for x in cg_features ]
+            smote_nc = SMOTENC(categorical_features=features)
+            x_matrix, y_vector = smote_nc.fit_resample(
+                x_matrix.values, y_vector.values
+            )
+            self.x_matrix = pandas.DataFrame(x_matrix, columns=x_cols)
+            self.y_vector = pandas.Series(y_vector, name=y_col)
 
     @timmer
     def label_encoder(self, target_cols=None, skip=None, remove=False):
@@ -349,7 +373,7 @@ class ASEPredictor:
 
     @timmer
     def setup_pipeline(self, estimator=None, biclass=True):
-        """Setup a training pipeline
+        """Setup a training pipeline 
 
         Args:
             estimator (estimator): None or a list of dicts; optional
