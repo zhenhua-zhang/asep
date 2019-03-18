@@ -279,9 +279,9 @@ class ASEPredictor:
                     self.x_matrix.columns.get_loc(x) for x in cg_features 
                 ]
                 resampler = SMOTENC(features)
-            elif resampling = 'BorderlineSMOTE':
+            elif resampling == 'BorderlineSMOTE':
                 resampler = BorderlineSMOTE()
-            elif resampling = "ADASYN":
+            elif resampling == "ADASYN":
                 resampler = ADASYN
             else:
                 print(
