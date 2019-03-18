@@ -61,7 +61,7 @@ class Config:
         self.estimators_list = [
             ('fs', SelectKBest()),
             # ('rfc', RandomForestClassifier())
-            ('brfr', BalancedRandomForestClassifier())
+            ('brfc', BalancedRandomForestClassifier())
         ]
 
         scoring_dict = dict(
