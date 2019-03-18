@@ -89,6 +89,10 @@ def get_args():
         from it, and overwrite values from command line except -i"""
     )
     group.add_argument(
+        "--resampling-method", dest="resampling_method", default=None,
+        help="Use nested cross validation or not. Default: False"
+    )
+    group.add_argument(
         "--nested-cv", dest="nested_cv", default=False, action="store_true",
         help="Use nested cross validation or not. Default: False"
     )
@@ -210,12 +214,14 @@ def main():
     lc_n_jobs = arguments.lc_n_jobs
     lc_cvs = arguments.lc_cvs
 
+    resampling_method = arguments.resampling_method
+
     asep.run(
         mask=mask, mings=min_group_size, maxgs=max_group_size,
         limit=first_k_rows, response=reponse_col, drop_cols=drop_cols,
         outer_cvs=outer_cvs, outer_n_jobs=outer_n_jobs, nested_cv=nested_cv,
         with_lc=with_lc, lc_space_size=lc_space_size, lc_n_jobs=lc_n_jobs,
-        lc_cvs=lc_cvs
+        lc_cvs=lc_cvs, resampling_method=resampling_method
     )
 
     output_dir = arguments.output_dir

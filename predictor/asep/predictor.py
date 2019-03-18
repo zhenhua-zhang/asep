@@ -38,6 +38,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 
+from imblearn.over_sampling import BorderlineSMOTE
+from imblearn.over_sampling import SMOTENC
+from imblearn.over_sampling import ADASYN
 from imblearn.over_sampling import SMOTE
 
 try:
@@ -112,7 +115,7 @@ class ASEPredictor:
     def run(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
             biclass_=True, outer_cvs=6, mings=2, maxgs=None, outer_n_jobs=5,
             with_lc=False, lc_space_size=10, lc_n_jobs=5, lc_cvs=5,
-            nested_cv=False):
+            nested_cv=False, resampling_method=None):
         """Execute a pre-designed construct pipeline"""
 
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
@@ -132,7 +135,7 @@ class ASEPredictor:
         self.simple_imputer()
         self.slice_dataframe(cols=drop_cols)
         self.label_encoder()
-        self.setup_xy(y_col=response)
+        self.setup_xy(y_col=response, resampling=resampling_method)
         self.setup_pipeline(estimator=self.estimators_list, biclass=biclass_)
         self.outer_validation(
             cvs=outer_cvs, n_jobs=outer_n_jobs, nested_cv=nested_cv
@@ -233,7 +236,7 @@ class ASEPredictor:
             do_mask(mask=mask, remove=remove)
 
     @timmer
-    def setup_xy(self, x_cols=None, y_col=None, resampling=True,
+    def setup_xy(self, x_cols=None, y_col=None, resampling=None,
                  cg_features=None):
         """Set up predictor variables and target variables.
 
@@ -268,16 +271,34 @@ class ASEPredictor:
         x_matrix = copy.deepcopy(self.work_dataframe.loc[:, x_cols])
         y_vector = copy.deepcopy(self.work_dataframe.loc[:, y_col])
         
-        self.x_matrix, self.y_vector = x_matrix, y_vector
-
         if resampling:
-            features = [ self.x_matrix.columns.get_loc(x) for x in cg_features ]
-            smote = SMOTE()
-            x_matrix, y_vector = smote.fit_resample(
+            if resampling == 'SMOTE':
+                resampler = SMOTE()
+            elif resampling == 'SMOTENC':
+                features = [
+                    self.x_matrix.columns.get_loc(x) for x in cg_features 
+                ]
+                resampler = SMOTENC(features)
+            elif resampling = 'BorderlineSMOTE':
+                resampler = BorderlineSMOTE()
+            elif resampling = "ADASYN":
+                resampler = ADASYN
+            else:
+                print(
+                    """Unknown over-sampling method, validating methods are
+                    SMOTE, SMOTENC, BorderlineSMOTE, and ADASYN, will use
+                    default(SMOTE)""",
+                    file=sys.stderr
+                )
+                resampler = SMOTE()
+
+            x_matrix, y_vector = resampler.fit_resample(
                 x_matrix.values, y_vector.values
             )
             self.x_matrix = pandas.DataFrame(x_matrix, columns=x_cols)
             self.y_vector = pandas.Series(y_vector, name=y_col)
+        else:
+            self.x_matrix, self.y_vector = x_matrix, y_vector
 
     @timmer
     def label_encoder(self, target_cols=None, skip=None, remove=False):
