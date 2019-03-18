@@ -38,7 +38,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 
-from imblearn.over_sampling import SMOTENC
+from imblearn.over_sampling import SMOTE
 
 try:
     from matplotlib import pyplot
@@ -272,8 +272,8 @@ class ASEPredictor:
 
         if resampling:
             features = [ self.x_matrix.columns.get_loc(x) for x in cg_features ]
-            smote_nc = SMOTENC(categorical_features=features)
-            x_matrix, y_vector = smote_nc.fit_resample(
+            smote = SMOTE()
+            x_matrix, y_vector = smote.fit_resample(
                 x_matrix.values, y_vector.values
             )
             self.x_matrix = pandas.DataFrame(x_matrix, columns=x_cols)
