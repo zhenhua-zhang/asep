@@ -248,12 +248,12 @@ class ASEPredictor:
         """
         if cg_features is None:
             cg_features = [
-                "chr", "ref_encoded", "alt_encoded", "oAA_encoded",
-                "nAA_encoded", "motifEHIPos", "CCDS_encoded", "Exon_encoded",
-                "gene_encoded", "Type_encoded", "group_encoded",
-                "Segway_encoded", "effect_encoded", "impact_encoded",
-                "Intron_encoded", "Domain_encoded", "SIFTcat_encoded",
-                "AnnoType_encoded", "ConsDetail_encoded", "motifEName_encoded",
+                "ref_encoded", "alt_encoded", "oAA_encoded", "nAA_encoded",
+                "motifEHIPos", "CCDS_encoded", "Exon_encoded", "gene_encoded",
+                "Type_encoded", "group_encoded", "Segway_encoded",
+                "effect_encoded", "impact_encoded", "Intron_encoded",
+                "Domain_encoded", "SIFTcat_encoded", "AnnoType_encoded",
+                "ConsDetail_encoded", "motifEName_encoded",
                 "Dst2SplType_encoded", "Consequence_encoded",
                 "PolyPhenCat_encoded",
             ]
