@@ -4,7 +4,6 @@
 
 import numpy
 
-from imblearn.ensemble import BalancedRandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier
 
@@ -16,6 +15,8 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import make_scorer
 from sklearn.metrics import f1_score
+
+from imblearn.ensemble import BalancedRandomForestClassifier
 
 class Config:
     """configs module for the ASEPredictor
@@ -75,9 +76,9 @@ class Config:
 
         self.estimators_list = [
             ('fs', SelectKBest()),
-            # ('rfc', RandomForestClassifier()),
+            ('rfc', RandomForestClassifier()),
             # ('gbc', GradientBoostingClassifier()),
-            ('brfc', BalancedRandomForestClassifier()),
+            # ('brfc', BalancedRandomForestClassifier()),
         ]
 
         scoring_dict = dict(
@@ -99,13 +100,13 @@ class Config:
                 param_distributions=dict(
                     fs__k=list(range(3, 90)),
                     fs__score_func=[mutual_info_classif],
-                    brfc__min_samples_split=range(2, 10),
-                    brfc__min_samples_leaf=range(2, 10),
-                    brfc__max_features=['sqrt', 'log2', None],
-                    brfc__n_estimators=list(range(50, 1000, 50)),
-                    brfc__class_weight=['balanced'],
-                    brfc__max_depth=list(range(10, 111, 10)),
-                    brfc__bootstrap=[False, True],
+                    rfc__min_samples_split=range(2, 10),
+                    rfc__min_samples_leaf=range(2, 10),
+                    rfc__max_features=['sqrt', 'log2', None],
+                    rfc__n_estimators=list(range(50, 1000, 50)),
+                    rfc__class_weight=['balanced'],
+                    rfc__max_depth=list(range(10, 111, 10)),
+                    rfc__bootstrap=[False, True],
                 ),
             )
         )
