@@ -671,10 +671,11 @@ class ASEPredictor:
         self.feature_importance_hist = (fig, ax_features)
 
     @timmer
-    def save_to(self, save_path="./"):
+    def save_to(self, save_path="./", run_flag=''):
         """Save configs, results and etc. to disk"""
 
         time_stamp = self.time_stamp
+        time_stamp = self.time_stamp + run_flag
         save_path = os.path.join(save_path, time_stamp)
 
         if not os.path.exists(save_path):

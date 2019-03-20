@@ -2,16 +2,18 @@
 # -*- coding: utf-8 -*-
 """configs module"""
 
+from imblearn.ensemble import BalancedRandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier
+
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.feature_selection import SelectKBest
 from sklearn.model_selection import StratifiedKFold
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_score
 from sklearn.metrics import accuracy_score
-from sklearn.metrics import make_scorer
 from sklearn.metrics import roc_auc_score
-
-from imblearn.ensemble import BalancedRandomForestClassifier
+from sklearn.metrics import make_scorer
+from sklearn.metrics import f1_score
 
 class Config:
     """configs module for the ASEPredictor
@@ -56,18 +58,31 @@ class Config:
     def set_params(self, param_name, param_value):
         """Set parameters in optim_params"""
 
-    def set_default(self):
+    def set_default(self, estimators_list=None, scoring_dict=None,
+                    optim_params=None):
         """Set up default configuration"""
+
+        # For GradientBoostingClassifier
+        estimator_params = dict(
+            gbc__leaning_rate=numpy.linspace(.01, 1., 50),
+            gbc__n_estimators=list(range(50, 1000, 50)),
+            gbc__min_samples_split=range(2, 12),
+            gbc__min_samples_leaf=range(1, 11),
+            gbc__max_features=['sqrt', 'log2', None],
+        )
+
         self.estimators_list = [
             ('fs', SelectKBest()),
-            # ('rfc', RandomForestClassifier())
-            ('brfc', BalancedRandomForestClassifier())
+            # ('rfc', RandomForestClassifier()),
+            # ('gbc', GradientBoostingClassifier()),
+            ('brfc', BalancedRandomForestClassifier()),
         ]
 
         scoring_dict = dict(
-            precision=make_scorer(precision_score, average="micro"),
-            accuracy=make_scorer(accuracy_score),
             roc_auc_score=make_scorer(roc_auc_score, needs_proba=True),
+            precision=make_scorer(precision_score, average="micro"),
+            f1_score=make_scorer(f1_score, needs_proba=True),
+            accuracy=make_scorer(accuracy_score),
         )
 
         self.optim_params.update(
@@ -75,20 +90,20 @@ class Config:
                 cv=StratifiedKFold(n_splits=10, shuffle=True),
                 n_jobs=5,
                 n_iter=25,
-                iid=False,  # TODO: need more knowledge to understand iid here
+                iid=False,
                 scoring=scoring_dict,
                 refit="accuracy",
                 return_train_score=True,
                 param_distributions=dict(
-                    fs__k=list(range(3, 100)),
+                    fs__k=list(range(3, 90)),
                     fs__score_func=[mutual_info_classif],
-                    brfc__n_estimators=list(range(50, 1000, 50)),
-                    brfc__max_features=['sqrt', 'log2', None],
-                    brfc__max_depth=list(range(10, 111, 10)),
                     brfc__min_samples_split=range(2, 10),
                     brfc__min_samples_leaf=range(2, 10),
-                    brfc__bootstrap=[False, True],
+                    brfc__max_features=['sqrt', 'log2', None],
+                    brfc__n_estimators=list(range(50, 1000, 50)),
                     brfc__class_weight=['balanced'],
+                    brfc__max_depth=list(range(10, 111, 10)),
+                    brfc__bootstrap=[False, True],
                 ),
             )
         )

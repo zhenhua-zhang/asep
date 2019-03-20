@@ -139,7 +139,7 @@ def get_args():
         help="the proportion of dataset for testing"
     )
     group.add_argument(
-        "--run-flag", dest="run_flag", default="New_task",
+        "--run-flag", dest="run_flag", default="new_task",
         help="Flags for current run"
     )
 
@@ -189,7 +189,7 @@ def main():
         drop_cols = [
             "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size",
             "bn_ASE", "CaddChrom", "CaddPos", "CaddRef", "CaddAlt", "GeneName",
-            "GeneID", "FeatureID", "chr", "pos"
+            "GeneID", "FeatureID", "chr", "pos", "Intron", "CCDS", "gene"
         ]
     else:
         pass
@@ -225,7 +225,7 @@ def main():
     )
 
     output_dir = arguments.output_dir
-    asep.save_to(output_dir)
+    asep.save_to(output_dir, run_flag=run_flag)
 
     print("{:-^80}".format(run_flag))
 
