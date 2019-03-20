@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """configs module"""
 
+import numpy
+
 from imblearn.ensemble import BalancedRandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier

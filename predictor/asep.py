@@ -189,7 +189,7 @@ def main():
         drop_cols = [
             "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size",
             "bn_ASE", "CaddChrom", "CaddPos", "CaddRef", "CaddAlt", "GeneName",
-            "GeneID", "FeatureID", "chr", "pos", "Intron", "CCDS", "gene"
+            "GeneID", "FeatureID", "chr", "pos", "gene", "Intron", "CCDS"
         ]
     else:
         pass
