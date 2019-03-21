@@ -38,10 +38,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 
-from imblearn.over_sampling import BorderlineSMOTE
 from imblearn.over_sampling import SMOTENC
-from imblearn.over_sampling import ADASYN
-from imblearn.over_sampling import SMOTE
 
 try:
     from matplotlib import pyplot
@@ -270,9 +267,9 @@ class ASEPredictor:
 
         x_matrix = copy.deepcopy(self.work_dataframe.loc[:, x_cols])
         y_vector = copy.deepcopy(self.work_dataframe.loc[:, y_col])
-        
+
         if resampling:
-            features = [ x_matrix.columns.get_loc(x) for x in cg_features ]
+            features = [x_matrix.columns.get_loc(x) for x in cg_features]
             resampler = SMOTENC(features)
             x_matrix, y_vector = resampler.fit_resample(
                 x_matrix.values, y_vector.values
@@ -376,7 +373,7 @@ class ASEPredictor:
 
     @timmer
     def setup_pipeline(self, estimator=None, biclass=True):
-        """Setup a training pipeline 
+        """Setup a training pipeline
 
         Args:
             estimator (estimator): None or a list of dicts; optional
