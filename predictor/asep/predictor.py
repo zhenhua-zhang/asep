@@ -115,7 +115,7 @@ class ASEPredictor:
     def run(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
             biclass_=True, outer_cvs=6, mings=2, maxgs=None, outer_n_jobs=5,
             with_lc=False, lc_space_size=10, lc_n_jobs=5, lc_cvs=5,
-            nested_cv=False, resampling_method=None):
+            nested_cv=False, resampling=None):
         """Execute a pre-designed construct pipeline"""
 
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
@@ -135,7 +135,7 @@ class ASEPredictor:
         self.simple_imputer()
         self.slice_dataframe(cols=drop_cols)
         self.label_encoder()
-        self.setup_xy(y_col=response, resampling=resampling_method)
+        self.setup_xy(y_col=response, resampling=resampling)
         self.setup_pipeline(estimator=self.estimators_list, biclass=biclass_)
         self.outer_validation(
             cvs=outer_cvs, n_jobs=outer_n_jobs, nested_cv=nested_cv
@@ -236,15 +236,15 @@ class ASEPredictor:
             do_mask(mask=mask, remove=remove)
 
     @timmer
-    def setup_xy(self, x_cols=None, y_col=None, resampling=None,
+    def setup_xy(self, x_cols=None, y_col=None, resampling=False,
                  cg_features=None):
         """Set up predictor variables and target variables.
 
         Args:
             x_cols(list, tuple, None):
             y_col(string, None):
-        Raises:
-            ValueError:
+            resampling(bool):
+            cg_features(list, tuple, None):
         """
         if cg_features is None:
             cg_features = [
@@ -272,26 +272,8 @@ class ASEPredictor:
         y_vector = copy.deepcopy(self.work_dataframe.loc[:, y_col])
         
         if resampling:
-            if resampling == 'SMOTE':
-                resampler = SMOTE()
-            elif resampling == 'SMOTENC':
-                features = [
-                    x_matrix.columns.get_loc(x) for x in cg_features 
-                ]
-                resampler = SMOTENC(features)
-            elif resampling == 'BorderlineSMOTE':
-                resampler = BorderlineSMOTE()
-            elif resampling == "ADASYN":
-                resampler = ADASYN()
-            else:
-                print(
-                    """Unknown over-sampling method, validating methods are
-                    SMOTE, SMOTENC, BorderlineSMOTE, and ADASYN, will use
-                    default(SMOTE)""",
-                    file=sys.stderr
-                )
-                resampler = SMOTE()
-
+            features = [ x_matrix.columns.get_loc(x) for x in cg_features ]
+            resampler = SMOTENC(features)
             x_matrix, y_vector = resampler.fit_resample(
                 x_matrix.values, y_vector.values
             )
