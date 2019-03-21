@@ -282,7 +282,7 @@ class ASEPredictor:
             elif resampling == 'BorderlineSMOTE':
                 resampler = BorderlineSMOTE()
             elif resampling == "ADASYN":
-                resampler = ADASYN
+                resampler = ADASYN()
             else:
                 print(
                     """Unknown over-sampling method, validating methods are
