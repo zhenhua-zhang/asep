@@ -44,8 +44,12 @@ def get_args():
         help="Only read first k rows as input from input file"
     )
     group.add_argument(
-        "-m", "--mask", dest="mask", default=None, type=str,
-        help="Pattern will be masked or kept"
+        "-m", "--mask-as", dest="mask_as", default=None, type=str,
+        help="Pattern will be kept"
+    )
+    group.add_argument(
+        "-M", "--mask-out", dest="mask_out", default=None, type=str,
+        help="Pattern will be masked"
     )
     group.add_argument(
         "--min-group-size", dest="min_group_size", default=2,
@@ -87,6 +91,10 @@ def get_args():
         "-c", "--config-file", dest="config_file", default=None, type=str,
         help="""The path to configuration file, all configuration will be get
         from it, and overwrite values from command line except -i"""
+    )
+    group.add_argument(
+        "--classifier", dest="classifier", default='rfc', type=str,
+        help="Algorithm. Choices: [abc, gbc, rfc, brfc]. Default: rfc"
     )
     group.add_argument(
         "--resampling", dest="resampling", action="store_true",
@@ -158,25 +166,18 @@ def main():
     # /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/biosGavinOverlapCov10/biosGavinOlCv10AntUfltCstBin.tsv
 
     my_config = Config()
+
     inner_cvs = arguments.inner_cvs
-    if inner_cvs != 6:
-        my_config.optim_params['cv'] = StratifiedKFold(
-            n_splits=inner_cvs, shuffle=True
-        )
-    else:
-        pass
-
     inner_n_jobs = arguments.inner_n_jobs
-    if inner_n_jobs != 5:
-        my_config.optim_params['n_jobs'] = inner_n_jobs
-    else:
-        pass
-
     inner_n_iters = arguments.inner_n_iters
-    if inner_n_iters != 25:
-        my_config.optim_params['n_iter'] = inner_n_iters
-    else:
-        pass
+    my_config.set_searcher_params(
+        n_jobs=inner_n_jobs, n_iter=inner_n_iters, ncvs=inner_cvs
+    )
+
+    classifier = arguments.classifier
+    my_config.set_classifier(classifier)
+
+    my_config.assembly()
 
     input_file = arguments.input_file
     asep = ASEPredictor(input_file, my_config)
