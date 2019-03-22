@@ -243,7 +243,7 @@ class ASEPredictor:
             resampling(bool):
             cg_features(list, tuple, None):
         """
-        if cg_features is None:
+        if cg_features is None: # Should be any clumns end with `encoded` 
             cg_features = [
                 "ref_encoded", "alt_encoded", "oAA_encoded", "nAA_encoded",
                 "motifEHIPos", "CCDS_encoded", "Exon_encoded", "gene_encoded",
@@ -275,7 +275,7 @@ class ASEPredictor:
                 x_matrix.values, y_vector.values
             )
             self.x_matrix = pandas.DataFrame(x_matrix, columns=x_cols)
-            self.y_vector = pandas.Series(y_vector, name=y_col)
+            self.y_vector = pandas.Series(y_vector, name=y_col, dtype='int8')
         else:
             self.x_matrix, self.y_vector = x_matrix, y_vector
 
@@ -472,9 +472,8 @@ class ASEPredictor:
         else:
             training_report = None
 
-        first_k_name = x_train_matrix.columns[
-            estimator.steps[0][-1].get_support(True)
-        ]
+        # TODO: need update if use more estimator
+        first_k_name = x_train_matrix.columns 
         first_k_importance = estimator.steps[-1][-1].feature_importances_
         feature_importance = {
             name: importance
@@ -486,7 +485,6 @@ class ASEPredictor:
     @timmer
     def outer_validation(self, cvs=6, n_jobs=5, nested_cv=False, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
-
         def worker(input_queue, output_queue):
             for func, estimator, split in iter(input_queue.get, 'STOP'):
                 output_queue.put(func(estimator, split))
@@ -555,8 +553,6 @@ class ASEPredictor:
 
             for name, importance in feature_importance.items():
                 self.feature_importance_pool[name][cv_idx] = importance
-
-
 
         for _ in range(n_jobs):
             task_queue.put('STOP')
