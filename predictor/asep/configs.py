@@ -6,6 +6,7 @@ import numpy
 
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import AdaBoostClassifier
 
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.feature_selection import SelectKBest
@@ -21,15 +22,6 @@ from imblearn.ensemble import BalancedRandomForestClassifier
 class Config:
     """configs module for the ASEPredictor
 
-    A class to configure the ASEPredictor class. You can use the default
-    configuration by using attributes estimators_list, and optim_params. You
-    can also load your own configurations by load_config(YOUR-FILE-NAME), but
-    please note it will covert the current configurations(`set_default` will
-    get you back to the default configs). If you want change the default
-    settings, please make a instance and modify it like modifying a Python dict
-    object, but please note the structure and import essential modules either
-    built-in or third-party ones.
-
     Attributes:
         estimators_list (list): required, no default
             A list of 2D-tuple, where tuple is (NAME, sklearn_estimator)
@@ -37,7 +29,6 @@ class Config:
             A `dict` form built-in `collections` module
 
     Methods:
-        set_default(self):
         get_configs(self):
         dump_configs(self, fn=None): dump configurations into a pickle file
         load_configs(self, fn=None):
@@ -45,75 +36,120 @@ class Config:
     Examples:
         >>> from configs import Config
         >>> config = Config()
+        >>> config.init()
     """
     def __init__(self):
         """Initializing configuration metrics"""
         self.estimators_list = None
         self.optim_params = dict()
-        self.set_default()
 
-    def insert_estimator(self, estimator, position=0):
-        """Add more estimator in to estimators_list"""
+        self.searcher_params = None
+        self.init_params = None
+        self.classifier = None
+        self.scorers = None
 
-    def insert_scorer(self, estimator, position=0):
-        """Add more scorer for end estimator"""
+    def set_init_params(self, classifier="rfc"):
+        """A mathod get initial params for classifier"""
+        if classifier == "abc": # For AdaboostClassifier
+            self.init_params = dict(
+                abc__n_stimators=list(range(50, 1000, 50)),
+                abc__learning_rate=numpy.linspace(.01, 1., 50),
+                abc__algorithm=["SAMME", "SAMME.R"],
+            )
+        elif classifier == "gbc": # For GradientBoostingClassifier
+            self.init_params = dict(
+                gbc__leaning_rate=numpy.linspace(.01, 1., 50),
+                gbc__n_estimators=list(range(50, 1000, 50)),
+                gbc__min_samples_split=range(2, 12),
+                gbc__min_samples_leaf=range(1, 11),
+                gbc__max_depth=list(range(3, 11)),
+                gbc__max_features=['sqrt', 'log2', None],
+            )
+        elif classifier == 'rfc': # For RandomForestClassifier
+            self.init_params = dict(
+                rfc__n_stimators=list(range(50, 1000, 50)),
+                rfc__min_samples_split=range(2, 10),
+                rfc__min_samples_leaf=range(2, 10),
+                rfc__max_depth=list(range(10, 111, 10)),
+                rfc__bootstrap=[False, True],
+                rfc__class_weight=['balanced'],
+                rfc__max_features=['sqrt', 'log2', None],
+            )
+        elif classifier == 'brfc': # For RandomForestClassifier
+            self.init_params = dict(
+                brfc__n_stimators=list(range(50, 1000, 50)),
+                brfc__min_samples_split=range(2, 10),
+                brfc__min_samples_leaf=range(2, 10),
+                brfc__max_depth=list(range(10, 111, 10)),
+                brfc__bootstrap=[False, True],
+                brfc__class_weight=['balanced'],
+                brfc__max_features=['sqrt', 'log2', None],
+            )
+        else:
+            raise ValueError(
+                "Unknow classifier, possible choice: abc, gbc, rfc, brfc."
+            )
 
-    def set_params(self, param_name, param_value):
-        """Set parameters in optim_params"""
+    def set_classifier(self, classifier="rfc"):
+        """Set classifier"""
+        self.set_init_params(classifier=classifier)
 
-    def set_default(self, estimators_list=None, scoring_dict=None,
-                    optim_params=None):
-        """Set up default configuration"""
+        if classifier == "abc": # For AdaboostClassifier
+            self.classifier = ('abc', AdaBoostClassifier())
+        elif classifier == "gbc": # For GradientBoostingClassifier
+            self.classifier = ('gbc', GradientBoostingClassifier())
+        elif classifier == 'rfc': # For RandomForestClassifier
+            self.classifier = ('rfc', RandomForestClassifier())
+        elif classifier == 'brfc': # For BalancedRandomForestClassifier
+            self.classifier = ('brfc', BalancedRandomForestClassifier())
+        else:
+            raise ValueError(
+                "Unknow type of classifier, possible choice [abc, gbc, rfc, brfc]"
+            )
 
-        # For GradientBoostingClassifier
-        estimator_params = dict(
-            gbc__leaning_rate=numpy.linspace(.01, 1., 50),
-            gbc__n_estimators=list(range(50, 1000, 50)),
-            gbc__min_samples_split=range(2, 12),
-            gbc__min_samples_leaf=range(1, 11),
-            gbc__max_features=['sqrt', 'log2', None],
-        )
-
-        self.estimators_list = [
-            ('fs', SelectKBest()),
-            ('rfc', RandomForestClassifier()),
-            # ('gbc', GradientBoostingClassifier()),
-            # ('brfc', BalancedRandomForestClassifier()),
-        ]
-
-        scoring_dict = dict(
+    def set_scorers(self, extra_scorer=None):
+        """Set scorer"""
+        basic_scorers = dict(
             roc_auc_score=make_scorer(roc_auc_score, needs_proba=True),
             precision=make_scorer(precision_score, average="micro"),
             f1_score=make_scorer(f1_score, needs_proba=True),
             accuracy=make_scorer(accuracy_score),
         )
 
-        self.optim_params.update(
-            dict(
-                cv=StratifiedKFold(n_splits=10, shuffle=True),
-                n_jobs=5,
-                n_iter=25,
-                iid=False,
-                scoring=scoring_dict,
-                refit="accuracy",
-                return_train_score=True,
-                param_distributions=dict(
-                    fs__k=list(range(3, 90)),
-                    fs__score_func=[mutual_info_classif],
-                    rfc__min_samples_split=range(2, 10),
-                    rfc__min_samples_leaf=range(2, 10),
-                    rfc__max_features=['sqrt', 'log2', None],
-                    rfc__n_estimators=list(range(50, 1000, 50)),
-                    rfc__class_weight=['balanced'],
-                    rfc__max_depth=list(range(10, 111, 10)),
-                    rfc__bootstrap=[False, True],
-                ),
-            )
+        if extra_scorer:
+            basic_scorers['extra_scorer'] = extra_scorer
+        self.scorers = basic_scorers
+
+    def set_searcher_params(self, cv=None, ncvs=10, n_jobs=5, n_iter=25,
+                            refit=None):
+        """Set params for the searcher"""
+        if cv is None:
+            cv = StratifiedKFold(n_splits=ncvs, shuffle=True)
+
+        if refit is None:
+            refit = True
+
+        self.searcher_params = dict(
+            cv=cv, iid=False, n_jobs=n_jobs, n_iter=n_iter, refit=refit,
+            return_train_score=True,
         )
 
-    def get_configs(self):
-        """Get current configs"""
-        return dict(
-            estimators_list=self.estimators_list,
-            random_search_parameters=self.optim_params
-        )
+    def assembly(self):
+        """Set up default configuration"""
+
+        if self.classifier is None:
+            self.set_classifier()
+
+        if self.init_params is None:
+            self.set_init_params()
+
+        if self.scorers is None:
+            self.set_scorers()
+
+        if self.searcher_params is None:
+            self.set_searcher_params()
+
+        self.estimators_list = [self.classifier]
+        self.optim_params['param_distributions'] = self.init_params
+        self.optim_params['scoring'] = self.scorers
+        self.optim_params.update(self.searcher_params)
