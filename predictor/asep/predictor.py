@@ -1,20 +1,7 @@
 #!./env/bin/python
 # -*- coding: utf-8 -*-
 
-"""Predicting Allele-specific expression effect
-
-Allele-specific expression predictor
-
-Attributes:
-    input_file_name (str): data set used to train the model
-
-Methods:
-    __init__(self, file_name, verbose=False)
-
-TODO:
-    * Eliminate some module level variables
-    * Add more input file type
-"""
+"""Predicting Allele-specific expression effect"""
 
 import pickle
 import copy
@@ -64,21 +51,10 @@ def save_file(filename, target):
 
 
 class ASEPredictor:
-    """A class implementing prediction of ASE variance of a variant
-
-    Example:
-        >>> import ASEPredictor
-        >>> ipf = 'input.tsv'
-        >>> ap = ASEPredictor(ipf)
-        >>> ap.run()
-    """
+    """A class implementing prediction of ASE variance of a variant"""
 
     def __init__(self, file_name, config, sed=3142):
-        """Set up basic variables
-
-        Args:
-            file_name (str): input data set
-        """
+        """Set up basic variables """
         set_sed(sed)
         self.time_stamp = None
 
@@ -167,38 +143,7 @@ class ASEPredictor:
     @timmer
     def slice_dataframe(self, rows=None, cols=None, mask=None, remove=True,
                         mask_first=True):
-        """Slice the DataFrame base on rows, columns, and mask.
-
-        This method will remove or keep rows, columns or any fields match the
-        `mask` in place meaning change the dataframe directly, which is time
-        and memory sufficient. NOTE: rows or columns will be removed first,
-        then the dataframe will be masked.
-
-        Args:
-            rows (`list`, `tuple`, `None`): optional, default `None`
-                Rows retained for the downstream. If it's `None`, all rows will
-                be retained.
-            cols (list, tuple, None): optional, default `None`
-                Columns retained for the downstream. If it's `None`, all
-                columns will be retained.
-            mask (str, None): optional, default `None`
-                A filter to screen dataframe. If it's a `str` object, `query`
-                method will be called; otherwise, if it's `None`, no filter
-                will be applied.
-            remove (bool): optional, default `True`
-                Whether the values of `rows` or `cols` will be kept or
-                discarded. If True, cells coorderated by `rows` and `cols` will
-                be keep and the exclusive will be discarded, otherwise the way
-                around.
-            mask_first (bool): optional, defautl `True`
-                Do mask first or not.
-
-        TODO:
-            Remove and mask can be conflict with each other. For instance, if
-            you want to do mask first then do remove second, after one or more
-            rows were masked by `mask`, the method won't check whether the
-            masked rows in those to be removed.
-        """
+        """Slice the DataFrame base on rows, columns, and mask."""
         if not isinstance(remove, bool):
             raise TypeError('remove should be bool')
 
@@ -209,8 +154,6 @@ class ASEPredictor:
                     self.work_dataframe.query(reverse_mask, inplace=True)
                 else:
                     self.work_dataframe.query(mask, inplace=True)
-            else:
-                print("\nMask is empty, skip mask\n", file=sys.stderr)
 
         def do_trim(cols, rows, remove):
             if remove:
@@ -235,14 +178,7 @@ class ASEPredictor:
     @timmer
     def setup_xy(self, x_cols=None, y_col=None, resampling=False,
                  cg_features=None):
-        """Set up predictor variables and target variables.
-
-        Args:
-            x_cols(list, tuple, None):
-            y_col(string, None):
-            resampling(bool):
-            cg_features(list, tuple, None):
-        """
+        """Set up predictor variables and target variables. """
         if cg_features is None: # Should be any clumns end with `encoded` 
             cg_features = [
                 "ref_encoded", "alt_encoded", "oAA_encoded", "nAA_encoded",
@@ -281,21 +217,7 @@ class ASEPredictor:
 
     @timmer
     def label_encoder(self, target_cols=None, skip=None, remove=False):
-        """Encode category columns
-
-        Args:
-            target_cols (list or None):
-                name of columns to be encoded
-            skip (str, list, tuple, None):
-                list of names of columns skipped encoded. string represents
-                only the specific column will be skipped; list or tuple means
-                all contained elements will be skipped; None means no columns
-                will be skipped.
-            remove (bool):
-                remove columns need to be encoded.
-        Raises:
-            TypeError:
-        """
+        """Encode category columns """
         if target_cols is None:
             col_types = self.work_dataframe.dtypes
             target_cols = [
@@ -331,10 +253,7 @@ class ASEPredictor:
 
     @timmer
     def simple_imputer(self):
-        """A simple imputater based on pandas DataFrame.replace method.
-
-        The columns information are derived from Dannis
-        """
+        """A simple imputater based on pandas DataFrame.replace method."""
         defaults = {
             'motifEName': 'unknown', 'GeneID': 'unknown', 'GeneName':
             'unknown', 'CCDS': 'unknown', 'Intron': 'unknown', 'Exon':
@@ -373,14 +292,7 @@ class ASEPredictor:
 
     @timmer
     def setup_pipeline(self, estimator=None, biclass=True):
-        """Setup a training pipeline
-
-        Args:
-            estimator (estimator): None or a list of dicts; optional
-                A list with estimator and their parameters
-            biclass (bool): optional; defaul True
-                Binary classes problem(True) or multiple classes problem(False)
-        """
+        """Setup a training pipeline """
         if biclass:
             self.pipeline = Pipeline(estimator)
         else:
@@ -435,13 +347,7 @@ class ASEPredictor:
 
     @timmer
     def randomized_searcher_cv(self, estimator, split):  # Nested cv
-        """Hyper-parameters optimization by RandomizedSearchCV
-
-        Args:
-            estimator (estimator): compulsory; scikit-learn estimator object
-                An object
-            split (iterable): required;
-        """
+        """Hyper-parameters optimization by RandomizedSearchCV """
         train_idx, test_idx = split
         x_train_matrix = copy.deepcopy(self.x_matrix.iloc[train_idx])
         y_train_vector = copy.deepcopy(self.y_vector.iloc[train_idx])

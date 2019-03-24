@@ -107,7 +107,14 @@ class Config:
                 "Unknow type of classifier, possible choice [abc, gbc, rfc, brfc]"
             )
 
-    def set_scorers(self, extra_scorer=None):
+    def set_scorers(self):
+        """Set scorer"""
+        self.scorers = [
+            'f1', 'recall', 'roc_auc', "accuracy", 'f1_micro', "f1_weighted",
+            "precision",
+        ]
+
+    def __set_scorers(self, extra_scorer=None):
         """Set scorer"""
         basic_scorers = dict(
             # roc_auc_score=make_scorer(roc_auc_score),
