@@ -39,15 +39,14 @@ from .utilities import format_print
 from .utilities import set_sed
 from .utilities import timmer
 
+
 def save_file(filename, target):
     """Save your file smartly"""
-
     with open(filename, "wb") as opfh:
         if hasattr(target, "savefig"):
             target.savefig(opfh)
         else:
             pickle.dump(target, opfh)
-
 
 
 class ASEPredictor:
@@ -84,35 +83,43 @@ class ASEPredictor:
         self.learning_line = None
         self.learning_report = None
 
+        self.label_encoder_matrix = None
+        self.mask_query = None
+        self.dropped_cols = None
+
     @timmer
-    def run(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
-            biclass_=True, outer_cvs=6, mings=2, maxgs=None, outer_n_jobs=5,
-            with_lc=False, lc_space_size=10, lc_n_jobs=5, lc_cvs=5,
-            nested_cv=False, resampling=None):
+    def trainer(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
+                biclass_=True, outer_cvs=6, mings=2, maxgs=None,
+                outer_n_jobs=5, with_lc=False, lc_space_size=10, lc_n_jobs=5,
+                lc_cvs=5, nested_cv=False, resampling=None):
         """Execute a pre-designed construct pipeline"""
 
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
+        self.work_dataframe = self.read_file(self.input_file_name, limit)
 
-        self.read_file_to_dataframe(nrows=limit)
         self.setup_work_dataframe()
 
         if maxgs:
-            gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))".format(
-                mings, maxgs
-            )
+            gs_mask = "((group_size>={:n})&(group_size<={:n}))".format(mings, maxgs)
         else:
             gs_mask = "group_size >= {:n}".format(mings)
 
-        self.slice_dataframe(mask=gs_mask, remove=False)
+        self.mask_query = gs_mask
+        self.dropped_cols = drop_cols
+
+        self.work_dataframe = self.slice_dataframe(self.work_dataframe, mask=gs_mask, remove=False)
+        self.work_dataframe = self.simple_imputer(self.work_dataframe)
+        self.work_dataframe = self.slice_dataframe(self.work_dataframe, cols=drop_cols)
         self.work_dataframe[response] = self.work_dataframe[response].apply(abs)
-        self.simple_imputer()
-        self.slice_dataframe(cols=drop_cols)
+
         self.label_encoder()
         self.setup_xy(y_col=response, resampling=resampling)
-        self.setup_pipeline(estimator=self.estimators_list, biclass=biclass_)
+        self.setup_pipeline(self.estimators_list, biclass=biclass_)
+
         self.outer_validation(
             cvs=outer_cvs, n_jobs=outer_n_jobs, nested_cv=nested_cv
         )
+
         self.draw_roc_curve_cv()
         self.draw_k_main_features_cv()
         if with_lc:
@@ -121,16 +128,15 @@ class ASEPredictor:
                 space_size=lc_space_size
             )
 
-    @timmer
-    def read_file_to_dataframe(self, nrows=None):
+    @staticmethod
+    def read_file(file_name, nrows=None):
         """Read input file into pandas DataFrame."""
-        file_name = self.input_file_name
         try:
-            file_hand = open(file_name)
+            file_handle = open(file_name)
         except PermissionError as err:
             print('File IO error: ', err, file=sys.stderr)
         else:
-            self.raw_dataframe = pandas.read_table(file_hand, nrows=nrows)
+            return pandas.read_table(file_handle, nrows=nrows)
 
     @timmer
     def setup_work_dataframe(self):
@@ -140,46 +146,50 @@ class ASEPredictor:
         except Exception('Failed to deepcopy raw_df to work_df') as exp:
             raise exp
 
-    @timmer
-    def slice_dataframe(self, rows=None, cols=None, mask=None, remove=True,
-                        mask_first=True):
+    @staticmethod
+    def slice_dataframe(dataframe, rows=None, cols=None, mask=None,
+                        remove=True, mask_first=True):
         """Slice the DataFrame base on rows, columns, and mask."""
         if not isinstance(remove, bool):
             raise TypeError('remove should be bool')
 
-        def do_mask(mask, remove):
+        def do_mask(work_dataframe, mask, remove):
             if mask is not None:
                 if remove:
                     reverse_mask = "~({})".format(mask)  # reverse of mask
-                    self.work_dataframe.query(reverse_mask, inplace=True)
+                    work_dataframe.query(reverse_mask, inplace=True)
                 else:
-                    self.work_dataframe.query(mask, inplace=True)
+                    work_dataframe.query(mask, inplace=True)
+            return work_dataframe
 
-        def do_trim(cols, rows, remove):
+        def do_trim(work_dataframe, cols, rows, remove):
             if remove:
                 if cols is not None or rows is not None:
-                    self.work_dataframe.drop(
+                    work_dataframe.drop(
                         index=rows, columns=cols, inplace=True
                     )
             else:
                 if rows is None:
-                    rows = self.work_dataframe.index
+                    rows = work_dataframe.index
                 if cols is None:
-                    cols = self.work_dataframe.columns
-                self.work_dataframe = self.work_dataframe.loc[rows, cols]
+                    cols = work_dataframe.columns
+                work_dataframe = work_dataframe.loc[rows, cols]
+            return work_dataframe
 
         if mask_first:
-            do_mask(mask=mask, remove=remove)
-            do_trim(cols=cols, rows=rows, remove=remove)
+            dataframe = do_mask(dataframe, mask=mask, remove=remove)
+            dataframe = do_trim(dataframe, cols=cols, rows=rows, remove=remove)
         else:
-            do_trim(cols=cols, rows=rows, remove=remove)
-            do_mask(mask=mask, remove=remove)
+            dataframe = do_trim(dataframe, cols=cols, rows=rows, remove=remove)
+            dataframe = do_mask(dataframe, mask=mask, remove=remove)
+
+        return dataframe
 
     @timmer
     def setup_xy(self, x_cols=None, y_col=None, resampling=False,
                  cg_features=None):
         """Set up predictor variables and target variables. """
-        if cg_features is None: # Should be any clumns end with `encoded` 
+        if cg_features is None: # Should be any clumns end with `encoded`
             cg_features = [
                 "ref_encoded", "alt_encoded", "oAA_encoded", "nAA_encoded",
                 "motifEHIPos", "CCDS_encoded", "Exon_encoded", "gene_encoded",
@@ -235,11 +245,17 @@ class ASEPredictor:
                     print('{} isn\'t in list...'.format(skip), file=sys.stderr)
 
         if remove:
-            format_print("Deleted columns (require encode)", "\n".join(target_cols))
+            format_print(
+                "Deleted columns (require encoding)", "\n".join(target_cols)
+            )
             self.work_dataframe.drop(columns=target_cols, inplace=True)
+            self.label_encoder_matrix = {x:"removed" for x in target_cols}
         else:
             format_print("Encoded columns", ", ".join(target_cols))
             target_cols_encod = [n + '_encoded' for n in target_cols]
+
+            if self.label_encoder_matrix is None:
+                self.label_encoder_matrix = {}
 
             encoder = LabelEncoder()
             for col_tag, col_tag_encod in zip(target_cols, target_cols_encod):
@@ -247,12 +263,13 @@ class ASEPredictor:
                     self.work_dataframe[col_tag_encod] = encoder.fit_transform(
                         self.work_dataframe[col_tag]
                     )
+                    self.label_encoder_matrix[col_tag] = copy.deepcopy(encoder)
                     del self.work_dataframe[col_tag]
                 except ValueError as err:
                     print(err, file=sys.stderr)
 
-    @timmer
-    def simple_imputer(self):
+    @staticmethod
+    def simple_imputer(dataframe):
         """A simple imputater based on pandas DataFrame.replace method."""
         defaults = {
             'motifEName': 'unknown', 'GeneID': 'unknown', 'GeneName':
@@ -288,7 +305,8 @@ class ASEPredictor:
         }
 
         targets = numpy.NaN
-        self.work_dataframe = self.work_dataframe.replace(targets, defaults)
+        dataframe = dataframe.replace(targets, defaults)
+        return dataframe
 
     @timmer
     def setup_pipeline(self, estimator=None, biclass=True):
@@ -299,8 +317,8 @@ class ASEPredictor:
             self.pipeline = OneVsOneClassifier(Pipeline(estimator))
 
     @timmer
-    def draw_learning_curve(
-            self, estimator, cvs=5, n_jobs=5, space_size=10, **kwargs):
+    def draw_learning_curve(self, estimator, cvs=5, n_jobs=5, space_size=10,
+                            **kwargs):
         """Draw the learning curve of specific estimator or pipeline"""
         train_sizes, train_scores, test_scores = learning_curve(
             estimator=estimator, X=self.x_matrix, y=self.y_vector,
@@ -379,7 +397,7 @@ class ASEPredictor:
             training_report = None
 
         # TODO: need update if use more estimator
-        first_k_name = x_train_matrix.columns 
+        first_k_name = x_train_matrix.columns
         first_k_importance = estimator.steps[-1][-1].feature_importances_
         feature_importance = {
             name: importance
@@ -551,10 +569,18 @@ class ASEPredictor:
 
         self.feature_importance_hist = (fig, ax_features)
 
+    def fetch_model(self, best=False):
+        """Use specific model to predict new dataset"""
+        if self.model_pool is None:
+            raise "Please train a model first."
+        else:
+            if best:
+                pass
+            return copy.deepcopy(self.model_pool[0].steps[-1][-1])
+
     @timmer
     def save_to(self, save_path="./", run_flag=''):
         """Save configs, results and etc. to disk"""
-
         time_stamp = self.time_stamp
         time_stamp = self.time_stamp + run_flag
         save_path = os.path.join(save_path, time_stamp)
@@ -586,6 +612,45 @@ class ASEPredictor:
             file_path = os.path.join(save_path, "learning_curve.png")
             save_file(file_path, self.learning_line[0])
 
+        if self.model_pool:
+            file_path = os.path.join(save_path, "model_pool.pkl")
+            save_file(file_path, self.model_pool)
+
         file_path = os.path.join(save_path, time_stamp + "_object.pkl")
         with open(file_path, 'wb') as opfh:
             pickle.dump(self, opfh)
+
+    def setup_input_matrix(self, dataframe):
+        """Preprocessing inputs to predict"""
+        # Encoding new dataframe
+        for tag, encoder in self.label_encoder_matrix:
+            if encoder == "removed":
+                del dataframe[tag]
+            else:
+                dataframe[tag] = encoder.transform(dataframe[tag])
+
+        dataframe = self.slice_dataframe(
+            dataframe, mask=self.mask_query, remove=False
+        )
+        dataframe = self.simple_imputer(dataframe)
+        dataframe = self.slice_dataframe(dataframe, cols=self.dropped_cols)
+
+        return dataframe
+
+    def predictor(self, input_file, output_file, nrows=1000):
+        """Predict ASE effects for raw dataset"""
+        try:
+            file_handle = open(input_file)
+        except PermissionError as err:
+            print('File IO error: ', err, file=sys.stderr)
+        else:
+            target_dataframe = pandas.read_table(file_handle, nrows=nrows)
+
+        predictor = self.fetch_model()
+        processed_dataframe = self.setup_input_matrix(target_dataframe)
+        target_dataframe['predict'] = predictor.predict(processed_dataframe)
+        target_dataframe['predict_proba'] = predictor.predict_proba(processed_dataframe)
+
+        target_dataframe.to_csv(output_file, sep="\t")
+
+        return 0

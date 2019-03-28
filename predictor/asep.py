@@ -28,6 +28,15 @@ def get_args():
 
     parser = ArgumentParser()
 
+    parser.add_argument(
+        "-a", "--action", dest="action", default="train", required=True,
+        choices=["train", "validate", "predict"],
+        help="""Action will be excuted. \"train\" for training on training data;
+        \"validate\" for validating the model; \"predict\" for predicting new
+        dataset using constructed dataset.
+        """
+    )
+
     group = parser.add_argument_group("Input")
     group.add_argument(
         "-i", "--input-file", dest="input_file", default=None, required=True,
@@ -71,7 +80,6 @@ def get_args():
     )
     group.add_argument(
         "--response-col", dest="reponse_col", default='bb_ASE',
-        # XXX: Default must be consistent with input dataset
         help="The column name of response variable or target variable"
     )
 
@@ -94,11 +102,12 @@ def get_args():
     )
     group.add_argument(
         "--classifier", dest="classifier", default='rfc', type=str,
+        choices=["abc", "gbc", "rfc", "brfc"],
         help="Algorithm. Choices: [abc, gbc, rfc, brfc]. Default: rfc"
     )
     group.add_argument(
         "--resampling", dest="resampling", action="store_true",
-        help="Use nested cross validation or not. Default: False"
+        help="Use resampling method or not. Default: False"
     )
     group.add_argument(
         "--nested-cv", dest="nested_cv", default=False, action="store_true",
@@ -139,11 +148,10 @@ def get_args():
 
     group = parser.add_argument_group("Misc")
     group.add_argument(
-        "--test-size", dest="test_size", default=None, type=int,
-        help="the proportion of dataset for testing"
+        "-V", dest="verbose_level", action="count", help="Verbose level"
     )
     group.add_argument(
-        "--verbose", dest="verbose_level", default=0, action="count",
+        "--test-size", dest="test_size", default=None, type=int,
         help="the proportion of dataset for testing"
     )
     group.add_argument(
@@ -152,6 +160,15 @@ def get_args():
     )
 
     return parser
+
+def train():
+    """Train the model"""
+
+def validate():
+    """Validate the model using extra dataset"""
+
+def predict():
+    """Predict new dataset based on constructed model"""
 
 
 def main():
@@ -218,7 +235,7 @@ def main():
 
     resampling = arguments.resampling
 
-    asep.run(
+    asep.trainer(
         mask=mask_out, mings=min_group_size, maxgs=max_group_size,
         limit=first_k_rows, response=reponse_col, drop_cols=drop_cols,
         outer_cvs=outer_cvs, outer_n_jobs=outer_n_jobs, nested_cv=nested_cv,
