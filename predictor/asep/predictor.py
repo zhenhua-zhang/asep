@@ -87,6 +87,7 @@ class ASEPredictor:
         self.mask_query = None
         self.dropped_cols = None
 
+    # trainer
     @timmer
     def trainer(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
                 biclass_=True, outer_cvs=6, mings=2, maxgs=None,
@@ -95,16 +96,16 @@ class ASEPredictor:
         """Execute a pre-designed construct pipeline"""
 
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
-        self.work_dataframe = self.read_file(self.input_file_name, limit)
+        self.raw_dataframe = self.read_file(self.input_file_name, limit)
 
         self.setup_work_dataframe()
 
         if maxgs:
-            gs_mask = "((group_size>={:n})&(group_size<={:n}))".format(mings, maxgs)
+            gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))".format(mings, maxgs)
         else:
             gs_mask = "group_size >= {:n}".format(mings)
 
-        self.mask_query = gs_mask
+        self.mask_query = mask
         self.dropped_cols = drop_cols
 
         self.work_dataframe = self.slice_dataframe(self.work_dataframe, mask=gs_mask, remove=False)
@@ -150,6 +151,7 @@ class ASEPredictor:
     def slice_dataframe(dataframe, rows=None, cols=None, mask=None,
                         remove=True, mask_first=True):
         """Slice the DataFrame base on rows, columns, and mask."""
+        # XXX: mask and rows, cols could be conflict
         if not isinstance(remove, bool):
             raise TypeError('remove should be bool')
 
@@ -175,6 +177,9 @@ class ASEPredictor:
                     cols = work_dataframe.columns
                 work_dataframe = work_dataframe.loc[rows, cols]
             return work_dataframe
+
+        if cols:
+            cols = [x for x in cols if x in dataframe.columns]
 
         if mask_first:
             dataframe = do_mask(dataframe, mask=mask, remove=remove)
@@ -569,20 +574,11 @@ class ASEPredictor:
 
         self.feature_importance_hist = (fig, ax_features)
 
-    def fetch_model(self, best=False):
-        """Use specific model to predict new dataset"""
-        if self.model_pool is None:
-            raise "Please train a model first."
-        else:
-            if best:
-                pass
-            return copy.deepcopy(self.model_pool[0].steps[-1][-1])
-
     @timmer
     def save_to(self, save_path="./", run_flag=''):
         """Save configs, results and etc. to disk"""
         time_stamp = self.time_stamp
-        time_stamp = self.time_stamp + run_flag
+        time_stamp = self.time_stamp + "_" + run_flag
         save_path = os.path.join(save_path, time_stamp)
 
         if not os.path.exists(save_path):
@@ -612,45 +608,57 @@ class ASEPredictor:
             file_path = os.path.join(save_path, "learning_curve.png")
             save_file(file_path, self.learning_line[0])
 
-        if self.model_pool:
-            file_path = os.path.join(save_path, "model_pool.pkl")
-            save_file(file_path, self.model_pool)
-
         file_path = os.path.join(save_path, time_stamp + "_object.pkl")
         with open(file_path, 'wb') as opfh:
             pickle.dump(self, opfh)
 
+
+    # Predictor
+    def predictor(self, input_file, output_dir="./", output_file=None, nrows=None):
+        """Predict ASE effects for raw dataset"""
+        model = self.fetch_model()
+        try:
+            file_handle = open(input_file)
+        except PermissionError as err:
+            print('File IO error: ', err, file=sys.stderr)
+        else:
+            target_dataframe = pandas.read_table(file_handle, sep="\t", nrows=nrows)
+
+        processed_dataframe = self.setup_input_matrix(target_dataframe)
+        target_dataframe['predict'] = model.predict(processed_dataframe)
+        target_dataframe['predict_proba'] = model.predict_proba(processed_dataframe)
+
+        if output_file is None:
+            input_dir, input_file_name = os.path.split(input_file)
+            name, ext = os.path.splitext(input_file_name)
+            output_file = "".join([output_dir, name, "_pred", ext])
+        else:
+            output_file = "".join([output_dir, output_file])
+
+        target_dataframe.to_csv(output_file, sep="\t")
+
+    def fetch_model(self, best=False):
+        """Use specific model to predict new dataset"""
+        if self.model_pool is None:
+            raise "Please train a model first."
+        else:
+            if best:
+                pass
+            return copy.deepcopy(self.model_pool[0].steps[-1][-1])
+
     def setup_input_matrix(self, dataframe):
         """Preprocessing inputs to predict"""
-        # Encoding new dataframe
-        for tag, encoder in self.label_encoder_matrix:
-            if encoder == "removed":
-                del dataframe[tag]
-            else:
-                dataframe[tag] = encoder.transform(dataframe[tag])
-
         dataframe = self.slice_dataframe(
             dataframe, mask=self.mask_query, remove=False
         )
         dataframe = self.simple_imputer(dataframe)
         dataframe = self.slice_dataframe(dataframe, cols=self.dropped_cols)
 
+        # Encoding new dataframe
+        for tag, encoder in self.label_encoder_matrix.items():
+            if encoder == "removed":
+                del dataframe[tag]
+            else:
+                dataframe[tag] = encoder.transform(dataframe[tag])
+
         return dataframe
-
-    def predictor(self, input_file, output_file, nrows=1000):
-        """Predict ASE effects for raw dataset"""
-        try:
-            file_handle = open(input_file)
-        except PermissionError as err:
-            print('File IO error: ', err, file=sys.stderr)
-        else:
-            target_dataframe = pandas.read_table(file_handle, nrows=nrows)
-
-        predictor = self.fetch_model()
-        processed_dataframe = self.setup_input_matrix(target_dataframe)
-        target_dataframe['predict'] = predictor.predict(processed_dataframe)
-        target_dataframe['predict_proba'] = predictor.predict_proba(processed_dataframe)
-
-        target_dataframe.to_csv(output_file, sep="\t")
-
-        return 0
