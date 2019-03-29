@@ -161,7 +161,7 @@ def get_args():
 
     return parser
 
-def train():
+def train(arguments):
     """Train the model"""
 
 def validate():
@@ -221,8 +221,8 @@ def main():
 
     mask_as = arguments.mask_as
     mask_out = arguments.mask_out
-    first_k_rows = arguments.first_k_rows
     reponse_col = arguments.reponse_col
+    first_k_rows = arguments.first_k_rows
 
     nested_cv = arguments.nested_cv
     outer_cvs = arguments.outer_cvs
