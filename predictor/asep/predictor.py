@@ -401,7 +401,7 @@ class ASEPredictor:
         else:
             training_report = None
 
-        # TODO: need update if use more estimator
+        # XXX: need update if use more estimator
         first_k_name = x_train_matrix.columns
         first_k_importance = estimator.steps[-1][-1].feature_importances_
         feature_importance = {
@@ -629,7 +629,7 @@ class ASEPredictor:
         target_dataframe['predict_proba'] = model.predict_proba(processed_dataframe)
 
         if output_file is None:
-            input_dir, input_file_name = os.path.split(input_file)
+            _, input_file_name = os.path.split(input_file)
             name, ext = os.path.splitext(input_file_name)
             output_file = "".join([output_dir, name, "_pred", ext])
         else:
@@ -646,7 +646,7 @@ class ASEPredictor:
                 pass
             return copy.deepcopy(self.model_pool[0].steps[-1][-1])
 
-    def setup_input_matrix(self, dataframe):
+    def setup_input_matrix(self, dataframe, missing_value=1e9-1):
         """Preprocessing inputs to predict"""
         dataframe = self.slice_dataframe(
             dataframe, mask=self.mask_query, remove=False
@@ -655,10 +655,16 @@ class ASEPredictor:
         dataframe = self.slice_dataframe(dataframe, cols=self.dropped_cols)
 
         # Encoding new dataframe
-        for tag, encoder in self.label_encoder_matrix.items():
-            if encoder == "removed":
-                del dataframe[tag]
+        for _tag, _encoder in self.label_encoder_matrix.items():
+            if _encoder == "removed":
+                del dataframe[_tag]
             else:
-                dataframe[tag] = encoder.transform(dataframe[tag])
+                classes = _encoder.classes_
+                _encoder_dict = dict(
+                    zip(classes, _encoder.transform(classes))
+                )
+                dataframe[_tag].apply(
+                    lambda x: _encoder_dict.get(x, missing_value)
+                )
 
         return dataframe
