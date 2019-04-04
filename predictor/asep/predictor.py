@@ -1,8 +1,6 @@
 #!./env/bin/python
 # -*- coding: utf-8 -*-
-
 """Predicting Allele-specific expression effect"""
-
 import pickle
 import copy
 import time
@@ -101,14 +99,17 @@ class ASEPredictor:
         self.setup_work_dataframe()
 
         if maxgs:
-            gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))".format(mings, maxgs)
+            __gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))"
+            gs_mask = __gs_mask.format(mings, maxgs)
         else:
             gs_mask = "group_size >= {:n}".format(mings)
 
         self.mask_query = mask
         self.dropped_cols = drop_cols
 
-        self.work_dataframe = self.slice_dataframe(self.work_dataframe, mask=gs_mask, remove=False)
+        self.work_dataframe = self.slice_dataframe(
+            self.work_dataframe, mask=gs_mask, remove=False
+        )
         self.work_dataframe = self.simple_imputer(self.work_dataframe)
         self.work_dataframe = self.slice_dataframe(self.work_dataframe, cols=drop_cols)
         self.work_dataframe[response] = self.work_dataframe[response].apply(abs)
@@ -194,7 +195,7 @@ class ASEPredictor:
     def setup_xy(self, x_cols=None, y_col=None, resampling=False,
                  cg_features=None):
         """Set up predictor variables and target variables. """
-        if cg_features is None: # Should be any clumns end with `encoded`
+        if cg_features is None:
             cg_features = [
                 "ref_encoded", "alt_encoded", "oAA_encoded", "nAA_encoded",
                 "motifEHIPos", "CCDS_encoded", "Exon_encoded", "gene_encoded",
@@ -217,6 +218,7 @@ class ASEPredictor:
                 raise ValueError('Target column is in predictor columns')
 
         x_matrix = copy.deepcopy(self.work_dataframe.loc[:, x_cols])
+        x_matrix.sort_index(1, inplace=True)
         y_vector = copy.deepcopy(self.work_dataframe.loc[:, y_col])
 
         if resampling:
@@ -254,27 +256,27 @@ class ASEPredictor:
                 "Deleted columns (require encoding)", "\n".join(target_cols)
             )
             self.work_dataframe.drop(columns=target_cols, inplace=True)
-            self.label_encoder_matrix = {x:"removed" for x in target_cols}
+            self.label_encoder_matrix = {(x, x):"removed" for x in target_cols}
         else:
             format_print("Encoded columns", ", ".join(target_cols))
-            target_cols_encod = [n + '_encoded' for n in target_cols]
+            target_cols_encoded = [n + '_encoded' for n in target_cols]
 
             if self.label_encoder_matrix is None:
                 self.label_encoder_matrix = {}
 
             encoder = LabelEncoder()
-            for col_tag, col_tag_encod in zip(target_cols, target_cols_encod):
+            for _tag, _tag_enc in zip(target_cols, target_cols_encoded):
                 try:
-                    self.work_dataframe[col_tag_encod] = encoder.fit_transform(
-                        self.work_dataframe[col_tag]
+                    self.work_dataframe[_tag_enc] = encoder.fit_transform(
+                        self.work_dataframe[_tag]
                     )
-                    self.label_encoder_matrix[col_tag] = copy.deepcopy(encoder)
-                    del self.work_dataframe[col_tag]
+                    self.label_encoder_matrix[(_tag, _tag_enc)] = copy.deepcopy(encoder)
+                    del self.work_dataframe[_tag]
                 except ValueError as err:
                     print(err, file=sys.stderr)
 
     @staticmethod
-    def simple_imputer(dataframe):
+    def simple_imputer(dataframe, targets=(numpy.NaN, '.')):
         """A simple imputater based on pandas DataFrame.replace method."""
         defaults = {
             'motifEName': 'unknown', 'GeneID': 'unknown', 'GeneName':
@@ -305,12 +307,13 @@ class ASEPredictor:
             'Grantham': 0, 'Dist2Mutation': 0, 'Freq100bp': 0, 'Rare100bp': 0,
             'Sngl100bp': 0, 'Freq1000bp': 0, 'Rare1000bp': 0, 'Sngl1000bp': 0,
             'Freq10000bp': 0, 'Rare10000bp': 0, 'Sngl10000bp': 0,
-            'dbscSNV.ada_score': 0, 'dbscSNV.rf_score': 0, "mirSVR.Score": 0,
-            "mirSVR.E": 0, "mirSVR.Aln": 0
+            'dbscSNV-ada_score': 0, 'dbscSNV-rf_score': 0, "mirSVR-Score": 0,
+            "mirSVR-E": 0, "mirSVR-Aln": 0
         }
 
-        targets = numpy.NaN
-        dataframe = dataframe.replace(targets, defaults)
+        for target in targets:
+            dataframe.replace(target, defaults, inplace=True)
+
         return dataframe
 
     @timmer
@@ -369,7 +372,7 @@ class ASEPredictor:
         self.learning_line = (fig, ax_learning)
 
     @timmer
-    def randomized_searcher_cv(self, estimator, split):  # Nested cv
+    def randomized_search_cv(self, estimator, split):  # Nested cv
         """Hyper-parameters optimization by RandomizedSearchCV """
         train_idx, test_idx = split
         x_train_matrix = copy.deepcopy(self.x_matrix.iloc[train_idx])
@@ -443,7 +446,7 @@ class ASEPredictor:
                 ]
 
         task_pool = [
-            (self.randomized_searcher_cv, copy.deepcopy(self.estimator), split)
+            (self.randomized_search_cv, copy.deepcopy(self.estimator), split)
             for split in split_pool
         ]  # XXX: Deepcopy estimator, memory intensive but much safer ??
 
@@ -593,7 +596,7 @@ class ASEPredictor:
             save_file(file_path, self.feature_importance_hist[0])
 
         if self.area_under_curve_pool:
-            file_path = os.path.join(save_path, "AUC_false_true_positive_matrix.pkl")
+            file_path = os.path.join(save_path, "auc_fpr_tpr.pkl")
             save_file(file_path, self.area_under_curve_pool)
 
         if self.area_under_curve_curve:
@@ -614,19 +617,26 @@ class ASEPredictor:
 
 
     # Predictor
-    def predictor(self, input_file, output_dir="./", output_file=None, nrows=None):
+    def predictor(self, input_file, output_dir="./", model=None,
+                  output_file=None, nrows=None):
         """Predict ASE effects for raw dataset"""
-        model = self.fetch_model()
-        try:
-            file_handle = open(input_file)
-        except PermissionError as err:
-            print('File IO error: ', err, file=sys.stderr)
+        if model is None:
+            model = self.fetch_model()
         else:
+            if not hasattr(model, "predict"):
+                raise AttributeError("Model should have `predict` method.")
+            if not hasattr(model, "predict_prob"):
+                raise AttributeError("Model should have `predict_proba` method.")
+
+        with open(input_file) as file_handle:
             target_dataframe = pandas.read_table(file_handle, sep="\t", nrows=nrows)
 
         processed_dataframe = self.setup_input_matrix(target_dataframe)
-        target_dataframe['predict'] = model.predict(processed_dataframe)
-        target_dataframe['predict_proba'] = model.predict_proba(processed_dataframe)
+
+        pre_prob = model.predict_proba(processed_dataframe)
+        target_dataframe['pre_prob0'] = pre_prob[:, 0]
+        target_dataframe['pre_prob1'] = pre_prob[:, 1]
+        target_dataframe['pre'] = model.predict(processed_dataframe)
 
         if output_file is None:
             _, input_file_name = os.path.split(input_file)
@@ -640,31 +650,31 @@ class ASEPredictor:
     def fetch_model(self, best=False):
         """Use specific model to predict new dataset"""
         if self.model_pool is None:
-            raise "Please train a model first."
+            print("Please train a model first.", file=sys.stderr)
+            sys.exit(1)
         else:
-            if best:
+            if best: # XXX: add method to get best model
                 pass
             return copy.deepcopy(self.model_pool[0].steps[-1][-1])
 
-    def setup_input_matrix(self, dataframe, missing_value=1e9-1):
+    def setup_input_matrix(self, dataframe, missing_val=1e9-1):
         """Preprocessing inputs to predict"""
         dataframe = self.slice_dataframe(
             dataframe, mask=self.mask_query, remove=False
         )
-        dataframe = self.simple_imputer(dataframe)
         dataframe = self.slice_dataframe(dataframe, cols=self.dropped_cols)
+        dataframe = self.simple_imputer(dataframe)
 
         # Encoding new dataframe
-        for _tag, _encoder in self.label_encoder_matrix.items():
+        for (_tag, _tag_enc), _encoder in self.label_encoder_matrix.items():
             if _encoder == "removed":
                 del dataframe[_tag]
             else:
                 classes = _encoder.classes_
-                _encoder_dict = dict(
-                    zip(classes, _encoder.transform(classes))
+                _tmp_dict = dict(zip(classes, _encoder.transform(classes)))
+                dataframe[_tag_enc] = dataframe[_tag].apply(
+                    lambda x: _tmp_dict.get(x, missing_val)
                 )
-                dataframe[_tag].apply(
-                    lambda x: _encoder_dict.get(x, missing_value)
-                )
+                del dataframe[_tag]
 
         return dataframe

@@ -28,157 +28,158 @@ def get_args():
     """
 
     parser = ArgumentParser()
+    _group = parser.add_argument_group("Global")
+    _group.add_argument(
+        "-V", dest="verbose_level", action="count", help="Verbose level"
+    )
+    _group.add_argument(
+        "--run-flag", dest="run_flag", default="new_task",
+        help="Flags for current run"
+    )
+
     subparser = parser.add_subparsers(dest="subcommand")
 
+    # Argument parser for subcommand `train`
     train_argparser = subparser.add_parser("train", help="Train a model")
-
-    group = train_argparser.add_argument_group("Input")
-    group.add_argument(
-        "-i", "--input-file", dest="input_file", default=None, required=True,
+    _group = train_argparser.add_argument_group("Input")
+    _group.add_argument(
+        "-i", "--train-input-file", dest="input_file", default=None, required=True,
         help="The path to file of training dataset. Default: None"
     )
 
-    group = train_argparser.add_argument_group("Filter")
-    group.add_argument(
+    _group = train_argparser.add_argument_group("Filter")
+    _group.add_argument(
         "-f", "--first-k-rows", dest="first_k_rows", default=None, type=int,
         help="Only read first k rows as input from input file. Default: None"
     )
-    group.add_argument(
+    _group.add_argument(
         "-m", "--mask-as", dest="mask_as", default=None, type=str,
         help="Pattern will be kept. Default: None"
     )
-    group.add_argument(
+    _group.add_argument(
         "-M", "--mask-out", dest="mask_out", default=None, type=str,
         help="Pattern will be masked. Default: None"
     )
-    group.add_argument(
+    _group.add_argument(
         "--min-group-size", dest="min_group_size", default=2,
         type=lambda x: int(x) > 1 and int(x) or parser.error(
             "--min-group-size must be >= 2"),
         help="""The minimum of individuals bearing the same variant (>= 2).
         Default: 2"""
     )
-    group.add_argument(
+    _group.add_argument(
         "--max-group-size", dest="max_group_size", default=None,
         type=lambda x: int(x) <= 1e4  and int(x) or parser.error(
             "--max-group-size must be <= 10,000"),
         help="""The maximum number of individuals bearing the same variant
         (<= 10,000). Default: None"""
     )
-    group.add_argument(
+    _group.add_argument(
         "--drop-cols", dest="drop_cols", default=None, nargs='+',
         help="""The columns will be dropped. Seperated by semi-colon and quote
         them by ','. if there are more than one columns. Default: None"""
     )
-    group.add_argument(
+    _group.add_argument(
         "--response-col", dest="reponse_col", default='bb_ASE',
         help="""The column name of response variable or target variable.
         Default: bb_ASE"""
     )
 
-    group = train_argparser.add_argument_group("Configuration")
-    group.add_argument(
+    _group = train_argparser.add_argument_group("Configuration")
+    _group.add_argument(
         "--test-size", dest="test_size", default=None, type=int,
         help="The proportion of dataset for testing. Default: None"
     )
-    group.add_argument(
+    _group.add_argument(
         "-c", "--config-file", dest="config_file", default=None, type=str,
         help="""The path to configuration file, all configuration will be get
         from it, and overwrite values from command line except -i. Default:
         None"""
     )
-    group.add_argument(
+    _group.add_argument(
         "--classifier", dest="classifier", default='rfc', type=str,
         choices=["abc", "gbc", "rfc", "brfc"],
         help="Algorithm. Choices: [abc, gbc, rfc, brfc]. Default: rfc"
     )
-    group.add_argument(
+    _group.add_argument(
         "--resampling", dest="resampling", action="store_true",
         help="Use resampling method or not. Default: False"
     )
-    group.add_argument(
+    _group.add_argument(
         "--nested-cv", dest="nested_cv", default=False, action="store_true",
         help="Use nested cross validation or not. Default: False"
     )
-    group.add_argument(
+    _group.add_argument(
         "--inner-cvs", dest="inner_cvs", default=6, type=int,
         help="Fold of cross-validations for RandomizedSearchCV. Default: 6"
     )
-    group.add_argument(
+    _group.add_argument(
         "--inner-n-jobs", dest="inner_n_jobs", default=5, type=int,
         help="Number of jobs for RandomizedSearchCV, Default: 5"
     )
-    group.add_argument(
+    _group.add_argument(
         "--inner-n-iters", dest="inner_n_iters", default=50, type=int,
         help="Number of iters for RandomizedSearchCV. Default: 50"
     )
-    group.add_argument(
+    _group.add_argument(
         "--outer-cvs", dest="outer_cvs", default=6, type=int,
         help="Fold of cross-validation for outer_validation"
     )
-    group.add_argument(
+    _group.add_argument(
         "--outer-n-jobs", dest="outer_n_jobs", default=5, type=int,
         help="Number of jobs for outer_validation"
     )
-    group.add_argument(
+    _group.add_argument(
+        "--with-learning-curve", dest="with_lc", default=False,
+        action='store_true', help="Whether draw learning curve. Default: False"
+    )
+    _group.add_argument(
         "--learning-curve-cvs", dest="lc_cvs", default=4, type=int,
         help="Number of folds to draw learning curve"
     )
-    group.add_argument(
+    _group.add_argument(
         "--learning-curve-n-jobs", dest="lc_n_jobs", default=5, type=int,
         help="Number of jobs to draw learning curves"
     )
-    group.add_argument(
-        "--learning-curve-space-size", dest="lc_space_size", default=10, type=int,
-        help="Number of splits will be create in learning curve"
+    _group.add_argument(
+        "--learning-curve-space-size", dest="lc_space_size", default=10,
+        type=int, help="Number of splits will be create in learning curve"
     )
 
-    group = train_argparser.add_argument_group("Output")
-    group.add_argument(
+    _group = train_argparser.add_argument_group("Output")
+    _group.add_argument(
         "-o", "--output-dir", dest="output_dir", default='./', type=str,
         help="The directory including output files. Default: ./"
     )
-    group.add_argument(
-        "--with-learning-curve", dest="with_lc", default=False,
-        action='store_true',
-        help="Whether to draw a learning curve. Default: False"
-    )
 
+    # Argument parser for subcommand `validate`
     validate_argparser = subparser.add_parser(
         "validate", help="Validate the model."
     )
-    group = validate_argparser.add_argument_group("Input")
-    group.add_argument(
+    _group = validate_argparser.add_argument_group("Input")
+    _group.add_argument(
         "-v", "--validation-file", dest="validation_file", type=str,
         required=True, help="The path to file of validation dataset"
     )
 
+    # Argument parser for subcommand `predict`
     predict_argparser = subparser.add_parser(
         "predict", help="Predict new dataset by the trained model"
     )
-    group = predict_argparser.add_argument_group("Input")
-    group.add_argument(
-        "-i", "--predict-input-file", dest="predict_input_file", type=str,
+    _group = predict_argparser.add_argument_group("Input")
+    _group.add_argument(
+        "-i", "--predict-input-file", dest="input_file", type=str,
         required=True, help="New files including case to be predicted"
     )
-    group.add_argument(
+    _group.add_argument(
         "-m", "--model-file", dest="model_file", type=str, required=True,
         help="Model to be used"
     )
 
-    group = predict_argparser.add_argument_group("Output")
-    group.add_argument(
-        "-o", "--predict-output-dir", dest="predict_output_dir", type=str,
+    _group = predict_argparser.add_argument_group("Output")
+    _group.add_argument(
+        "-o", "--predict-output-dir", dest="output_dir", type=str,
         required=True, help="Output directory for predict input file"
-    )
-
-    group = parser.add_argument_group("Global")
-    group.add_argument(
-        "-V", dest="verbose_level", action="count", help="Verbose level"
-    )
-    group.add_argument(
-        "--run-flag", dest="run_flag", default="new_task",
-        help="Flags for current run"
     )
 
     return parser
@@ -254,9 +255,9 @@ def predict(arguments):
     with open(model_file, 'rb') as model_file_handle:
         model_obj = pickle.load(model_file_handle)
 
-    predict_input_file = arguments.predict_input_file
-    predict_output_dir = arguments.predict_output_dir 
-    model_obj.predictor(predict_input_file, predict_output_dir)
+    input_file = arguments.input_file
+    output_dir = arguments.output_dir 
+    model_obj.predictor(input_file, output_dir=output_dir)
 
 
 def main():
