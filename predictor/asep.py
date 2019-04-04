@@ -7,8 +7,6 @@ import pickle
 
 from argparse import ArgumentParser
 
-from sklearn.model_selection import StratifiedKFold
-
 from asep.predictor import ASEPredictor
 from asep.utilities import timmer
 from asep.configs import Config
