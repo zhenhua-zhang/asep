@@ -617,6 +617,7 @@ class ASEPredictor:
 
 
     # Predictor
+    @timmer
     def predictor(self, input_file, output_dir="./", model=None,
                   output_file=None, nrows=None):
         """Predict ASE effects for raw dataset"""
@@ -645,18 +646,22 @@ class ASEPredictor:
         else:
             output_file = "".join([output_dir, output_file])
 
-        target_dataframe.to_csv(output_file, sep="\t")
+        # XXX: maybe need state data type for each column explicitly
+        target_dataframe.to_csv(output_file, sep="\t", index=False)
 
+    @timmer
     def fetch_model(self, best=False):
         """Use specific model to predict new dataset"""
         if self.model_pool is None:
             print("Please train a model first.", file=sys.stderr)
             sys.exit(1)
         else:
-            if best: # XXX: add method to get best model
+            # XXX: add method to get best model
+            if best:
                 pass
             return copy.deepcopy(self.model_pool[0].steps[-1][-1])
 
+    @timmer
     def setup_input_matrix(self, dataframe, missing_val=1e9-1):
         """Preprocessing inputs to predict"""
         dataframe = self.slice_dataframe(

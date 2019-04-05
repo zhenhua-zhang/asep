@@ -15,18 +15,6 @@ from asep.configs import Config
 def get_args():
     """A method to get arguments from the command line"""
 
-    __head = """
-        ##############################################
-        #    Allele-specific expression predictor    #
-        #                                            #
-        # Zhenhua Zhang <zhenhua.zhang217@gmail.com> #
-        ##############################################
-    """
-
-    __foot = """
-        GitHub: https://github.com/zhenhua-zhang/asep
-    """
-
     parser = ArgumentParser()
     _group = parser.add_argument_group("Global")
     _group.add_argument(
@@ -263,6 +251,20 @@ def predict(arguments):
 def main():
     """Main function to run the module """
     # /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/biosGavinOverlapCov10/biosGavinOlCv10AntUfltCstBin.tsv
+
+    __head = """
+              ##############################################
+              #    Allele-specific expression predictor    #
+              #              Version 0.0.1                 #
+              # Zhenhua Zhang <zhenhua.zhang217@gmail.com> #
+              ##############################################
+    """
+
+    __foot = """
+              GitHub: https://github.com/zhenhua-zhang/asep
+    """
+    print(__head)
+    print(__foot)
 
     parser = get_args()
     arguments = parser.parse_args()
