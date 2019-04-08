@@ -4,6 +4,7 @@
 
 import numpy
 
+from sklearn.neural_network import BernoulliRBM
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import AdaBoostClassifier
@@ -45,8 +46,13 @@ class Config:
 
         self.searcher_params = None
         self.init_params = None
+        self.constuctor = None
         self.classifier = None
         self.scorers = None
+
+    def set_constructor(self, **kwargs):
+        """Setup sample constructor"""
+        self.constuctor = ("rbm", BernoulliRBM(**kwargs))
 
     def set_init_params(self, classifier="rfc"):
         """A mathod get initial params for classifier"""
@@ -156,7 +162,11 @@ class Config:
         if self.searcher_params is None:
             self.set_searcher_params()
 
-        self.estimators_list = [self.classifier]
+        if self.constuctor is not None:
+            self.estimators_list = [self.constuctor, self.classifier]
+        else:
+            self.estimators_list = [self.classifier]
+
         self.optim_params['param_distributions'] = self.init_params
         self.optim_params['scoring'] = self.scorers
         self.optim_params.update(self.searcher_params)

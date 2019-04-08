@@ -186,6 +186,7 @@ def train(arguments):
 
     classifier = arguments.classifier
     my_config.set_classifier(classifier)
+    my_config.set_constructor()
 
     my_config.assembly()
 
