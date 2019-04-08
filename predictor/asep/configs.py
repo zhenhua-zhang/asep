@@ -14,9 +14,7 @@ from sklearn.ensemble import AdaBoostClassifier
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import precision_score
 from sklearn.metrics import accuracy_score
-from sklearn.metrics import roc_auc_score
 from sklearn.metrics import make_scorer
-from sklearn.metrics import f1_score
 
 from imblearn.ensemble import BalancedRandomForestClassifier
 

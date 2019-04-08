@@ -307,8 +307,7 @@ class ASEPredictor:
             'Grantham': 0, 'Dist2Mutation': 0, 'Freq100bp': 0, 'Rare100bp': 0,
             'Sngl100bp': 0, 'Freq1000bp': 0, 'Rare1000bp': 0, 'Sngl1000bp': 0,
             'Freq10000bp': 0, 'Rare10000bp': 0, 'Sngl10000bp': 0,
-            'dbscSNV-ada_score': 0, 'dbscSNV-rf_score': 0, "mirSVR-Score": 0,
-            "mirSVR-E": 0, "mirSVR-Aln": 0,
+            'dbscSNV-ada_score': 0, 'dbscSNV-rf_score': 0
         }
 
         for target in targets:

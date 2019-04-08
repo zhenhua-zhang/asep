@@ -133,6 +133,10 @@ def get_args():
         "--learning-curve-space-size", dest="lc_space_size", default=10,
         type=int, help="Number of splits will be create in learning curve"
     )
+    _group.add_argument(
+        "--with-rbm", dest="with_rbm", default=False, action="store_true",
+        help="Whether using Reistricted Boltzmann Machine to create training components."
+    )
 
     _group = train_argparser.add_argument_group("Output")
     _group.add_argument(
@@ -186,7 +190,10 @@ def train(arguments):
 
     classifier = arguments.classifier
     my_config.set_classifier(classifier)
-    my_config.set_constructor()
+
+    with_rbm = arguments.with_rbm
+    if with_rbm:
+        my_config.set_constructor()
 
     my_config.assembly()
 
@@ -283,13 +290,10 @@ def main():
 
     if subcommand == "train":
         model_pool = train(arguments)
-        return 1
     elif subcommand == "validate":
         validate(arguments)
-        return 1
     elif subcommand == "predict":
         predict(arguments)
-        return 1
     else:
         parser.print_help()
         return 1
