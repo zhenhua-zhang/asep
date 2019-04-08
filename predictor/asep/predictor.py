@@ -138,7 +138,7 @@ class ASEPredictor:
         except PermissionError as err:
             print('File IO error: ', err, file=sys.stderr)
         else:
-            return pandas.read_table(file_handle, nrows=nrows)
+            return pandas.read_table(file_handle, nrows=nrows, low_memory=False)
 
     @timmer
     def setup_work_dataframe(self):
@@ -308,7 +308,7 @@ class ASEPredictor:
             'Sngl100bp': 0, 'Freq1000bp': 0, 'Rare1000bp': 0, 'Sngl1000bp': 0,
             'Freq10000bp': 0, 'Rare10000bp': 0, 'Sngl10000bp': 0,
             'dbscSNV-ada_score': 0, 'dbscSNV-rf_score': 0, "mirSVR-Score": 0,
-            "mirSVR-E": 0, "mirSVR-Aln": 0
+            "mirSVR-E": 0, "mirSVR-Aln": 0,
         }
 
         for target in targets:
@@ -630,7 +630,9 @@ class ASEPredictor:
                 raise AttributeError("Model should have `predict_proba` method.")
 
         with open(input_file) as file_handle:
-            target_dataframe = pandas.read_table(file_handle, sep="\t", nrows=nrows)
+            target_dataframe = pandas.read_table(
+                file_handle, sep="\t", nrows=nrows, low_memory=False
+            )
 
         processed_dataframe = self.setup_input_matrix(target_dataframe)
 
@@ -667,10 +669,12 @@ class ASEPredictor:
         dataframe = self.slice_dataframe(
             dataframe, mask=self.mask_query, remove=False
         )
+        # XXX: one of the longest
         dataframe = self.slice_dataframe(dataframe, cols=self.dropped_cols)
         dataframe = self.simple_imputer(dataframe)
 
         # Encoding new dataframe
+        # XXX: one of the longest
         for (_tag, _tag_enc), _encoder in self.label_encoder_matrix.items():
             if _encoder == "removed":
                 del dataframe[_tag]

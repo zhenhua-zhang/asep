@@ -274,21 +274,28 @@ def main():
     subcommand = arguments.subcommand
     verbose_level = arguments.verbose_level
 
-    run_flag = "".join(
-        [" Subcommand: ", subcommand, ". Run flag: ", run_flag, " "]
-    )
-    print("{:-^80}".format(run_flag))
+    if subcommand:
+        run_flag = "".join(
+            [" Subcommand: ", subcommand, ". Run flag: ", run_flag, " "]
+        )
+        print("{:-^80}".format(run_flag))
 
     if subcommand == "train":
         model_pool = train(arguments)
+        return 1
     elif subcommand == "validate":
         validate(arguments)
+        return 1
     elif subcommand == "predict":
         predict(arguments)
+        return 1
     else:
-        print("Uknown subcommand {}".format(subcommand), file=sys.stderr)
+        parser.print_help()
+        return 1
 
-    print("{:-^80}".format(run_flag))
+    if subcommand:
+        print("{:-^80}".format(run_flag))
 
+    return 0
 if __name__ == '__main__':
     main()
