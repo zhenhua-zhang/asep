@@ -45,5 +45,7 @@ _explore_log2FC
 **/2019*
 
 # tags and cscope db
-cscope.files
-cscope.out
+**/cscope.files
+**/cscope.out
+**/tags
+
