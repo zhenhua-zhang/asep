@@ -131,6 +131,7 @@ srun -n 1 -c 1 --mem=10G \
 wait
 
 
+head -1 chr1.tsv > trainig_set.tsv
 for fl in chr{1..22}.tsv; do
-	sed -n '2,$p' ${fl}>> trainig_set.tsv
+	sed -n '2,$p' ${fl} >> training_set.tsv
 done

@@ -207,24 +207,6 @@ def train(arguments):
             "bn_ASE", "Chrom", "Pos", "Ref", "Alt", "GeneID", "FeatureID",
             "GeneName", "Intron", "Exon", "CCDS", "motifEName"
         ]
-        # Chrom Pos Ref Alt Type Length AnnoType Consequence ConsScore
-        # ConsDetail GC CpG motifECount motifEName motifEHIPos motifEScoreChng
-        # oAA nAA GeneID FeatureID GeneName CCDS Intron Exon cDNApos relcDNApos
-        # CDSpos relCDSpos protPos relProtPos Domain Dst2Splice Dst2SplType
-        # minDistTSS minDistTSE SIFTcat SIFTval PolyPhenCat PolyPhenVal
-        # priPhCons mamPhCons verPhCons priPhyloP mamPhyloP verPhyloP
-        # bStatistic targetScan mirSVR-Score mirSVR-E mirSVR-Aln cHmmTssA
-        # cHmmTssAFlnk cHmmTxFlnk cHmmTx cHmmTxWk cHmmEnhG cHmmEnh cHmmZnfRpts
-        # cHmmHet cHmmTssBiv cHmmBivFlnk cHmmEnhBiv cHmmReprPC cHmmReprPCWk
-        # cHmmQuies GerpRS GerpRSpval GerpN GerpS TFBS TFBSPeaks TFBSPeaksMax
-        # tOverlapMotifs motifDist Segway EncH3K27Ac EncH3K4Me1 EncH3K4Me3
-        # EncExp EncNucleo EncOCC EncOCCombPVal EncOCDNasePVal EncOCFairePVal
-        # EncOCpolIIPVal EncOCctcfPVal EncOCmycPVal EncOCDNaseSig EncOCFaireSig
-        # EncOCpolIISig EncOCctcfSig EncOCmycSig Grantham Dist2Mutation
-        # Freq100bp Rare100bp Sngl100bp Freq1000bp Rare1000bp Sngl1000bp
-        # Freq10000bp Rare10000bp Sngl10000bp dbscSNV-ada_score
-        # dbscSNV-rf_score RawScore PHRED log2FC bn_p bn_p_adj bb_p bb_p_adj
-        # group_size bn_ASE bb_ASE
 
     min_group_size = arguments.min_group_size
     max_group_size = arguments.max_group_size
@@ -273,37 +255,46 @@ def predict(arguments):
     output_dir = arguments.output_dir 
     model_obj.predictor(input_file, output_dir=output_dir)
 
+def print_header(version=None, author=None, email=None, institute=None, url=None):
+    astr = "{: ^80}\n"
+    bstr = "#{: ^48}#"
+    head  = astr.format("#" * 50)
+    head += astr.format(bstr.format("Allele-Specific Expression Predictor"))
+    head += astr.format(bstr.format("Version 0.01"))
+    head += astr.format(bstr.format("Zhen-hua Zhang"))
+    head += astr.format(bstr.format("zhenhua.zhang217@gmail.com"))
+    head += astr.format(bstr.format("Genomics Coordination Centre"))
+    head += astr.format(bstr.format("University Medical Centre Groningen"))
+    head += astr.format(bstr.format("https://github.com/zhenhua-zhang/asep"))
+    head += astr.format("#" * 50)
+    print(head, file=sys.stderr)
+
+
+def print_flag(subc=None, flag=None):
+    if subc and flag:
+        run_flag = "".join([" Subcommand: ", subc, ". Run flag: ", flag, " "])
+    elif subc:
+        run_flag = "".join([" Subcommand: ", subc, " "])
+    elif flag:
+        run_flag = "".join([" Run flag: ", flag, " "])
+    else:
+        run_flag = "-" * 80
+
+    print("{:-^80}".format(run_flag), file=sys.stderr)
+
 
 def main():
     """Main function to run the module """
     # /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/biosGavinOverlapCov10/biosGavinOlCv10AntUfltCstBin.tsv
 
-    __head = """
-              ##############################################
-              #    Allele-specific expression predictor    #
-              #              Version 0.0.1                 #
-              # Zhenhua Zhang <zhenhua.zhang217@gmail.com> #
-              ##############################################
-    """
-
-    __foot = """
-              GitHub: https://github.com/zhenhua-zhang/asep
-    """
-    print(__head)
-    print(__foot)
-
     parser = get_args()
     arguments = parser.parse_args()
-
     run_flag = arguments.run_flag
     subcommand = arguments.subcommand
     verbose_level = arguments.verbose_level
 
-    if subcommand:
-        run_flag = "".join(
-            [" Subcommand: ", subcommand, ". Run flag: ", run_flag, " "]
-        )
-        print("{:-^80}".format(run_flag))
+    print_header()
+    print_flag(subcommand, run_flag)
 
     if subcommand == "train":
         model_pool = train(arguments)
@@ -315,9 +306,31 @@ def main():
         parser.print_help()
         return 1
 
-    if subcommand:
-        print("{:-^80}".format(run_flag))
+    print_flag(subcommand, run_flag)
 
     return 0
+
+
 if __name__ == '__main__':
     main()
+
+
+# Column names
+#
+# Chrom Pos Ref Alt Type Length AnnoType Consequence ConsScore ConsDetail GC
+# CpG motifECount motifEName motifEHIPos motifEScoreChng oAA nAA GeneID
+# FeatureID GeneName CCDS Intron Exon cDNApos relcDNApos CDSpos relCDSpos
+# protPos relProtPos Domain Dst2Splice Dst2SplType minDistTSS minDistTSE
+# SIFTcat SIFTval PolyPhenCat PolyPhenVal priPhCons mamPhCons verPhCons
+# priPhyloP mamPhyloP verPhyloP bStatistic targetScan mirSVR-Score mirSVR-E
+# mirSVR-Aln cHmmTssA cHmmTssAFlnk cHmmTxFlnk cHmmTx cHmmTxWk cHmmEnhG cHmmEnh
+# cHmmZnfRpts cHmmHet cHmmTssBiv cHmmBivFlnk cHmmEnhBiv cHmmReprPC cHmmReprPCWk
+# cHmmQuies GerpRS GerpRSpval GerpN GerpS TFBS TFBSPeaks TFBSPeaksMax
+# tOverlapMotifs motifDist Segway EncH3K27Ac EncH3K4Me1 EncH3K4Me3 EncExp
+# EncNucleo EncOCC EncOCCombPVal EncOCDNasePVal EncOCFairePVal EncOCpolIIPVal
+# EncOCctcfPVal EncOCmycPVal EncOCDNaseSig EncOCFaireSig EncOCpolIISig
+# EncOCctcfSig EncOCmycSig Grantham Dist2Mutation Freq100bp Rare100bp Sngl100bp
+# Freq1000bp Rare1000bp Sngl1000bp Freq10000bp Rare10000bp Sngl10000bp
+# dbscSNV-ada_score dbscSNV-rf_score RawScore PHRED log2FC bn_p bn_p_adj bb_p
+# bb_p_adj group_size bn_ASE bb_ASE
+
