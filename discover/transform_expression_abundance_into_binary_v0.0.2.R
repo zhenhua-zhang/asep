@@ -191,7 +191,9 @@ trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
       bb_p_adj = p.adjust(bb_p, method = "fdr"),
       bn_ASE = ifelse(bn_p_adj < pv, ifelse(log2FC < 0, -1, 1), 0),
       bb_ASE = ifelse(bb_p_adj < pv, ifelse(log2FC < 0, -1, 1), 0)
-    ) %>%
+    ) 
+  cat("ARRANGE: Filter ...\n")
+  gp <- gp %>%
     select(rn) %>%
     arrange(Chrom, Pos, Ref, Alt) %>%
     distinct() %>%
