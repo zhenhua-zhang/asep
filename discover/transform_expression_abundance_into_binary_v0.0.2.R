@@ -173,7 +173,7 @@ trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
 	& (refCountsBios + altCountsBios >= min_dep)
   )
 
-  cat("MUTATE: ADD binom_p, group_size, and binom_p_adj ...\n")
+  cat("MUTATE: ADD bn_p, bb_p, group_size, and log2FC ...\n")
   gp <- gp %>%
     group_by(Chrom, Pos, Ref, Alt) %>%
     mutate(
@@ -183,7 +183,7 @@ trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
 	  group_size = length(log2FC)
     )
 
-  cat("MUTATE: ADD binom_p_adj, ASE ...\n")
+  cat("MUTATE: ADD bn_p_adj, bn_ASE, bb_p_adj, bb_ASE ...\n")
   gp <- gp %>%
     ungroup() %>%
     mutate(
@@ -191,10 +191,11 @@ trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
       bb_p_adj = p.adjust(bb_p, method = "fdr"),
       bn_ASE = ifelse(bn_p_adj < pv, ifelse(log2FC < 0, -1, 1), 0),
       bb_ASE = ifelse(bb_p_adj < pv, ifelse(log2FC < 0, -1, 1), 0)
-    ) 
+    ) %>%
+    select(rn)
+
   cat("ARRANGE: Filter ...\n")
   gp <- gp %>%
-    select(rn) %>%
     arrange(Chrom, Pos, Ref, Alt) %>%
     distinct() %>%
     as.data.frame()
