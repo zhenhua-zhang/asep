@@ -269,6 +269,7 @@ class ASEPredictor:
             encoder = LabelEncoder()
             for _tag, _tag_enc in zip(target_cols, target_cols_encoded):
                 try:
+                    print(_tag, _tag_enc)
                     self.work_dataframe[_tag_enc] = encoder.fit_transform(
                         self.work_dataframe[_tag]
                     )
