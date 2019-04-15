@@ -139,7 +139,8 @@ class ASEPredictor:
             print('File IO error: ', err, file=sys.stderr)
         else:
             return pandas.read_table(
-                file_handle, nrows=nrows, low_memory=False, na_values='NA'
+                file_handle, nrows=nrows, low_memory=False,
+                na_values=['NA', '.']
             )
 
     @timmer
@@ -269,7 +270,6 @@ class ASEPredictor:
             encoder = LabelEncoder()
             for _tag, _tag_enc in zip(target_cols, target_cols_encoded):
                 try:
-                    print(_tag, _tag_enc)
                     self.work_dataframe[_tag_enc] = encoder.fit_transform(
                         self.work_dataframe[_tag]
                     )
@@ -633,7 +633,8 @@ class ASEPredictor:
 
         with open(input_file) as file_handle:
             target_dataframe = pandas.read_table(
-                file_handle, sep="\t", nrows=nrows, low_memory=False
+                file_handle, nrows=nrows, low_memory=False,
+                na_values=['NA', '.']
             )
 
         processed_dataframe = self.setup_input_matrix(target_dataframe)
