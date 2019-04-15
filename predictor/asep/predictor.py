@@ -138,7 +138,9 @@ class ASEPredictor:
         except PermissionError as err:
             print('File IO error: ', err, file=sys.stderr)
         else:
-            return pandas.read_table(file_handle, nrows=nrows, low_memory=False)
+            return pandas.read_table(
+                file_handle, nrows=nrows, low_memory=False, na_values='NA'
+            )
 
     @timmer
     def setup_work_dataframe(self):
