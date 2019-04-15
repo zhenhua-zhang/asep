@@ -14,7 +14,6 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=10G
-
 # module load R/3.3.3-foss-2015b
 # Rscript  transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
 
@@ -176,7 +175,7 @@ trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
 
   cat("MUTATE: ADD binom_p, group_size, and binom_p_adj ...\n")
   gp <- gp %>%
-    group_by(chr, pos, ref, alt) %>%
+    group_by(Chrom, Pos, Ref, Alt) %>%
     mutate(
       log2FC = log2(sum(altCountsBios) / sum(refCountsBios)),
 	  bn_p = bn_lrt(altCountsBios, refCountsBios)$p_value, 

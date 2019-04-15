@@ -6,7 +6,7 @@
 # Version    : v0.0.1
 # License    : MIT
 
-#SBATCH --time=0:3:0
+#SBATCH --time=9:59:0
 #SBATCH --output=%j-%u-transform_expression_abundance_into_binary_sbatch_v0.0.2.log
 #SBATCH --job-name=teaibs
 #SBATCH --ntasks=1
