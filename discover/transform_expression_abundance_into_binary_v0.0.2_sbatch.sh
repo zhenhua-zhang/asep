@@ -6,7 +6,7 @@
 # Version    : v0.0.1
 # License    : MIT
 
-#SBATCH --time=0:30:0
+#SBATCH --time=0:3:0
 #SBATCH --output=%j-%u-transform_expression_abundance_into_binary_sbatch_v0.0.2.log
 #SBATCH --job-name=teaibs
 #SBATCH --ntasks=1
@@ -15,5 +15,4 @@
 
 module load R/3.3.3-foss-2015b
 
-Rscript  transform_expression_abundance_into_binary_v0.0.2.R
-
+Rscript  transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
