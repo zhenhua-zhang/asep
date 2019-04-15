@@ -216,7 +216,7 @@ if(length(args) == 2){
 if (endsWith(ipf, '.tar.gz') || endsWith(ipf, '.tgz')){ ipf <- untar(ipf) }
 rtb <- read.csv(ipf, header = TRUE, sep = "\t")
 rn <- c(
-  colnames(rtb)[1:117], "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj",
+  colnames(rtb)[1:107], "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj",
   "group_size", "bn_ASE", "bb_ASE"
 )
 

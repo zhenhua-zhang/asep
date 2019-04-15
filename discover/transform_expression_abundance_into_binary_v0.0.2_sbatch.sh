@@ -16,3 +16,24 @@
 module load R/3.3.3-foss-2015b
 
 Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr2_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr3_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr4_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr5_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr6_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr7_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr8_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr9_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr10_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr11_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
