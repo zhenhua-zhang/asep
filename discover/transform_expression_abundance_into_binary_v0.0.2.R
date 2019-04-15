@@ -193,7 +193,7 @@ trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
       bb_ASE = ifelse(bb_p_adj < pv, ifelse(log2FC < 0, -1, 1), 0)
     ) %>%
     select(rn) %>%
-    arrange(chr, pos, ref, alt) %>%
+    arrange(Chrom, Pos, Ref, Alt) %>%
     distinct() %>%
     as.data.frame()
 

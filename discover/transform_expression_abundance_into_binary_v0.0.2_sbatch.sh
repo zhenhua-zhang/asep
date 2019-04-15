@@ -15,4 +15,4 @@
 
 module load R/3.3.3-foss-2015b
 
-Rscript  transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+Rscript transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
