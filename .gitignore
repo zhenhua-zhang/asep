@@ -1,9 +1,6 @@
 # Ignore all ipython notebook checkpoints directories
 **/.ipynb_checkpoints/
 
-# Ignore all rope project directories
-**/.ropeproject/
-
 # Ignore all python cache directories
 **/__pycache__/
 
@@ -26,22 +23,6 @@
 
 # Ignore all backup dirs
 **/backup
-
-# Ignore pycharm project directory
-.idea/
-
-# Ignore Python virtual environment files
-_asep_env
-
-# Ignore archived files
-_archived
-
-# Ignore all syntax test files
-_syntax_test/
-
-# Misc
-_notes.md
-_explore_log2FC
 **/2019*
 
 # tags and cscope db
@@ -49,3 +30,4 @@ _explore_log2FC
 **/cscope.out
 **/tags
 
+**/.vscode

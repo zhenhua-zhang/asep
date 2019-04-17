@@ -31,7 +31,8 @@ def get_args():
     train_argparser = subparser.add_parser("train", help="Train a model")
     _group = train_argparser.add_argument_group("Input")
     _group.add_argument(
-        "-i", "--train-input-file", dest="input_file", default=None, required=True,
+        "-i", "--train-input-file", dest="input_file", default=None,
+        required=True,
         help="The path to file of training dataset. Default: None"
     )
 
@@ -57,7 +58,7 @@ def get_args():
     )
     _group.add_argument(
         "--max-group-size", dest="max_group_size", default=None,
-        type=lambda x: int(x) <= 1e4  and int(x) or parser.error(
+        type=lambda x: int(x) <= 1e4 and int(x) or parser.error(
             "--max-group-size must be <= 10,000"),
         help="""The maximum number of individuals bearing the same variant
         (<= 10,000). Default: None"""
@@ -176,6 +177,7 @@ def get_args():
 
     return parser
 
+
 @timmer
 def train(arguments):
     """Train the model"""
@@ -252,25 +254,44 @@ def predict(arguments):
         model_obj = pickle.load(model_file_handle)
 
     input_file = arguments.input_file
-    output_dir = arguments.output_dir 
+    output_dir = arguments.output_dir
     model_obj.predictor(input_file, output_dir=output_dir)
 
-def print_header(version=None, author=None, email=None, institute=None, url=None):
+
+def print_header(title=None, version=None, author=None, email=None,
+                 institute=None, url=None):
     astr = "{: ^80}\n"
     bstr = "#{: ^48}#"
-    head  = astr.format("#" * 50)
-    head += astr.format(bstr.format("Allele-Specific Expression Predictor"))
-    head += astr.format(bstr.format("Version 0.01"))
-    head += astr.format(bstr.format("Zhen-hua Zhang"))
-    head += astr.format(bstr.format("zhenhua.zhang217@gmail.com"))
-    head += astr.format(bstr.format("Genomics Coordination Centre"))
-    head += astr.format(bstr.format("University Medical Centre Groningen"))
-    head += astr.format(bstr.format("https://github.com/zhenhua-zhang/asep"))
+    head = astr.format("#" * 50)
+
+    if title is None:
+        title = "Allele-Specific Expression Predictor"
+    head += astr.format(bstr.format(title))
+    if version is None:
+        version = 'Version 0.01'
+    head += astr.format(bstr.format(version))
+    if author is None:
+        author = 'Zhen-hua Zhang'
+    head += astr.format(bstr.format(author))
+    if email is None:
+        email = 'zhenhua.zhang217@gmail.com'
+    head += astr.format(bstr.format(email))
+    if institute is None:
+        head += astr.format(bstr.format('Genomics Coordination Centre'))
+        head += astr.format(bstr.format("University Medical Centre Groningen"))
+    elif isinstance(institute, (tuple, list)):
+        for i in institute:
+            head += astr.format(bstr.format(i))
+    if url is None:
+        url = 'https://github.com/zhenhua-zhang/asep'
+    head += astr.format(bstr.format(url))
+
     head += astr.format("#" * 50)
     print(head, file=sys.stderr)
 
 
 def print_flag(subc=None, flag=None):
+    """A method to print runing flags"""
     if subc and flag:
         run_flag = "".join([" Subcommand: ", subc, ". Run flag: ", flag, " "])
     elif subc:
@@ -285,7 +306,8 @@ def print_flag(subc=None, flag=None):
 
 def main():
     """Main function to run the module """
-    # /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/biosGavinOverlapCov10/biosGavinOlCv10AntUfltCstBin.tsv
+    # /home/umcg-zzhang/Documents/projects
+    # /ASEPrediction/training/outputs/biosGavinOverlapCov10/biosGavinOlCv10AntUfltCstBin.tsv
 
     parser = get_args()
     arguments = parser.parse_args()
@@ -297,7 +319,7 @@ def main():
     print_flag(subcommand, run_flag)
 
     if subcommand == "train":
-        model_pool = train(arguments)
+        train(arguments)
     elif subcommand == "validate":
         validate(arguments)
     elif subcommand == "predict":
@@ -333,4 +355,3 @@ if __name__ == '__main__':
 # Freq1000bp Rare1000bp Sngl1000bp Freq10000bp Rare10000bp Sngl10000bp
 # dbscSNV-ada_score dbscSNV-rf_score RawScore PHRED log2FC bn_p bn_p_adj bb_p
 # bb_p_adj group_size bn_ASE bb_ASE
-
