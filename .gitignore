@@ -1,6 +1,3 @@
-# Ignore all ipython notebook checkpoints directories
-**/.ipynb_checkpoints/
-
 # Ignore all python cache directories
 **/__pycache__/
 
@@ -23,18 +20,8 @@
 _archived
 _asep_env
 _syntax_test
+_notes
 
-# Ignore all backup dirs
-**/backup
-**/2019*
-
-# tags and cscope db
-**/cscope.files
-**/cscope.out
-**/tags
-
-_notes.md
-
-**/.vscode
-
+# Ignore some hidden files or directories
+.vscode/
 .pylintrc
