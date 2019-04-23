@@ -170,8 +170,9 @@ trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
     (refCountsBios >= min_dep_per)
     & (altCountsBios >= min_dep_per)
     & (refCountsBios != altCountsBios)
-	& (refCountsBios + altCountsBios >= min_dep)
-  )
+    & (refCountsBios + altCountsBios >= min_dep)
+    & (GeneID != "NA")
+  ) 
 
   cat("MUTATE: ADD bn_p, bb_p, group_size, and log2FC ...\n")
   gp <- gp %>%
@@ -180,7 +181,7 @@ trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
       log2FC = log2(sum(altCountsBios) / sum(refCountsBios)),
 	  bn_p = bn_lrt(altCountsBios, refCountsBios)$p_value, 
 	  bb_p = bb_lrt(altCountsBios, refCountsBios)$p_value,
-	  group_size = length(log2FC)
+	  group_size = n_distinct(sampleBios)
     )
 
   cat("MUTATE: ADD bn_p_adj, bn_ASE, bb_p_adj, bb_ASE ...\n")
