@@ -5,23 +5,23 @@
 **/*.bai
 **/*.bam
 **/*.bed
+**/*.docx
 **/*.fa
 **/*.fai
-**/*.png
-**/*.sam
-**/*.tsv
-**/*.tbi
-**/*.vcf
-**/*.docx
 **/*.html
+**/*.png
 **/*.pyc
+**/*.sam
+**/*.tbi
+**/*.tsv
+**/*.vcf
 
 # Ignore all starting with _
 _archived
 _asep_env
-_syntax_test
 _notes
+_syntax_test
 
 # Ignore some hidden files or directories
-.vscode/
 .pylintrc
+.vscode/
