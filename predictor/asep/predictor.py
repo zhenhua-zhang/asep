@@ -1,6 +1,7 @@
-#!./env/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Predicting Allele-specific expression effect"""
+
 import pickle
 import copy
 import time
@@ -27,8 +28,8 @@ from imblearn.over_sampling import SMOTENC
 
 try:
     from matplotlib import pyplot
-except ImportError as err:
-    print(err, file=sys.stderr)
+except ImportWarning as warning:
+    print(warning, file=sys.stderr)
     import matplotlib
     matplotlib.use('Agg')
     from matplotlib import pyplot
@@ -111,8 +112,10 @@ class ASEPredictor:
             self.work_dataframe, mask=gs_mask, remove=False
         )
         self.work_dataframe = self.simple_imputer(self.work_dataframe)
-        self.work_dataframe = self.slice_dataframe(self.work_dataframe, cols=drop_cols)
-        self.work_dataframe[response] = self.work_dataframe[response].apply(abs)
+        self.work_dataframe = self.slice_dataframe(
+            self.work_dataframe, cols=drop_cols)
+        self.work_dataframe[response] = self.work_dataframe[response].apply(
+            abs)
 
         self.label_encoder()
         self.setup_xy(y_col=response, resampling=resampling)
@@ -259,7 +262,8 @@ class ASEPredictor:
                 "Deleted columns (require encoding)", "\n".join(target_cols)
             )
             self.work_dataframe.drop(columns=target_cols, inplace=True)
-            self.label_encoder_matrix = {(x, x):"removed" for x in target_cols}
+            self.label_encoder_matrix = {
+                (x, x): "removed" for x in target_cols}
         else:
             format_print("Encoded columns", ", ".join(target_cols))
             target_cols_encoded = [n + '_encoded' for n in target_cols]
@@ -273,7 +277,8 @@ class ASEPredictor:
                     self.work_dataframe[_tag_enc] = encoder.fit_transform(
                         self.work_dataframe[_tag]
                     )
-                    self.label_encoder_matrix[(_tag, _tag_enc)] = copy.deepcopy(encoder)
+                    self.label_encoder_matrix[(
+                        _tag, _tag_enc)] = copy.deepcopy(encoder)
                     del self.work_dataframe[_tag]
                 except ValueError as err:
                     print(err, file=sys.stderr)
@@ -617,7 +622,6 @@ class ASEPredictor:
         with open(file_path, 'wb') as opfh:
             pickle.dump(self, opfh)
 
-
     # Predictor
     @timmer
     def predictor(self, input_file, output_dir="./", model=None,
@@ -629,7 +633,8 @@ class ASEPredictor:
             if not hasattr(model, "predict"):
                 raise AttributeError("Model should have `predict` method.")
             if not hasattr(model, "predict_prob"):
-                raise AttributeError("Model should have `predict_proba` method.")
+                raise AttributeError(
+                    "Model should have `predict_proba` method.")
 
         with open(input_file) as file_handle:
             target_dataframe = pandas.read_table(

@@ -9,8 +9,6 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import AdaBoostClassifier
 
-# from sklearn.feature_selection import mutual_info_classif
-# from sklearn.feature_selection import SelectKBest
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import precision_score
 from sklearn.metrics import accuracy_score

@@ -1,4 +1,4 @@
-#!./env/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Utilities for package asep"""
 
@@ -13,8 +13,6 @@ import os
 import numpy
 import scipy
 
-# Global variable
-# time stamp
 
 def timmer(func):
     """Print the runtime of the decorated function
@@ -79,7 +77,6 @@ def set_sed(sed=None):
         numpy.random.seed(3142)
 
 
-# TODO: finish it into a standalone function
 def feature_pre_selection_by_spearman(
         input_dataframe, drop_list, target=None, pvalue_threshhold=0.1):
     """Drop features with low correlation to target variables."""
@@ -104,11 +101,3 @@ def feature_pre_selection_by_spearman(
     pre_selected_features = candidates_pool.keys()
 
     return pre_selected_features
-
-
-# Expired fucntion from asep/predictor.py
-# def train_test_slicer(self, **kwargs):
-    # """Set up training and testing data set by train_test_split"""
-    # (self.x_train_matrix, self.x_test_matrix,
-    #  self.y_train_vector, self.y_test_vector
-    # ) = train_test_split(self.x_matrix, self.y_vector, **kwargs)
