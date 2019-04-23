@@ -51,10 +51,8 @@ def get_args():
     )
     _group.add_argument(
         "--min-group-size", dest="min_group_size", default=2,
-        type=lambda x: int(x) > 1 and int(x) or parser.error(
-            "--min-group-size must be >= 2"),
-        help="""The minimum of individuals bearing the same variant (>= 2).
-        Default: 2"""
+        type=lambda x: int(x) > 1 and int(x) or parser.error("--min-group-size must be >= 2"),
+        help="The minimum of individuals bearing the same variant (>= 2). Default: 2"
     )
     _group.add_argument(
         "--max-group-size", dest="max_group_size", default=None,
@@ -82,8 +80,8 @@ def get_args():
     _group.add_argument(
         "-c", "--config-file", dest="config_file", default=None, type=str,
         help="""The path to configuration file, all configuration will be get
-        from it, and overwrite values from command line except -i. Default:
-        None"""
+        from it, and overwrite values from command line except -i. Not
+        implemented yet. Default: None"""
     )
     _group.add_argument(
         "--classifier", dest="classifier", default='rfc', type=str,
@@ -112,11 +110,11 @@ def get_args():
     )
     _group.add_argument(
         "--outer-cvs", dest="outer_cvs", default=6, type=int,
-        help="Fold of cross-validation for outer_validation"
+        help="Fold of cross-validation for outer_validation. Default: 6"
     )
     _group.add_argument(
         "--outer-n-jobs", dest="outer_n_jobs", default=5, type=int,
-        help="Number of jobs for outer_validation"
+        help="Number of jobs for outer_validation. Default: 5"
     )
     _group.add_argument(
         "--with-learning-curve", dest="with_lc", default=False,
@@ -124,15 +122,15 @@ def get_args():
     )
     _group.add_argument(
         "--learning-curve-cvs", dest="lc_cvs", default=4, type=int,
-        help="Number of folds to draw learning curve"
+        help="Number of folds to draw learning curve. Default: 4"
     )
     _group.add_argument(
         "--learning-curve-n-jobs", dest="lc_n_jobs", default=5, type=int,
-        help="Number of jobs to draw learning curves"
+        help="Number of jobs to draw learning curves. Default: 5"
     )
     _group.add_argument(
         "--learning-curve-space-size", dest="lc_space_size", default=10,
-        type=int, help="Number of splits will be create in learning curve"
+        type=int, help="Number of splits will be create in learning curve. Default: 10"
     )
     _group.add_argument(
         "--with-rbm", dest="with_rbm", default=False, action="store_true",
@@ -244,7 +242,7 @@ def train(arguments):
 @timmer
 def validate(arguments):
     """Validate the model using extra dataset"""
-
+    print(arguments)
 
 @timmer
 def predict(arguments):
@@ -260,6 +258,7 @@ def predict(arguments):
 
 def print_header(title=None, version=None, author=None, email=None,
                  institute=None, url=None):
+    """A function to print a header including information of the package"""
     astr = "{: ^80}\n"
     bstr = "#{: ^48}#"
     head = astr.format("#" * 50)

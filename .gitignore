@@ -17,9 +17,12 @@
 **/*.vcf
 **/*.docx
 **/*.html
+**/*.pyc
 
 # Ignore all starting with _
-**/_*
+_archived
+_asep_env
+_syntax_test
 
 # Ignore all backup dirs
 **/backup
@@ -29,5 +32,7 @@
 **/cscope.files
 **/cscope.out
 **/tags
+
+_notes.md
 
 **/.vscode

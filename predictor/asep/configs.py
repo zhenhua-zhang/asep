@@ -18,6 +18,7 @@ from sklearn.metrics import make_scorer
 
 from imblearn.ensemble import BalancedRandomForestClassifier
 
+
 class Config:
     """configs module for the ASEPredictor
 
@@ -37,6 +38,7 @@ class Config:
         >>> config = Config()
         >>> config.init()
     """
+
     def __init__(self):
         """Initializing configuration metrics"""
         self.estimators_list = None
@@ -54,13 +56,13 @@ class Config:
 
     def set_init_params(self, classifier="rfc"):
         """A mathod get initial params for classifier"""
-        if classifier == "abc": # For AdaboostClassifier
+        if classifier == "abc":  # For AdaboostClassifier
             self.init_params = dict(
                 abc__n_estimators=list(range(50, 1000, 50)),
                 abc__learning_rate=numpy.linspace(.01, 1., 50),
                 abc__algorithm=["SAMME", "SAMME.R"],
             )
-        elif classifier == "gbc": # For GradientBoostingClassifier
+        elif classifier == "gbc":  # For GradientBoostingClassifier
             self.init_params = dict(
                 gbc__learning_rate=numpy.linspace(.01, 1., 50),
                 gbc__n_estimators=list(range(50, 1000, 50)),
@@ -69,7 +71,7 @@ class Config:
                 gbc__max_depth=list(range(3, 11)),
                 gbc__max_features=['sqrt', 'log2', None],
             )
-        elif classifier == 'rfc': # For RandomForestClassifier
+        elif classifier == 'rfc':  # For RandomForestClassifier
             self.init_params = dict(
                 rfc__n_estimators=list(range(50, 1000, 50)),
                 rfc__min_samples_split=list(range(2, 10)),
@@ -79,7 +81,7 @@ class Config:
                 rfc__class_weight=['balanced'],
                 rfc__max_features=['sqrt', 'log2', None],
             )
-        elif classifier == 'brfc': # For RandomForestClassifier
+        elif classifier == 'brfc':  # For RandomForestClassifier
             self.init_params = dict(
                 brfc__n_estimators=list(range(50, 1000, 50)),
                 brfc__min_samples_split=list(range(2, 10)),
@@ -98,17 +100,17 @@ class Config:
         """Set classifier"""
         self.set_init_params(classifier=classifier)
 
-        if classifier == "abc": # For AdaboostClassifier
+        if classifier == "abc":  # For AdaboostClassifier
             self.classifier = ('abc', AdaBoostClassifier())
-        elif classifier == "gbc": # For GradientBoostingClassifier
+        elif classifier == "gbc":  # For GradientBoostingClassifier
             self.classifier = ('gbc', GradientBoostingClassifier())
-        elif classifier == 'rfc': # For RandomForestClassifier
+        elif classifier == 'rfc':  # For RandomForestClassifier
             self.classifier = ('rfc', RandomForestClassifier())
-        elif classifier == 'brfc': # For BalancedRandomForestClassifier
+        elif classifier == 'brfc':  # For BalancedRandomForestClassifier
             self.classifier = ('brfc', BalancedRandomForestClassifier())
         else:
             raise ValueError(
-                "Unknow type of classifier, possible choice [abc, gbc, rfc, brfc]"
+                "Unknow type of classifier, choice [abc, gbc, rfc, brfc]"
             )
 
     def set_scorers(self):
