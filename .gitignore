@@ -36,3 +36,5 @@ _syntax_test
 _notes.md
 
 **/.vscode
+
+./pylintrc
