@@ -175,7 +175,7 @@ trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
 
   cat("MUTATE: ADD bn_p, bb_p, group_size, and log2FC ...\n")
   gp <- gp %>%
-    group_by(Chrom, Pos, Ref, Alt) %>%
+    group_by(Chrom, Pos, Ref, Alt, GeneID) %>%
     mutate(
       log2FC = log2(sum(altCountsBios) / sum(refCountsBios)),
 	  bn_p = bn_lrt(altCountsBios, refCountsBios)$p_value, 
@@ -222,8 +222,8 @@ rn <- c(
 
 # Calculate
 odf <- trans_into_bin(rtb, rn)
-cat(dim(odf[which(abs(odf$bn_ASE)==1), ]), " in bn_ASE(1, -1)\n")
-cat(dim(odf[which(abs(odf$bb_ASE)==1), ]), " in bb_ASE(1, -1)\n")
+# cat(dim(odf[which(abs(odf$bn_ASE)==1), ]), " in bn_ASE(1, -1)\n")
+# cat(dim(odf[which(abs(odf$bb_ASE)==1), ]), " in bb_ASE(1, -1)\n")
 
 # Dump out results
 write.table(odf, file = opf, quote = FALSE, sep = "\t", row.names = FALSE)
