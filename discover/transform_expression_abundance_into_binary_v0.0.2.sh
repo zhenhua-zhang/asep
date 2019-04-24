@@ -149,7 +149,7 @@ srun -n 1 -c 1 --mem=10G \
 wait
 
 
-head -1 ${dstDir}/chr1.tsv > ${dstDir}/trainig_set.tsv
+head -1 ${dstDir}/chr1.tsv | tr "." "-" > ${dstDir}/trainig_set.tsv
 for fl in ${dstDir}/chr{1..22}.tsv; do
 	sed -n '2,$p' ${fl} >> ${dstDir}/trainig_set.tsv
 done

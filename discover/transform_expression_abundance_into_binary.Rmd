@@ -101,6 +101,7 @@ bn_lrt <- function(alt_counts, ref_counts) {
 ```
 
 ### Beta-Binomial model
+
 However, the $\theta$ could be various. And we assume $\theta$ is respect to a
 Beta distribution.
 $$
@@ -113,7 +114,7 @@ $$
 \mu=\frac{n\alpha}{\alpha + \beta}=n\pi
 $$
 while let $\rho=\frac{1}{\alpha+\beta+1}$, then the variance is
-$$ 
+$$
 \begin{align}
 \sigma^2&=\frac{n\alpha\beta(\alpha+\beta+n)}{(\alpha+\beta)^2(\alpha+\beta+1)} \\
   &=n\pi(1-\pi)[1+(n-1)\rho]
@@ -264,7 +265,7 @@ bb_lrt <- function(alt_counts, ref_counts){
 }
 ```
 
-
 ## Predicting ASE effects via Machine Learning Model
+
 One of goals in this studies is to connect the DNA annotations and ASE effects
 by machine learning.
