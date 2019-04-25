@@ -146,7 +146,7 @@ python /groups/umcg-gcc/tmp03/umcg-zzhang/git/asep/predictor/asep.py \
  	--run-flag rfc_ic6_ini50_oc6_mings5 \
 	train \
 	--first-k-rows 50000 \
- 	--train-input-file /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/annotCadd/training_set.tsv
+ 	--train-input-file /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/annotCadd/training_set.tsv \
 	--inner-cvs 4 \
  	--inner-n-jobs 5 \
 	--inner-n-iters 50 \
