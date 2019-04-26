@@ -305,9 +305,6 @@ def print_flag(subc=None, flag=None):
 
 def main():
     """Main function to run the module """
-    # /home/umcg-zzhang/Documents/projects
-    # /ASEPrediction/training/outputs/biosGavinOverlapCov10/biosGavinOlCv10AntUfltCstBin.tsv
-
     parser = get_args()
     arguments = parser.parse_args()
     run_flag = arguments.run_flag
