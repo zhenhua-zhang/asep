@@ -7,12 +7,12 @@
 # Version    : v0.0.1
 # License    : MIT
 #
-#SBATCH --time=7:59:0
+#SBATCH --time=1-23:59:0
 #SBATCH --output=%j-%u-predictor_sbatch.log
 #SBATCH --job-name=predictor_sbatch
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=20
-#SBATCH --mem=10G
+#SBATCH --cpus-per-task=29
+#SBATCH --mem=15G
 
 #usage: asep.py [-h] [-V] [--run-flag RUN_FLAG] {train,validate,predict} ...
 #
@@ -145,16 +145,16 @@ source /groups/umcg-bios/tmp03/users/umcg-zzhang/projects/ASEPrediction/_asep_en
 python /groups/umcg-gcc/tmp03/umcg-zzhang/git/asep/predictor/asep.py \
  	--run-flag rfc_ic6_ini50_oc6_mings5 \
 	train \
-	--first-k-rows 50000 \
  	--train-input-file /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/annotCadd/training_set.tsv \
 	--inner-cvs 4 \
  	--inner-n-jobs 5 \
 	--inner-n-iters 50 \
 	--outer-cvs 6 \
- 	--outer-n-jobs 4 \
+ 	--outer-n-jobs 5 \
  	--min-group-size 5 \
  	--classifier rfc
 
+	# --first-k-rows 100000 \
 	# --with-learning-curve \
 	# --learning-curve-cvs 10 \
 	# --learning-curve-n-jobs 5 \
