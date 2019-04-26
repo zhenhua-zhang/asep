@@ -242,7 +242,6 @@ def train(arguments):
 @timmer
 def validate(arguments):
     """Validate the model using extra dataset"""
-    print(arguments)
 
 @timmer
 def predict(arguments):
@@ -308,10 +307,14 @@ def print_arguments(arguments):
     print("Arguments for current run: ", file=sys.stderr)
     arguments_dict = vars(arguments)
     arguments_pair = [(_dst, _arg) for _dst, _arg in arguments_dict.items()]
-    sorted(arguments_pair, key=lambda x: len(x[0]))
+    arguments_pair = sorted(arguments_pair, key=lambda x: len(x[0]))
+    fill_width = len(arguments_pair[-1][0]) + 1 
 
     for _dst, _arg in arguments_pair:
-        print("{: >25}: {: <25}".format(_dst, _arg), file=sys.stderr)
+        print(
+            "{dst: <{wid}}: {arg: <{wid}}".format(dst=_dst, arg=_arg, wid=fill_width),
+            file=sys.stderr
+        )
 
 
 def main():
