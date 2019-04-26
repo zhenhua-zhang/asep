@@ -303,6 +303,17 @@ def print_flag(subc=None, flag=None):
     print("{:-^80}".format(run_flag), file=sys.stderr)
 
 
+def print_arguments(arguments):
+    """Print artuments from command lines"""
+    print("Arguments for current run: ", file=sys.stderr)
+    arguments_dict = vars(arguments)
+    arguments_pair = [(_dst, _arg) for _dst, _arg in arguments_dict.items()]
+    sorted(arguments_pair, key=lambda x: len(x[0]))
+
+    for _dst, _arg in arguments_pair:
+        print("{: >25}: {: <25}".format(_dst, _arg), file=sys.stderr)
+
+
 def main():
     """Main function to run the module """
     parser = get_args()
@@ -313,6 +324,7 @@ def main():
 
     print_header()
     print_flag(subcommand, run_flag)
+    print_arguments(arguments)
 
     if subcommand == "train":
         train(arguments)
@@ -322,11 +334,8 @@ def main():
         predict(arguments)
     else:
         parser.print_help()
-        return 1
 
     print_flag(subcommand, run_flag)
-
-    return 0
 
 
 if __name__ == '__main__':
