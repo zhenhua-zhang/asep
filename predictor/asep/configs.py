@@ -3,18 +3,12 @@
 """configs module"""
 
 import numpy
-
-from sklearn.neural_network import BernoulliRBM
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.ensemble import AdaBoostClassifier
-
-from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import precision_score
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import make_scorer
-
 from imblearn.ensemble import BalancedRandomForestClassifier
+from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier,
+                              RandomForestClassifier)
+from sklearn.metrics import accuracy_score, make_scorer, precision_score
+from sklearn.model_selection import StratifiedKFold
+from sklearn.neural_network import BernoulliRBM
 
 
 class Config:
@@ -71,23 +65,23 @@ class Config:
             )
         elif classifier == 'rfc':  # For RandomForestClassifier
             self.init_params = dict(
-                rfc__n_estimators=list(range(50, 1000, 50)),
-                rfc__min_samples_split=list(range(2, 10)),
-                rfc__min_samples_leaf=list(range(2, 10)),
-                rfc__max_depth=list(range(10, 111, 10)),
-                rfc__bootstrap=[False, True],
+                rfc__n_estimators=list(range(50, 500, 50)),
+                rfc__min_samples_split=list(range(2, 10, 2)),
+                rfc__min_samples_leaf=list(range(2, 10, 2)),
+                rfc__max_depth=list(range(10, 50, 10)),
+                # rfc__bootstrap=[False, True],
                 rfc__class_weight=['balanced'],
-                rfc__max_features=['sqrt', 'log2', None],
+                # rfc__max_features=['sqrt', 'log2', None],
             )
         elif classifier == 'brfc':  # For RandomForestClassifier
             self.init_params = dict(
-                brfc__n_estimators=list(range(50, 1000, 50)),
-                brfc__min_samples_split=list(range(2, 10)),
-                brfc__min_samples_leaf=list(range(2, 10)),
-                brfc__max_depth=list(range(10, 111, 10)),
-                brfc__bootstrap=[False, True],
-                brfc__class_weight=['balanced'],
-                brfc__max_features=['sqrt', 'log2', None],
+                rfc__n_estimators=list(range(50, 500, 50)),
+                rfc__min_samples_split=list(range(2, 10, 2)),
+                rfc__min_samples_leaf=list(range(2, 10, 2)),
+                rfc__max_depth=list(range(10, 50, 10)),
+                # rfc__bootstrap=[False, True],
+                rfc__class_weight=['balanced'],
+                # rfc__max_features=['sqrt', 'log2', None],
             )
         else:
             raise ValueError(
