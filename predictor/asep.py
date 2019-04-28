@@ -2,14 +2,13 @@
 # -*- coding: utf-8 -*-
 
 """Main interface for asep"""
-import sys
 import pickle
-
+import sys
 from argparse import ArgumentParser
 
+from asep.configs import Config
 from asep.predictor import ASEPredictor
 from asep.utilities import timmer
-from asep.configs import Config
 
 
 def get_args():
@@ -27,7 +26,7 @@ def get_args():
 
     subparser = parser.add_subparsers(dest="subcommand")
 
-    # Argument parser for subcommand `train`
+    # Argument parser for sub-command `train`
     train_argparser = subparser.add_parser("train", help="Train a model")
     _group = train_argparser.add_argument_group("Input")
     _group.add_argument(
@@ -51,7 +50,8 @@ def get_args():
     )
     _group.add_argument(
         "--min-group-size", dest="min_group_size", default=2,
-        type=lambda x: int(x) > 1 and int(x) or parser.error("--min-group-size must be >= 2"),
+        type=lambda x: int(x) > 1 and int(x) or parser.error(
+            "--min-group-size must be >= 2"),
         help="The minimum of individuals bearing the same variant (>= 2). Default: 2"
     )
     _group.add_argument(
@@ -243,6 +243,7 @@ def train(arguments):
 def validate(arguments):
     """Validate the model using extra dataset"""
 
+
 @timmer
 def predict(arguments):
     """Predict new dataset based on constructed model"""
@@ -308,7 +309,7 @@ def print_arguments(arguments):
     arguments_dict = vars(arguments)
     arguments_pair = [(_dst, _arg) for _dst, _arg in arguments_dict.items()]
     arguments_pair = sorted(arguments_pair, key=lambda x: len(x[0]))
-    fill_width = len(arguments_pair[-1][0]) + 1 
+    fill_width = len(arguments_pair[-1][0]) + 1
 
     for _dst, _arg in arguments_pair:
         print(
