@@ -303,15 +303,19 @@ def print_flag(subc=None, flag=None):
     print("{:-^80}".format(run_flag), file=sys.stderr)
 
 
-def print_arguments(arguments):
+def print_arguments(arguments, fill_width=None):
     """Print artuments from command lines"""
     print("Arguments for current run: ", file=sys.stderr)
     arguments_dict = vars(arguments)
     arguments_pair = [(_dst, _arg) for _dst, _arg in arguments_dict.items()]
     arguments_pair = sorted(arguments_pair, key=lambda x: len(x[0]))
-    fill_width = len(arguments_pair[-1][0]) + 1
+
+    if fill_width is None:
+        fill_width = len(arguments_pair[-1][0]) + 1
 
     for _dst, _arg in arguments_pair:
+        if _arg is None:
+            _arg = "None"
         print(
             "{dst: <{wid}}: {arg: <{wid}}".format(dst=_dst, arg=_arg, wid=fill_width),
             file=sys.stderr
