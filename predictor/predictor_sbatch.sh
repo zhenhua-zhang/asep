@@ -7,11 +7,11 @@
 # Version    : v0.0.1
 # License    : MIT
 #
-#SBATCH --time=23:59:0
+#SBATCH --time=1-23:59:0
 #SBATCH --output=%j-%u-predictor_sbatch.log
 #SBATCH --job-name=predictor_sbatch
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=45
+#SBATCH --cpus-per-task=30
 #SBATCH --mem=15G
 
 #usage: asep.py [-h] [-V] [--run-flag RUN_FLAG] {train,validate,predict} ...
@@ -130,20 +130,20 @@ module load Python/3.5.1-foss-2015b
 module list
 echo "Current directory: $(pwd)"
 
-source /groups/umcg-bios/tmp03/users/umcg-zzhang/projects/ASEPrediction/_asep_env/bin/activate
+export OPENBLAS_NUM_THREADS=2  # conflicts of threads usage between OPENBLAS and n_jobs in RandomForestClassifier
+source /groups/umcg-gcc/tmp03/umcg-zzhang/git/asep/_asep_env/bin/activate
 python /groups/umcg-gcc/tmp03/umcg-zzhang/git/asep/predictor/asep.py \
- 	--run-flag rfc_ic6_ini50_oc6_mings5 \
+ 	--run-flag brfc_ini50_oc10_mings5 \
 	train \
-	--first-k-rows 25000 \
- 	--train-input-file /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/annotCadd/training_set.tsv \
-	--inner-cvs 5 \
- 	--inner-n-jobs 20 \
-	--inner-n-iters 50 \
+ 	--train-input-file /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/annotCadd/training_set_non-redundant.tsv \
+ 	--inner-n-jobs 5 \
+	--inner-n-iters 30 \
 	--outer-cvs 10 \
- 	--outer-n-jobs 2 \
+ 	--outer-n-jobs 5 \
  	--min-group-size 5 \
- 	--classifier rfc
+ 	--classifier brfc
 
+  # --first-k-rows 25000 \
 	# --with-learning-curve \
 	# --learning-curve-cvs 10 \
 	# --learning-curve-n-jobs 5 \
