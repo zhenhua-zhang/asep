@@ -12,7 +12,7 @@
 #SBATCH --job-name=predictor_sbatch
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=30
-#SBATCH --mem=15G
+#SBATCH --mem=30G
 
 #usage: asep.py [-h] [-V] [--run-flag RUN_FLAG] {train,validate,predict} ...
 #
@@ -135,6 +135,7 @@ source /groups/umcg-gcc/tmp03/umcg-zzhang/git/asep/_asep_env/bin/activate
 python /groups/umcg-gcc/tmp03/umcg-zzhang/git/asep/predictor/asep.py \
  	--run-flag brfc_ini50_oc10_mings5 \
 	train \
+  --first-k-rows 50000 \
  	--train-input-file /home/umcg-zzhang/Documents/projects/ASEPrediction/training/outputs/annotCadd/training_set_non-redundant.tsv \
  	--inner-n-jobs 5 \
 	--inner-n-iters 30 \

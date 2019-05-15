@@ -132,7 +132,7 @@ class Config:
             cvs = StratifiedKFold(n_splits=ncvs, shuffle=True)
 
         if refit is None:
-            refit = 'accuracy'
+            refit = 'roc_auc'
 
         self.searcher_params = dict(
             cv=cvs, iid=False, n_jobs=n_jobs, n_iter=n_iter, refit=refit,

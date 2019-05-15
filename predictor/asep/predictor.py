@@ -2,29 +2,26 @@
 # -*- coding: utf-8 -*-
 """Predicting Allele-specific expression effect"""
 
-import pickle
 import copy
-import time
-import sys
 import os
+import pickle
+import sys
+import time
+from multiprocessing import Process, Queue
 
-from multiprocessing import Process
-from multiprocessing import Queue
-
-import pandas
 import numpy
+import pandas
 import scipy
-
-from sklearn.model_selection import RandomizedSearchCV
-from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import learning_curve
-from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.model_selection import (RandomizedSearchCV, StratifiedKFold,
+                                     learning_curve)
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import roc_curve
+from sklearn.preprocessing import LabelEncoder
 
 from imblearn.over_sampling import SMOTENC
+
+from .utilities import format_print, set_sed, timmer
 
 try:
     from matplotlib import pyplot
@@ -34,9 +31,6 @@ except ImportWarning as warning:
     matplotlib.use('Agg')
     from matplotlib import pyplot
 
-from .utilities import format_print
-from .utilities import set_sed
-from .utilities import timmer
 
 
 def save_file(filename, target):
@@ -356,7 +350,7 @@ class ASEPredictor:
         )
         ax_learning.plot(
             train_sizes, train_scores_mean, color='r',
-            label='Training score(precision)'
+            label='Training score'
         )
 
         ax_learning.fill_between(
@@ -367,12 +361,12 @@ class ASEPredictor:
         )
         ax_learning.plot(
             train_sizes, test_scores_mean, color='g',
-            label='Cross-validation score(precision)'
+            label='Cross-validation score'
         )
 
         ax_learning.set(
             title='Learning curve',
-            xlabel='Training examples', ylabel='Score(precision)'
+            xlabel='Training examples', ylabel='Score'
         )
         ax_learning.legend(loc='best')
 
