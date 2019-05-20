@@ -6,6 +6,7 @@ import pickle
 import sys
 from argparse import ArgumentParser
 
+sys.path.append("/home/umcg-zzhang/Documents/git/asep/")
 from asep.configs import Config
 from asep.predictor import ASEPredictor
 from asep.utilities import timmer
