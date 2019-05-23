@@ -25,4 +25,3 @@ _syntax_test
 # Ignore some hidden files or directories
 .pylintrc
 .vscode/
-/bin/
