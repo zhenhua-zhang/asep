@@ -170,7 +170,7 @@ def get_args():
 
     _group = predict_argparser.add_argument_group("Output")
     _group.add_argument(
-        "-o", "--predict-output-dir", dest="output_dir", type=str,
+        "-o", "--output-dir", dest="output_dir", type=str,
         required=True, help="Output directory for predict input file"
     )
 
