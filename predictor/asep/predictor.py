@@ -630,8 +630,7 @@ class ASEPredictor:
 
     # Predictor
     @timmer
-    def predictor(self, input_file, output_dir="./", models=None,
-                  output_file=None, nrows=None):
+    def predictor(self, input_file, output_dir="./", nrows=None, models=None):
         """Predict ASE effects for raw dataset"""
         with open(input_file) as file_handle:
             dataframe = pandas.read_table(
@@ -643,15 +642,14 @@ class ASEPredictor:
         x_matrix = self.setup_x_matrix(dataframe)
         dataframe[new_cols] = self.get_predict_proba(x_matrix, models)
 
-        if output_file is None:
-            _, input_file_name = os.path.split(input_file)
-            name, ext = os.path.splitext(input_file_name)
-            output_file = "".join([name, "_pred", ext])
+        _, input_file_name = os.path.split(input_file)
+        name, ext = os.path.splitext(input_file_name)
+        output_file = "".join([name, "_pred", ext])
         output_path = os.path.join(output_dir, output_file)
 
         dataframe.to_csv(output_path, sep="\t", index=False)
 
-    def get_predict_proba(self, x_matrix, models):
+    def get_predict_proba(self, x_matrix, models=None):
         """Predict"""
         if models is None:
             models = self.fetch_models()
@@ -703,9 +701,8 @@ class ASEPredictor:
 
     # Validator
     @timmer
-    def validator(self, input_file, output_dir="./", output_file=None,
-                  models=None, limit=None, response="bb_ASE",
-                  resampling=False):
+    def validator(self, input_file, output_dir="./", limit=None,
+                  response="bb_ASE", models=None, resampling=False):
         """Validate the model using another dataset"""
         mask = self.mask_query
         gs_mask = self.gs_mask
@@ -718,11 +715,9 @@ class ASEPredictor:
         new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
         dataframe[new_cols] = self.get_predict_proba(x_matrix, models)
 
-        if output_file is None:
-            _, input_file_name = os.path.split(input_file)
-            name, ext = os.path.splitext(input_file_name)
-            output_file = "".join([name, "_pred", ext])
-
+        _, input_file_name = os.path.split(input_file)
+        name, ext = os.path.splitext(input_file_name)
+        output_file = "".join([name, "_pred", ext])
         output_path = os.path.join(output_dir, output_file)
         dataframe.to_csv(output_path, sep="\t", index=False)
 

@@ -154,6 +154,21 @@ def get_args():
         help="Model to be validated. [Required]"
     )
 
+    _group = validate_argparser.add_argument_group("Filter")
+    _group.add_argument(
+        "-f", "--first-k-rows", dest="first_k_rows", default=None, type=int,
+        help="Only read first k rows as input from input file. Default: None"
+    )
+    _group.add_argument(
+        "--response-col", dest="reponse_col", default='bb_ASE',
+        help="""The column name of response variable or target variable.
+        Default: bb_ASE"""
+    )
+    _group.add_argument(
+        "--resampling", dest="resampling", action="store_true",
+        help="Use resampling method or not. Default: False"
+    )
+
     _group = validate_argparser.add_argument_group("Output")
     _group.add_argument(
         "-o", "--output", dest="output_dir", default="./", type=str,
@@ -172,6 +187,12 @@ def get_args():
     _group.add_argument(
         "-m", "--model-file", dest="model_file", type=str, required=True,
         help="Model to be used. [Required]"
+    )
+
+    _group = predict_argparser.add_argument_group("Filter")
+    _group.add_argument(
+        "-f", "--first-k-rows", dest="first_k_rows", default=None, type=int,
+        help="Only read first k rows as input from input file. Default: None"
     )
 
     _group = predict_argparser.add_argument_group("Output")
@@ -217,7 +238,7 @@ def train(arguments):
 
     min_group_size = arguments.min_group_size
     max_group_size = arguments.max_group_size
-    mask_as = arguments.mask_as
+    _mask_as = arguments.mask_as
     mask_out = arguments.mask_out
     reponse_col = arguments.reponse_col
     first_k_rows = arguments.first_k_rows
@@ -252,9 +273,14 @@ def validate(arguments):
     with open(model_file, 'rb') as model_file_handle:
         model_obj = pickle.load(model_file_handle)
 
+    response_col = arguments.response_col
+    first_k_rows = arguments.first_k_rows
     input_file = arguments.input_file
     output_dir = arguments.output_dir
-    model_obj.validate(input_file, output_dir=output_dir)
+    resampling = arguments.resampling
+    model_obj.validator(
+        input_file, output_dir, first_k_rows, response_col, resampling
+    )
 
 
 @timmer
@@ -266,7 +292,8 @@ def predict(arguments):
 
     input_file = arguments.input_file
     output_dir = arguments.output_dir
-    model_obj.predictor(input_file, output_dir=output_dir)
+    first_k_rows = arguments.first_k_rows
+    model_obj.predictor(input_file, output_dir, first_k_rows)
 
 
 def print_header(title=None, version=None, author=None, email=None,
@@ -341,7 +368,7 @@ def main():
     arguments = parser.parse_args()
     run_flag = arguments.run_flag
     subcommand = arguments.subcommand
-    verbose_level = arguments.verbose_level
+    _verbose_level = arguments.verbose_level
 
     print_header()
     print_flag(subcommand, run_flag)
