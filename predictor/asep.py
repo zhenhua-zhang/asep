@@ -240,9 +240,9 @@ def train(arguments):
     asep.trainer(
         mask=mask_out, mings=min_group_size, maxgs=max_group_size,
         limit=first_k_rows, response=reponse_col, drop_cols=drop_cols,
-        outer_cvs=outer_cvs, outer_n_jobs=outer_n_jobs, nested_cv=nested_cv,
-        with_lc=with_lc, lc_space_size=lc_space_size, lc_n_jobs=lc_n_jobs,
-        lc_cvs=lc_cvs, resampling=resampling
+        outer_cvs=outer_cvs, nested_cv=nested_cv, with_lc=with_lc,
+        lc_space_size=lc_space_size, lc_n_jobs=lc_n_jobs, lc_cvs=lc_cvs,
+        resampling=resampling
     )
 
     run_flag = arguments.run_flag
