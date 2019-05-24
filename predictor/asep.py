@@ -31,7 +31,7 @@ def get_args():
     train_argparser = subparser.add_parser("train", help="Train a model")
     _group = train_argparser.add_argument_group("Input")
     _group.add_argument(
-        "-i", "--train-input-file", dest="input_file", default=None,
+        "-i", "--input-file", dest="input_file", default=None,
         required=True,
         help="The path to file of training dataset. Default: None"
     )
@@ -146,7 +146,7 @@ def get_args():
     )
     _group = validate_argparser.add_argument_group("Input")
     _group.add_argument(
-        "-v", "--validation-file", dest="validation_file", type=str,
+        "-i", "--input-file", dest="input_file", type=str,
         required=True, help="Path to file of validation dataset. [Required]"
     )
     _group.add_argument(
