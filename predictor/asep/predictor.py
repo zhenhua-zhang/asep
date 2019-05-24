@@ -200,7 +200,6 @@ class ASEPredictor:
 
         return dataframe
 
-    @timmer
     @staticmethod
     def setup_xy(work_dataframe, x_cols=None, y_col=None, resampling=False,
                  cg_features=None):
