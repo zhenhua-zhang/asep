@@ -114,10 +114,6 @@ def get_args():
         help="Fold of cross-validation for outer_validation. Default: 6"
     )
     _group.add_argument(
-        "--outer-n-jobs", dest="outer_n_jobs", default=5, type=int,
-        help="Number of jobs for outer_validation. Default: 5"
-    )
-    _group.add_argument(
         "--with-learning-curve", dest="with_lc", default=False,
         action='store_true', help="Whether draw learning curve. Default: False"
     )
@@ -228,7 +224,6 @@ def train(arguments):
 
     nested_cv = arguments.nested_cv
     outer_cvs = arguments.outer_cvs
-    outer_n_jobs = arguments.outer_n_jobs
 
     with_lc = arguments.with_lc
     lc_space_size = arguments.lc_space_size
