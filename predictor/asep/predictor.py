@@ -686,7 +686,7 @@ class ASEPredictor:
         return dataframe
 
     # Validator
-    @time
+    @timmer
     def validator(self, input_file, output_dir="./", output_file=None,
                   models=None, nrows=None, response="bb_ASE"):
         """Validate the model using another dataset"""
