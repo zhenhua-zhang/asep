@@ -689,41 +689,41 @@ class ASEPredictor:
 
         return dataframe
 
-    # Validator
-    @time
-    def validator(self, input_file, output_dir="./", model=None,
-                  output_file=None, nrows=None, cv=6):
-        """Validate the model using another dataset"""
-        self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
-        self.raw_dataframe = self.read_file(self.input_file_name, limit)
-
-        self.setup_work_dataframe()
-
-        if maxgs:
-            __gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))"
-            gs_mask = __gs_mask.format(mings, maxgs)
-        else:
-            gs_mask = "group_size >= {:n}".format(mings)
-
-        self.mask_query = mask
-        self.dropped_cols = drop_cols
-
-        self.work_dataframe = self.slice_dataframe(
-            self.work_dataframe, mask=gs_mask, remove=False
-        )
-        self.work_dataframe = self.simple_imputer(self.work_dataframe)
-        self.work_dataframe = self.slice_dataframe(
-            self.work_dataframe, cols=drop_cols)
-        self.work_dataframe[response] = self.work_dataframe[response].apply(
-            abs)
-
-        self.label_encoder()
-        self.setup_xy(y_col=response, resampling=resampling)
-        skf = StratifiedKFold(n_splits=cvs)
-        split_pool = skf.split(x_matrix, y_vector)
-
-        y_test_scores = model.predict_proba(processed_dataframe)[:, 1]
-        auc = [
-            roc_auc_score(y_test_vector, y_test_scores),
-            roc_curve(y_test_vector, y_test_scores)
-        ]
+#    # Validator
+#    @time
+#    def validator(self, input_file, output_dir="./", model=None,
+#                  output_file=None, nrows=None, cv=6):
+#        """Validate the model using another dataset"""
+#        self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
+#        self.raw_dataframe = self.read_file(self.input_file_name, limit)
+#
+#        self.setup_work_dataframe()
+#
+#        if maxgs:
+#            __gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))"
+#            gs_mask = __gs_mask.format(mings, maxgs)
+#        else:
+#            gs_mask = "group_size >= {:n}".format(mings)
+#
+#        self.mask_query = mask
+#        self.dropped_cols = drop_cols
+#
+#        self.work_dataframe = self.slice_dataframe(
+#            self.work_dataframe, mask=gs_mask, remove=False
+#        )
+#        self.work_dataframe = self.simple_imputer(self.work_dataframe)
+#        self.work_dataframe = self.slice_dataframe(
+#            self.work_dataframe, cols=drop_cols)
+#        self.work_dataframe[response] = self.work_dataframe[response].apply(
+#            abs)
+#
+#        self.label_encoder()
+#        self.setup_xy(y_col=response, resampling=resampling)
+#        skf = StratifiedKFold(n_splits=cvs)
+#        split_pool = skf.split(x_matrix, y_vector)
+#
+#        y_test_scores = model.predict_proba(processed_dataframe)[:, 1]
+#        auc = [
+#            roc_auc_score(y_test_vector, y_test_scores),
+#            roc_curve(y_test_vector, y_test_scores)
+#        ]
