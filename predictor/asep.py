@@ -151,7 +151,17 @@ def get_args():
     _group = validate_argparser.add_argument_group("Input")
     _group.add_argument(
         "-v", "--validation-file", dest="validation_file", type=str,
-        required=True, help="The path to file of validation dataset"
+        required=True, help="Path to file of validation dataset. [Required]"
+    )
+    _group.add_argument(
+        "-m", "--model-file", dest="model_file", type=str, required=True,
+        help="Model to be validated. [Required]"
+    )
+
+    _group = validate_argparser.add_argument_group("Output")
+    _group.add_argument(
+        "-o", "--output", dest="output_dir", default="./", type=str,
+        help="The directory including output files. Default: ./"
     )
 
     # Argument parser for subcommand `predict`
@@ -160,18 +170,18 @@ def get_args():
     )
     _group = predict_argparser.add_argument_group("Input")
     _group.add_argument(
-        "-i", "--predict-input-file", dest="input_file", type=str,
-        required=True, help="New files including case to be predicted"
+        "-i", "--input-file", dest="input_file", type=str,
+        required=True, help="New dataset to be predicted. [Required]"
     )
     _group.add_argument(
         "-m", "--model-file", dest="model_file", type=str, required=True,
-        help="Model to be used"
+        help="Model to be used. [Required]"
     )
 
     _group = predict_argparser.add_argument_group("Output")
     _group.add_argument(
         "-o", "--output-dir", dest="output_dir", type=str,
-        required=True, help="Output directory for predict input file"
+        required=True, help="Output directory for input file. [Reqired]"
     )
 
     return parser
@@ -243,6 +253,13 @@ def train(arguments):
 @timmer
 def validate(arguments):
     """Validate the model using extra dataset"""
+    model_file = arguments.model_file
+    with open(model_file, 'rb') as model_file_handle:
+        model_obj = pickle.load(model_file_handle)
+
+    input_file = arguments.input_file
+    output_dir = arguments.output_dir
+    model_obj.validate(input_file, output_dir=output_dir)
 
 
 @timmer
