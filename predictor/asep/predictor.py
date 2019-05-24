@@ -7,7 +7,6 @@ import os
 import pickle
 import sys
 import time
-from multiprocessing import Process, Queue
 
 import numpy
 import pandas
@@ -32,7 +31,6 @@ except ImportWarning as warning:
     from matplotlib import pyplot
 
 
-
 def save_file(filename, target):
     """Save your file smartly"""
     with open(filename, "wb") as opfh:
@@ -55,43 +53,44 @@ class ASEPredictor:
         self.estimators_list = config.estimators_list
         self.optim_params = config.optim_params
 
-        self.raw_dataframe = None
         self.work_dataframe = None
+        self.raw_dataframe = None
 
         self.x_matrix = None
         self.y_vector = None
 
-        self.pipeline = None
         self.estimator = None
+        self.pipeline = None
 
-        self.model_pool = None
         self.training_report_pool = None
+        self.model_pool = None
 
         self.feature_importance_pool = None
         self.feature_importance_hist = None
 
-        self.area_under_curve_pool = None
         self.area_under_curve_curve = None
+        self.area_under_curve_pool = None
 
-        self.learning_line = None
         self.learning_report = None
+        self.learning_line = None
 
         self.label_encoder_matrix = None
-        self.mask_query = None
         self.dropped_cols = None
+        self.mask_query = None
+        self.gs_mask = None
 
     # trainer
     @timmer
     def trainer(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
-                biclass_=True, outer_cvs=6, mings=2, maxgs=None,
-                outer_n_jobs=5, with_lc=False, lc_space_size=10, lc_n_jobs=5,
-                lc_cvs=5, nested_cv=False, resampling=None):
+                biclass_=True, outer_cvs=6, mings=2, maxgs=None, with_lc=False,
+                lc_space_size=10, lc_n_jobs=5, lc_cvs=5, nested_cv=False,
+                resampling=None):
         """Execute a pre-designed construct pipeline"""
 
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
         self.raw_dataframe = self.read_file(self.input_file_name, limit)
 
-        self.setup_work_dataframe()
+        self.work_dataframe = self.setup_work_dataframe(self.raw_dataframe)
 
         if maxgs:
             __gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))"
@@ -99,28 +98,38 @@ class ASEPredictor:
         else:
             gs_mask = "group_size >= {:n}".format(mings)
 
+        self.gs_mask = gs_mask
         self.mask_query = mask
         self.dropped_cols = drop_cols
 
         self.work_dataframe = self.slice_dataframe(
-            self.work_dataframe, mask=gs_mask, remove=False
+            self.work_dataframe, mask=self.gs_mask, remove=False
         )
+
         self.work_dataframe = self.simple_imputer(self.work_dataframe)
+
         self.work_dataframe = self.slice_dataframe(
-            self.work_dataframe, cols=drop_cols)
-        self.work_dataframe[response] = self.work_dataframe[response].apply(
-            abs)
-
-        self.label_encoder()
-        self.setup_xy(y_col=response, resampling=resampling)
-        self.setup_pipeline(self.estimators_list, biclass=biclass_)
-
-        self.outer_validation(
-            cvs=outer_cvs, n_jobs=outer_n_jobs, nested_cv=nested_cv
+            self.work_dataframe, cols=drop_cols
         )
 
-        self.draw_roc_curve_cv()
-        self.draw_k_main_features_cv()
+        self.work_dataframe[response] = self.work_dataframe[response].apply(abs)
+        self.work_dataframe = self.label_encoder(self.work_dataframe)
+
+        self.x_matrix, self.y_vector = self.setup_xy(
+            self.work_dataframe, y_col=response, resampling=resampling
+        )
+
+        self.setup_pipeline(self.estimators_list, biclass=biclass_)
+        self.outer_validation(cvs=outer_cvs, nested_cv=nested_cv)
+
+        self.area_under_curve_curve = self.draw_roc_curve_cv(
+            self.area_under_curve_pool
+        )
+
+        self.feature_importance_hist = self.draw_k_main_features_cv(
+            self.feature_importance_pool
+        )
+
         if with_lc:
             self.draw_learning_curve(
                 estimator=self.estimator, cvs=lc_cvs, n_jobs=lc_n_jobs,
@@ -140,11 +149,11 @@ class ASEPredictor:
                 na_values=['NA', '.']
             )
 
-    @timmer
-    def setup_work_dataframe(self):
+    @staticmethod
+    def setup_work_dataframe(raw_dataframe):
         """Deep copy the raw DataFrame into work DataFrame"""
         try:
-            self.work_dataframe = copy.deepcopy(self.raw_dataframe)
+            return copy.deepcopy(raw_dataframe)
         except Exception('Failed to deepcopy raw_df to work_df') as exp:
             raise exp
 
@@ -192,7 +201,8 @@ class ASEPredictor:
         return dataframe
 
     @timmer
-    def setup_xy(self, x_cols=None, y_col=None, resampling=False,
+    @staticmethod
+    def setup_xy(work_dataframe, x_cols=None, y_col=None, resampling=False,
                  cg_features=None):
         """Set up predictor variables and target variables. """
         if cg_features is None:
@@ -207,7 +217,7 @@ class ASEPredictor:
                 "PolyPhenCat_encoded",
             ]
 
-        cols = self.work_dataframe.columns
+        cols = work_dataframe.columns
         if x_cols is None and y_col is None:
             x_cols, y_col = cols[:-1], cols[-1]
         elif x_cols is None:
@@ -217,9 +227,9 @@ class ASEPredictor:
             if y_col in x_cols:
                 raise ValueError('Target column is in predictor columns')
 
-        x_matrix = copy.deepcopy(self.work_dataframe.loc[:, x_cols])
+        x_matrix = copy.deepcopy(work_dataframe.loc[:, x_cols])
         x_matrix.sort_index(1, inplace=True)
-        y_vector = copy.deepcopy(self.work_dataframe.loc[:, y_col])
+        y_vector = copy.deepcopy(work_dataframe.loc[:, y_col])
 
         if resampling:
             features = [x_matrix.columns.get_loc(x) for x in cg_features]
@@ -227,16 +237,17 @@ class ASEPredictor:
             x_matrix, y_vector = resampler.fit_resample(
                 x_matrix.values, y_vector.values
             )
-            self.x_matrix = pandas.DataFrame(x_matrix, columns=x_cols)
-            self.y_vector = pandas.Series(y_vector, name=y_col, dtype='int8')
-        else:
-            self.x_matrix, self.y_vector = x_matrix, y_vector
+            x_matrix = pandas.DataFrame(x_matrix, columns=x_cols)
+            y_vector = pandas.Series(y_vector, name=y_col, dtype='int8')
+
+        return (x_matrix, y_vector)
 
     @timmer
-    def label_encoder(self, target_cols=None, skip=None, remove=False):
+    def label_encoder(self, work_dataframe, target_cols=None, skip=None,
+                      remove=False):
         """Encode category columns """
         if target_cols is None:
-            col_types = self.work_dataframe.dtypes
+            col_types = work_dataframe.dtypes
             target_cols = [
                 n for n, t in col_types.items() if t is numpy.dtype('O')
             ]
@@ -255,7 +266,7 @@ class ASEPredictor:
             format_print(
                 "Deleted columns (require encoding)", "\n".join(target_cols)
             )
-            self.work_dataframe.drop(columns=target_cols, inplace=True)
+            work_dataframe.drop(columns=target_cols, inplace=True)
             self.label_encoder_matrix = {
                 (x, x): "removed" for x in target_cols}
         else:
@@ -268,14 +279,16 @@ class ASEPredictor:
             encoder = LabelEncoder()
             for _tag, _tag_enc in zip(target_cols, target_cols_encoded):
                 try:
-                    self.work_dataframe[_tag_enc] = encoder.fit_transform(
-                        self.work_dataframe[_tag]
+                    work_dataframe[_tag_enc] = encoder.fit_transform(
+                        work_dataframe[_tag]
                     )
                     self.label_encoder_matrix[(
                         _tag, _tag_enc)] = copy.deepcopy(encoder)
-                    del self.work_dataframe[_tag]
+                    del work_dataframe[_tag]
                 except ValueError as err:
                     print(err, file=sys.stderr)
+
+        return work_dataframe
 
     @staticmethod
     def simple_imputer(dataframe, targets=(numpy.NaN, '.')):
@@ -416,12 +429,8 @@ class ASEPredictor:
         return (training_report, auc, feature_importance, estimator)
 
     @timmer
-    def outer_validation(self, cvs=6, n_jobs=5, nested_cv=False, **kwargs):
+    def outer_validation(self, cvs=6, nested_cv=False, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
-        def worker(input_queue, output_queue):
-            for func, estimator, split in iter(input_queue.get, 'STOP'):
-                output_queue.put(func(estimator, split))
-
         skf = StratifiedKFold(n_splits=cvs, **kwargs)
         split_pool = skf.split(self.x_matrix, self.y_vector)
 
@@ -432,6 +441,7 @@ class ASEPredictor:
             model.fit(self.x_matrix, self.y_vector)
             self.estimator = model.best_estimator_
 
+            # XXX: possible wrong logics
             if self.training_report_pool is None:
                 self.training_report_pool = [
                     dict(
@@ -445,21 +455,6 @@ class ASEPredictor:
                         Estimator_score=None
                     )
                 ]
-
-        task_pool = [
-            (self.randomized_search_cv, copy.deepcopy(self.estimator), split)
-            for split in split_pool
-        ]  # XXX: Deepcopy estimator, memory intensive but much safer ??
-
-        task_queue = Queue()
-        for task in task_pool:
-            task_queue.put(task)
-
-        result_queue = Queue()
-        for _ in range(n_jobs):
-            time.sleep(20)
-            process = Process(target=worker, args=(task_queue, result_queue))
-            process.start()
 
         if self.model_pool is None:
             self.model_pool = []
@@ -475,8 +470,10 @@ class ASEPredictor:
                 name: [0] * cvs for name in self.x_matrix.columns
             }
 
-        for cv_idx in range(cvs):
-            training_report, auc, feature_importance, model = result_queue.get()
+        for cv_idx, split in enumerate(split_pool):
+            estimator = copy.deepcopy(self.estimator)
+            training_report, auc, feature_importance, model \
+                    = self.randomized_search_cv(estimator, split)
 
             self.model_pool.append(model)
             self.area_under_curve_pool.append(auc)
@@ -487,16 +484,13 @@ class ASEPredictor:
             for name, importance in feature_importance.items():
                 self.feature_importance_pool[name][cv_idx] = importance
 
-        for _ in range(n_jobs):
-            task_queue.put('STOP')
-
-    @timmer
-    def draw_roc_curve_cv(self):
+    @staticmethod
+    def draw_roc_curve_cv(area_under_curve_pool):
         """Draw ROC curve with cross-validation"""
         fig, ax_roc = pyplot.subplots(figsize=(10, 10))
         auc_pool, fpr_pool, tpr_pool = [], [], []
         space_len = 0
-        for auc_area, (fpr, tpr, _) in self.area_under_curve_pool:
+        for auc_area, (fpr, tpr, _) in area_under_curve_pool:
             auc_pool.append(auc_area)
             fpr_pool.append(fpr)
             tpr_pool.append(tpr)
@@ -546,13 +540,13 @@ class ASEPredictor:
         ax_roc.plot([0, 1], color='grey', linestyle='--')
         ax_roc.legend(loc="best")
 
-        self.area_under_curve_curve = (fig, ax_roc)
+        return (fig, ax_roc)
 
-    @timmer
-    def draw_k_main_features_cv(self, first_k=20):
+    @staticmethod
+    def draw_k_main_features_cv(feature_importance_pool, first_k=20):
         """Draw feature importance for the model with cross-validation"""
         name_mean_std_pool = []
-        for name, importances in self.feature_importance_pool.items():
+        for name, importances in feature_importance_pool.items():
             mean = numpy.mean(importances)
             std = numpy.std(importances, ddof=1)
             name_mean_std_pool.append([name, mean, std])
@@ -576,7 +570,7 @@ class ASEPredictor:
             xlabel='Feature name', ylabel='Importance'
         )
 
-        self.feature_importance_hist = (fig, ax_features)
+        return (fig, ax_features)
 
     @timmer
     def save_to(self, save_path="./", run_flag=''):
@@ -618,15 +612,16 @@ class ASEPredictor:
 
     # Predictor
     @timmer
-    def predictor(self, input_file, output_dir="./", model=None,
+    def predictor(self, input_file, output_dir="./", models=None,
                   output_file=None, nrows=None):
         """Predict ASE effects for raw dataset"""
-        if model is None:
-            model = self.fetch_model()
+        if models is None:
+            models = self.fetch_models()
         else:
-            if not hasattr(model, "predict"):
+            # TODO: a generic function to check model sanity
+            if not hasattr(models, "predict"):
                 raise AttributeError("Model need `predict` method.")
-            if not hasattr(model, "predict_prob"):
+            if not hasattr(models, "predict_prob"):
                 raise AttributeError("Model need `predict_proba` method.")
 
         with open(input_file) as file_handle:
@@ -637,32 +632,36 @@ class ASEPredictor:
 
         processed_dataframe = self.setup_input_matrix(target_dataframe)
 
-        pre_prob = model.predict_proba(processed_dataframe)
-        target_dataframe['pre_prob0'] = pre_prob[:, 0]
-        target_dataframe['pre_prob1'] = pre_prob[:, 1]
-        target_dataframe['pre'] = model.predict(processed_dataframe)
+        _pre_prob0, _pre_prob1 = [], []
+        for model in models:
+            _pre_prob = model.predict_proba(processed_dataframe)
+            _pre_prob0.append(_pre_prob[:, 0])
+            _pre_prob1.append(_pre_prob[:, 1])
+
+        pre_prob0 = numpy.array(_pre_prob0)
+        target_dataframe['pre_prob0_mean'] = pre_prob0.mean(axis=0)
+        target_dataframe['pre_prob0_var'] = pre_prob0.var(axis=0)
+
+        pre_prob1 = numpy.array(_pre_prob1)
+        target_dataframe['pre_prob1_mean'] = pre_prob1.mean(axis=0)
+        target_dataframe['pre_prob1_var'] = pre_prob1.var(axis=0)
 
         if output_file is None:
             _, input_file_name = os.path.split(input_file)
             name, ext = os.path.splitext(input_file_name)
-            output_file = "".join([output_dir, name, "_pred", ext])
-        else:
-            output_file = "".join([output_dir, output_file])
+            output_file = "".join([name, "_pred", ext])
 
-        # XXX: maybe need state data type for each column explicitly
-        target_dataframe.to_csv(output_file, sep="\t", index=False)
+        output_path = os.path.join(output_dir, output_file)
+        target_dataframe.to_csv(output_path, sep="\t", index=False)
 
     @timmer
-    def fetch_model(self, best=False):
+    def fetch_models(self):
         """Use specific model to predict new dataset"""
         if self.model_pool is None:
             print("Please train a model first.", file=sys.stderr)
             sys.exit(1)
         else:
-            # XXX: add method to get best model
-            if best:
-                pass
-            return copy.deepcopy(self.model_pool[0].steps[-1][-1])
+            return [copy.deepcopy(m.steps[-1][-1]) for m in self.model_pool]
 
     @timmer
     def setup_input_matrix(self, dataframe, missing_val=1e9-1):
@@ -670,12 +669,9 @@ class ASEPredictor:
         dataframe = self.slice_dataframe(
             dataframe, mask=self.mask_query, remove=False
         )
-        # XXX: one of the longest
         dataframe = self.slice_dataframe(dataframe, cols=self.dropped_cols)
         dataframe = self.simple_imputer(dataframe)
 
-        # Encoding new dataframe
-        # XXX: one of the longest
         for (_tag, _tag_enc), _encoder in self.label_encoder_matrix.items():
             if _encoder == "removed":
                 del dataframe[_tag]
@@ -689,41 +685,60 @@ class ASEPredictor:
 
         return dataframe
 
-#    # Validator
-#    @time
-#    def validator(self, input_file, output_dir="./", model=None,
-#                  output_file=None, nrows=None, cv=6):
-#        """Validate the model using another dataset"""
-#        self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
-#        self.raw_dataframe = self.read_file(self.input_file_name, limit)
-#
-#        self.setup_work_dataframe()
-#
-#        if maxgs:
-#            __gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))"
-#            gs_mask = __gs_mask.format(mings, maxgs)
-#        else:
-#            gs_mask = "group_size >= {:n}".format(mings)
-#
-#        self.mask_query = mask
-#        self.dropped_cols = drop_cols
-#
-#        self.work_dataframe = self.slice_dataframe(
-#            self.work_dataframe, mask=gs_mask, remove=False
-#        )
-#        self.work_dataframe = self.simple_imputer(self.work_dataframe)
-#        self.work_dataframe = self.slice_dataframe(
-#            self.work_dataframe, cols=drop_cols)
-#        self.work_dataframe[response] = self.work_dataframe[response].apply(
-#            abs)
-#
-#        self.label_encoder()
-#        self.setup_xy(y_col=response, resampling=resampling)
-#        skf = StratifiedKFold(n_splits=cvs)
-#        split_pool = skf.split(x_matrix, y_vector)
-#
-#        y_test_scores = model.predict_proba(processed_dataframe)[:, 1]
-#        auc = [
-#            roc_auc_score(y_test_vector, y_test_scores),
-#            roc_curve(y_test_vector, y_test_scores)
-#        ]
+    # Validator
+    @time
+    def validator(self, input_file, output_dir="./", output_file=None,
+                  models=None, nrows=None, response="bb_ASE"):
+        """Validate the model using another dataset"""
+        if models is None:
+            models = self.fetch_models()
+        else:
+            # TODO: a generic function to check model sanity
+            if not hasattr(models, "predict"):
+                raise AttributeError("Model need `predict` method.")
+            if not hasattr(models, "predict_prob"):
+                raise AttributeError("Model need `predict_proba` method.")
+
+        gs_mask = self.gs_mask
+        drop_cols = self.dropped_cols
+
+        # TODO: create a generic function to do preprocessing
+        dataframe = self.read_file(input_file, nrows)
+        dataframe = self.setup_work_dataframe(dataframe)
+        dataframe = self.slice_dataframe(dataframe, mask=gs_mask, remove=False)
+        dataframe = self.simple_imputer(dataframe)
+        dataframe = self.slice_dataframe(dataframe, cols=drop_cols)
+        dataframe = self.label_encoder(dataframe)
+        dataframe[response] = dataframe[response].apply(abs)
+        x_matrix, y_vector = self.setup_xy(dataframe, y_col=response)
+
+        # TODO: create a generic function to do prediction
+        _pre_prob0, _pre_prob1 = [], []
+        for model in models:
+            _pre_prob = model.predict_proba(x_matrix)
+            _pre_prob0.append(_pre_prob[:, 0])
+            _pre_prob1.append(_pre_prob[:, 1])
+
+        pre_prob0 = numpy.array(_pre_prob0)
+        dataframe['pre_prob0_mean'] = pre_prob0.mean(axis=0)
+        dataframe['pre_prob0_var'] = pre_prob0.var(axis=0)
+
+        pre_prob1 = numpy.array(_pre_prob1)
+        dataframe['pre_prob1_mean'] = pre_prob1.mean(axis=0)
+        dataframe['pre_prob1_var'] = pre_prob1.var(axis=0)
+
+        if output_file is None:
+            _, input_file_name = os.path.split(input_file)
+            name, ext = os.path.splitext(input_file_name)
+            output_file = "".join([name, "_pred", ext])
+        output_path = os.path.join(output_dir, output_file)
+        dataframe.to_csv(output_path, sep="\t", index=False)
+
+        auc = [
+            roc_auc_score(y_vector, dataframe['pre_prob1_mean']),
+            roc_curve(y_vector, dataframe['pre_prob1_mean'])
+        ]
+
+        _, ax_roc = self.draw_roc_curve_cv(auc)
+        file_path = os.path.join(output_dir, "validation_roc_curve.png")
+        save_file(file_path, ax_roc)
