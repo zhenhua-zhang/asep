@@ -470,7 +470,8 @@ class ASEPredictor:
             }
 
         for cv_idx, split in enumerate(split_pool):
-            estimator = copy.deepcopy(self.estimator)
+            # estimator = copy.deepcopy(self.estimator)
+            estimator = self.estimator
             training_report, auc, feature_importance, model \
                     = self.randomized_search_cv(estimator, split)
 
