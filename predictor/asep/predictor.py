@@ -40,6 +40,21 @@ def save_file(filename, target):
             pickle.dump(target, opfh)
 
 
+def check_model_sanity(models):
+    """Check the sanity of given model"""
+    if not isinstance(models, (list, tuple)):
+        models = [models]
+
+    for _model in models:
+        if not hasattr(_model, "predict"):
+            raise AttributeError("Model require `predict` method.")
+
+        if not hasattr(_model, "predict_prob"):
+            raise AttributeError("Model require `predict_proba` method.")
+
+    return True
+
+
 class ASEPredictor:
     """A class implementing prediction of ASE variance of a variant"""
 
@@ -86,15 +101,11 @@ class ASEPredictor:
                 lc_space_size=10, lc_n_jobs=5, lc_cvs=5, nested_cv=False,
                 resampling=None):
         """Execute a pre-designed construct pipeline"""
-
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
-        self.raw_dataframe = self.read_file(self.input_file_name, limit)
-
-        self.work_dataframe = self.setup_work_dataframe(self.raw_dataframe)
 
         if maxgs:
-            __gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))"
-            gs_mask = __gs_mask.format(mings, maxgs)
+            _gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))"
+            gs_mask = _gs_mask.format(mings, maxgs)
         else:
             gs_mask = "group_size >= {:n}".format(mings)
 
@@ -102,21 +113,12 @@ class ASEPredictor:
         self.mask_query = mask
         self.dropped_cols = drop_cols
 
-        self.work_dataframe = self.slice_dataframe(
-            self.work_dataframe, mask=self.gs_mask, remove=False
-        )
-
-        self.work_dataframe = self.simple_imputer(self.work_dataframe)
-
-        self.work_dataframe = self.slice_dataframe(
-            self.work_dataframe, cols=drop_cols
-        )
-
-        self.work_dataframe[response] = self.work_dataframe[response].apply(abs)
-        self.work_dataframe = self.label_encoder(self.work_dataframe)
-
-        self.x_matrix, self.y_vector = self.setup_xy(
-            self.work_dataframe, y_col=response, resampling=resampling
+        (
+            self.raw_dataframe, self.work_dataframe,
+            self.x_matrix, self.y_vector
+        ) = self.preprocessing(
+            self.input_file_name, limit, gs_mask, mask, drop_cols, response,
+            resampling
         )
 
         self.setup_pipeline(self.estimators_list, biclass=biclass_)
@@ -135,6 +137,25 @@ class ASEPredictor:
                 estimator=self.estimator, cvs=lc_cvs, n_jobs=lc_n_jobs,
                 space_size=lc_space_size
             )
+
+    @timmer
+    def preprocessing(self, file_name, limit=None, gs_mask=None, mask=None,
+                      drop_cols=None, response="bb_ASE", resampling=False):
+        """Preprocessing input data set"""
+        if mask:
+            pass
+        raw_dataframe = self.read_file(file_name, limit)
+        dataframe = self.setup_work_dataframe(raw_dataframe)
+        dataframe = self.slice_dataframe(dataframe, mask=gs_mask, remove=False)
+        dataframe = self.simple_imputer(dataframe)
+        dataframe = self.slice_dataframe(dataframe, cols=drop_cols)
+        dataframe[response] = dataframe[response].apply(abs)
+        dataframe = self.label_encoder(dataframe)
+        x_matrix, y_vector = self.setup_xy(
+            dataframe, y_col=response, resampling=resampling
+        )
+
+        return raw_dataframe, dataframe, x_matrix, y_vector
 
     @staticmethod
     def read_file(file_name, nrows=None):
@@ -241,7 +262,6 @@ class ASEPredictor:
 
         return (x_matrix, y_vector)
 
-    @timmer
     def label_encoder(self, work_dataframe, target_cols=None, skip=None,
                       remove=False):
         """Encode category columns """
@@ -329,7 +349,6 @@ class ASEPredictor:
 
         return dataframe
 
-    @timmer
     def setup_pipeline(self, estimator=None, biclass=True):
         """Setup a training pipeline """
         if biclass:
@@ -337,7 +356,6 @@ class ASEPredictor:
         else:
             self.pipeline = OneVsOneClassifier(Pipeline(estimator))
 
-    @timmer
     def draw_learning_curve(self, estimator, cvs=5, n_jobs=5, space_size=10,
                             **kwargs):
         """Draw the learning curve of specific estimator or pipeline"""
@@ -615,46 +633,45 @@ class ASEPredictor:
     def predictor(self, input_file, output_dir="./", models=None,
                   output_file=None, nrows=None):
         """Predict ASE effects for raw dataset"""
-        if models is None:
-            models = self.fetch_models()
-        else:
-            # TODO: a generic function to check model sanity
-            if not hasattr(models, "predict"):
-                raise AttributeError("Model need `predict` method.")
-            if not hasattr(models, "predict_prob"):
-                raise AttributeError("Model need `predict_proba` method.")
-
         with open(input_file) as file_handle:
-            target_dataframe = pandas.read_table(
+            dataframe = pandas.read_table(
                 file_handle, nrows=nrows, low_memory=False,
                 na_values=['NA', '.']
             )
 
-        processed_dataframe = self.setup_input_matrix(target_dataframe)
-
-        _pre_prob0, _pre_prob1 = [], []
-        for model in models:
-            _pre_prob = model.predict_proba(processed_dataframe)
-            _pre_prob0.append(_pre_prob[:, 0])
-            _pre_prob1.append(_pre_prob[:, 1])
-
-        pre_prob0 = numpy.array(_pre_prob0)
-        target_dataframe['pre_prob0_mean'] = pre_prob0.mean(axis=0)
-        target_dataframe['pre_prob0_var'] = pre_prob0.var(axis=0)
-
-        pre_prob1 = numpy.array(_pre_prob1)
-        target_dataframe['pre_prob1_mean'] = pre_prob1.mean(axis=0)
-        target_dataframe['pre_prob1_var'] = pre_prob1.var(axis=0)
+        new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
+        x_matrix = self.setup_x_matrix(dataframe)
+        dataframe[new_cols] = self.get_predict_proba(x_matrix, models)
 
         if output_file is None:
             _, input_file_name = os.path.split(input_file)
             name, ext = os.path.splitext(input_file_name)
             output_file = "".join([name, "_pred", ext])
-
         output_path = os.path.join(output_dir, output_file)
-        target_dataframe.to_csv(output_path, sep="\t", index=False)
 
-    @timmer
+        dataframe.to_csv(output_path, sep="\t", index=False)
+
+    def get_predict_proba(self, x_matrix, models):
+        """Predict"""
+        if models is None:
+            models = self.fetch_models()
+        else:
+            check_model_sanity(models)
+
+        _pre_prob0, _pre_prob1 = [], []
+        for model in models:
+            _pre_prob = model.predict_proba(x_matrix)
+            _pre_prob0.append(_pre_prob[:, 0])
+            _pre_prob1.append(_pre_prob[:, 1])
+
+        pre_prob0 = numpy.array(_pre_prob0)
+        pre_prob1 = numpy.array(_pre_prob1)
+
+        return (
+            pre_prob0.mean(axis=0), pre_prob0.var(axis=0),
+            pre_prob1.mean(axis=0), pre_prob1.var(axis=0)
+        )
+
     def fetch_models(self):
         """Use specific model to predict new dataset"""
         if self.model_pool is None:
@@ -663,8 +680,7 @@ class ASEPredictor:
         else:
             return [copy.deepcopy(m.steps[-1][-1]) for m in self.model_pool]
 
-    @timmer
-    def setup_input_matrix(self, dataframe, missing_val=1e9-1):
+    def setup_x_matrix(self, dataframe, missing_val=1e9-1):
         """Preprocessing inputs to predict"""
         dataframe = self.slice_dataframe(
             dataframe, mask=self.mask_query, remove=False
@@ -688,55 +704,31 @@ class ASEPredictor:
     # Validator
     @timmer
     def validator(self, input_file, output_dir="./", output_file=None,
-                  models=None, nrows=None, response="bb_ASE"):
+                  models=None, limit=None, response="bb_ASE",
+                  resampling=False):
         """Validate the model using another dataset"""
-        if models is None:
-            models = self.fetch_models()
-        else:
-            # TODO: a generic function to check model sanity
-            if not hasattr(models, "predict"):
-                raise AttributeError("Model need `predict` method.")
-            if not hasattr(models, "predict_prob"):
-                raise AttributeError("Model need `predict_proba` method.")
-
+        mask = self.mask_query
         gs_mask = self.gs_mask
         drop_cols = self.dropped_cols
 
-        # TODO: create a generic function to do preprocessing
-        dataframe = self.read_file(input_file, nrows)
-        dataframe = self.setup_work_dataframe(dataframe)
-        dataframe = self.slice_dataframe(dataframe, mask=gs_mask, remove=False)
-        dataframe = self.simple_imputer(dataframe)
-        dataframe = self.slice_dataframe(dataframe, cols=drop_cols)
-        dataframe = self.label_encoder(dataframe)
-        dataframe[response] = dataframe[response].apply(abs)
-        x_matrix, y_vector = self.setup_xy(dataframe, y_col=response)
+        _, dataframe, x_matrix, y_vector = self.preprocessing(
+            input_file, limit, gs_mask, mask, drop_cols, response, resampling
+        )
 
-        # TODO: create a generic function to do prediction
-        _pre_prob0, _pre_prob1 = [], []
-        for model in models:
-            _pre_prob = model.predict_proba(x_matrix)
-            _pre_prob0.append(_pre_prob[:, 0])
-            _pre_prob1.append(_pre_prob[:, 1])
-
-        pre_prob0 = numpy.array(_pre_prob0)
-        dataframe['pre_prob0_mean'] = pre_prob0.mean(axis=0)
-        dataframe['pre_prob0_var'] = pre_prob0.var(axis=0)
-
-        pre_prob1 = numpy.array(_pre_prob1)
-        dataframe['pre_prob1_mean'] = pre_prob1.mean(axis=0)
-        dataframe['pre_prob1_var'] = pre_prob1.var(axis=0)
+        new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
+        dataframe[new_cols] = self.get_predict_proba(x_matrix, models)
 
         if output_file is None:
             _, input_file_name = os.path.split(input_file)
             name, ext = os.path.splitext(input_file_name)
             output_file = "".join([name, "_pred", ext])
+
         output_path = os.path.join(output_dir, output_file)
         dataframe.to_csv(output_path, sep="\t", index=False)
 
         auc = [
-            roc_auc_score(y_vector, dataframe['pre_prob1_mean']),
-            roc_curve(y_vector, dataframe['pre_prob1_mean'])
+            roc_auc_score(y_vector, dataframe['prob1_mean']),
+            roc_curve(y_vector, dataframe['prob1_mean'])
         ]
 
         _, ax_roc = self.draw_roc_curve_cv(auc)
