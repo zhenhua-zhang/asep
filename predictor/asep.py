@@ -160,7 +160,7 @@ def get_args():
         help="Only read first k rows as input from input file. Default: None"
     )
     _group.add_argument(
-        "--response-col", dest="reponse_col", default='bb_ASE',
+        "--response-col", dest="response_col", default='bb_ASE',
         help="""The column name of response variable or target variable.
         Default: bb_ASE"""
     )
