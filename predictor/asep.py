@@ -279,7 +279,8 @@ def validate(arguments):
     output_dir = arguments.output_dir
     resampling = arguments.resampling
     model_obj.validator(
-        input_file, output_dir, first_k_rows, response_col, resampling
+        input_file, output_dir, first_k_rows, response_col,
+        resampling=resampling
     )
 
 

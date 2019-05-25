@@ -488,8 +488,8 @@ class ASEPredictor:
             }
 
         for cv_idx, split in enumerate(split_pool):
-            # estimator = copy.deepcopy(self.estimator)
-            estimator = self.estimator
+            estimator = copy.deepcopy(self.estimator)
+            # estimator = self.estimator
             training_report, auc, feature_importance, model \
                     = self.randomized_search_cv(estimator, split)
 
@@ -638,9 +638,12 @@ class ASEPredictor:
                 na_values=['NA', '.']
             )
 
-        new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
         x_matrix = self.setup_x_matrix(dataframe)
-        dataframe[new_cols] = self.get_predict_proba(x_matrix, models)
+
+        _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
+        _new_vals, *_ = self.get_predict_proba(x_matrix, models)
+        for col_key, col_val in zip(_new_cols, _new_vals):
+            dataframe[col_key] = col_val
 
         _, input_file_name = os.path.split(input_file)
         name, ext = os.path.splitext(input_file_name)
@@ -650,7 +653,8 @@ class ASEPredictor:
         dataframe.to_csv(output_path, sep="\t", index=False)
 
     def get_predict_proba(self, x_matrix, models=None):
-        """Predict"""
+        """Get the predicted probability"""
+
         if models is None:
             models = self.fetch_models()
         else:
@@ -662,13 +666,15 @@ class ASEPredictor:
             _pre_prob0.append(_pre_prob[:, 0])
             _pre_prob1.append(_pre_prob[:, 1])
 
-        pre_prob0 = numpy.array(_pre_prob0)
-        pre_prob1 = numpy.array(_pre_prob1)
+        prob0 = numpy.array(_pre_prob0)
+        prob1 = numpy.array(_pre_prob1)
 
-        return (
-            pre_prob0.mean(axis=0), pre_prob0.var(axis=0),
-            pre_prob1.mean(axis=0), pre_prob1.var(axis=0)
+        prob_mean = (
+            prob0.mean(axis=0), prob0.var(axis=0),
+            prob1.mean(axis=0), prob1.var(axis=0)
         )
+
+        return prob_mean, prob1, prob0
 
     def fetch_models(self):
         """Use specific model to predict new dataset"""
@@ -712,8 +718,10 @@ class ASEPredictor:
             input_file, limit, gs_mask, mask, drop_cols, response, resampling
         )
 
-        new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
-        dataframe[new_cols] = self.get_predict_proba(x_matrix, models)
+        _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
+        _new_vals, prob1, prob0 = self.get_predict_proba(x_matrix, models)
+        for col_key, col_val in zip(_new_cols, _new_vals):
+            dataframe[col_key] = col_val
 
         _, input_file_name = os.path.split(input_file)
         name, ext = os.path.splitext(input_file_name)
@@ -722,10 +730,10 @@ class ASEPredictor:
         dataframe.to_csv(output_path, sep="\t", index=False)
 
         auc = [
-            roc_auc_score(y_vector, dataframe['prob1_mean']),
-            roc_curve(y_vector, dataframe['prob1_mean'])
+            [roc_auc_score(y_vector, _prob1), roc_curve(y_vector, _prob1)]
+            for _prob1 in prob1
         ]
 
-        _, ax_roc = self.draw_roc_curve_cv(auc)
+        fig, _ = self.draw_roc_curve_cv(auc)
         file_path = os.path.join(output_dir, "validation_roc_curve.png")
-        save_file(file_path, ax_roc)
+        save_file(file_path, fig)
