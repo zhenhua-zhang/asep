@@ -171,7 +171,7 @@ def get_args():
 
     _group = validate_argparser.add_argument_group("Output")
     _group.add_argument(
-        "-o", "--output", dest="output_dir", default="./", type=str,
+        "-o", "--output-dir", dest="output_dir", default="./", type=str,
         help="The directory including output files. Default: ./"
     )
 
