@@ -226,7 +226,7 @@ def train(arguments):
     my_config.assembly()
 
     input_file = arguments.input_file
-    asep = ASEPredictor(input_file, my_config)
+    asep = ASEPredictor(input_file, my_config, sed=1325)
 
     drop_cols = arguments.drop_cols
     if drop_cols is None:
