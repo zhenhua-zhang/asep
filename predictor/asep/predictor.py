@@ -341,8 +341,8 @@ class ASEPredictor:
             'Grantham': 0, 'Dist2Mutation': 0, 'Freq100bp': 0, 'Rare100bp': 0,
             'Sngl100bp': 0, 'Freq1000bp': 0, 'Rare1000bp': 0, 'Sngl1000bp': 0,
             'Freq10000bp': 0, 'Rare10000bp': 0, 'Sngl10000bp': 0,
-            'dbscSNV-ada_score': 0, 'dbscSNV-rf_score': 0, 
-            'pLI_score': 0.303188 # Using the mean of fordist_cleaned_exac_r03_march16_z_pli_rec_null_data.txt.gz; A new feature 4th Jul, 2019
+            'dbscSNV-ada_score': 0, 'dbscSNV-rf_score': 0, 'gnomAD_AF': 0.0,
+            'pLI_score': 0.303188, # Using the mean of fordist_cleaned_exac_r03_march16_z_pli_rec_null_data.txt.gz; A new feature 4th Jul, 2019
         }
 
         for target in targets:

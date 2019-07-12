@@ -8,10 +8,10 @@ from asep.predictor import ASEPredictor
 
 # Expected features
 expected_features = [
-    'EncExp', 'Sngl10000bp', 'GerpN', 'Rare10000bp', 'Dist2Mutation',
-    'cHmmQuies', 'bStatistic', 'minDistTSS', 'Sngl1000bp', 'Freq10000bp',
-    'minDistTSE', 'EncNucleo','cHmmTxWk', 'cHmmTx', 'cHmmReprPCWk', 'GC',
-    'RawScore'
+    'Sngl10000bp', 'EncExp', 'GerpN', 'minDistTSS', 'bStatistic', 'cHmmQuies',
+    'minDistTSE', 'cHmmTxWk', 'EncNucleo', 'Freq10000bp', 'cHmmReprPCWk',
+    'Sngl1000bp', 'Rare10000bp', 'pLI_score', 'Dist2Mutation', 'GC',
+    'EncH3K27Ac', 'EncH3K4Me3', 'EncH3K4Me1'
 ]
 
 height = 9  # plot height
@@ -24,7 +24,7 @@ first_k_rows = int(sys.argv[2])
 
 my_x_matrix = my_object.x_matrix.loc[:first_k_rows, ]
 
-my_model = my_object.fetch_model()
+my_model = my_object.fetch_models()[0]
 plt.clf()  # Clean figures created in model
 
 print("Creating explainer ...", file=sys.stderr)

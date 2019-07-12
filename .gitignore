@@ -15,13 +15,17 @@
 **/*.tbi
 **/*.tsv
 **/*.vcf
+**/*.pdf
 
 # Ignore all starting with _
 _archived
-_asep_env
+_asep_venv
 _notes
 _syntax_test
 
 # Ignore some hidden files or directories
 .pylintrc
 .vscode/
+
+# Ignore rsyncMe
+rs2boxy
