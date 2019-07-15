@@ -739,7 +739,8 @@ class ASEPredictor:
         ]
 
         auc_opt = os.path.join(output_dir, "validation_roc_auc.pkl")
-        pickle.dump(auc, auc_opt)
+        with open(auc_opt, 'wb') as auc_opth:
+            pickle.dump(auc, auc_opth)
 
         fig, _ = self.draw_roc_curve_cv(auc)
         file_path = os.path.join(output_dir, "validation_roc_auc.png")
