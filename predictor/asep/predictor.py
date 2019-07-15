@@ -342,7 +342,10 @@ class ASEPredictor:
             'Sngl100bp': 0, 'Freq1000bp': 0, 'Rare1000bp': 0, 'Sngl1000bp': 0,
             'Freq10000bp': 0, 'Rare10000bp': 0, 'Sngl10000bp': 0,
             'dbscSNV-ada_score': 0, 'dbscSNV-rf_score': 0, 'gnomAD_AF': 0.0,
-            'pLI_score': 0.303188, # Using the mean of fordist_cleaned_exac_r03_march16_z_pli_rec_null_data.txt.gz; A new feature 4th Jul, 2019
+            'pLI_score': 0.303188,
+            # Using the mean of 
+            # fordist_cleaned_exac_r03_march16_z_pli_rec_null_data.txt.gz;
+            # A new feature 4th Jul, 2019
         }
 
         for target in targets:
@@ -720,13 +723,13 @@ class ASEPredictor:
         )
 
         _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
-        _new_vals, prob1, prob0 = self.get_predict_proba(x_matrix, models)
+        _new_vals, prob1, _ = self.get_predict_proba(x_matrix, models)
         for col_key, col_val in zip(_new_cols, _new_vals):
             dataframe[col_key] = col_val
 
         _, input_file_name = os.path.split(input_file)
         name, ext = os.path.splitext(input_file_name)
-        output_file = "".join([name, "_pred", ext])
+        output_file = "".join(["validation_", name, "_pred", ext])
         output_path = os.path.join(output_dir, output_file)
         dataframe.to_csv(output_path, sep="\t", index=False)
 
@@ -735,6 +738,9 @@ class ASEPredictor:
             for _prob1 in prob1
         ]
 
+        auc_opt = os.path.join(output_dir, "validation_roc_auc.pkl")
+        pickle.dump(auc, auc_opt)
+
         fig, _ = self.draw_roc_curve_cv(auc)
-        file_path = os.path.join(output_dir, "validation_roc_curve.png")
+        file_path = os.path.join(output_dir, "validation_roc_auc.png")
         save_file(file_path, fig)
