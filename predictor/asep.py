@@ -375,23 +375,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-# Column names
-#
-# Chrom Pos Ref Alt Type Length AnnoType Consequence ConsScore ConsDetail GC
-# CpG motifECount motifEName motifEHIPos motifEScoreChng oAA nAA GeneID
-# FeatureID GeneName CCDS Intron Exon cDNApos relcDNApos CDSpos relCDSpos
-# protPos relProtPos Domain Dst2Splice Dst2SplType minDistTSS minDistTSE
-# SIFTcat SIFTval PolyPhenCat PolyPhenVal priPhCons mamPhCons verPhCons
-# priPhyloP mamPhyloP verPhyloP bStatistic targetScan mirSVR-Score mirSVR-E
-# mirSVR-Aln cHmmTssA cHmmTssAFlnk cHmmTxFlnk cHmmTx cHmmTxWk cHmmEnhG cHmmEnh
-# cHmmZnfRpts cHmmHet cHmmTssBiv cHmmBivFlnk cHmmEnhBiv cHmmReprPC cHmmReprPCWk
-# cHmmQuies GerpRS GerpRSpval GerpN GerpS TFBS TFBSPeaks TFBSPeaksMax
-# tOverlapMotifs motifDist Segway EncH3K27Ac EncH3K4Me1 EncH3K4Me3 EncExp
-# EncNucleo EncOCC EncOCCombPVal EncOCDNasePVal EncOCFairePVal EncOCpolIIPVal
-# EncOCctcfPVal EncOCmycPVal EncOCDNaseSig EncOCFaireSig EncOCpolIISig
-# EncOCctcfSig EncOCmycSig Grantham Dist2Mutation Freq100bp Rare100bp Sngl100bp
-# Freq1000bp Rare1000bp Sngl1000bp Freq10000bp Rare10000bp Sngl10000bp
-# dbscSNV-ada_score dbscSNV-rf_score RawScore PHRED log2FC bn_p bn_p_adj bb_p
-# bb_p_adj group_size bn_ASE bb_ASE
