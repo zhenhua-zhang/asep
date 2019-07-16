@@ -1,2 +1,4 @@
 """Main module of asep project"""
-__all__ = ['configs', 'predictor', 'utilities']
+from __future__ import absolute_import
+
+__all__ = ["configs", "predictor", "utilities"]

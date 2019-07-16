@@ -2,13 +2,12 @@
 # -*- coding: utf-8 -*-
 """Utilities for package asep"""
 
-import functools
-import pickle
+import os
+import sys
+import math
 import json
 import time
-import math
-import sys
-import os
+import functools
 
 import numpy
 import scipy
@@ -37,7 +36,6 @@ def timmer(func):
 
 def check_resources():
     """Chekc resources available"""
-    cpus = os.cpu_count()  # Number of cpus physically
     cpus_per_task = os.environ['SLURM_CPUS_PER_TASK']
     math.sqrt(cpus_per_task)
 

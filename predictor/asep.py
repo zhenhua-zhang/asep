@@ -2,11 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """Main interface for asep"""
-import pickle
 import sys
+import pickle
 from argparse import ArgumentParser
 
-sys.path.append("/home/umcg-zzhang/Documents/git/asep/")
 from asep.configs import Config
 from asep.predictor import ASEPredictor
 from asep.utilities import timmer
@@ -90,10 +89,6 @@ def get_args():
         help="Algorithm. Choices: [abc, gbc, rfc, brfc]. Default: rfc"
     )
     _group.add_argument(
-        "--resampling", dest="resampling", action="store_true",
-        help="Use resampling method or not. Default: False"
-    )
-    _group.add_argument(
         "--nested-cv", dest="nested_cv", default=False, action="store_true",
         help="Use nested cross validation or not. Default: False"
     )
@@ -164,10 +159,6 @@ def get_args():
         help="""The column name of response variable or target variable.
         Default: bb_ASE"""
     )
-    _group.add_argument(
-        "--resampling", dest="resampling", action="store_true",
-        help="Use resampling method or not. Default: False"
-    )
 
     _group = validate_argparser.add_argument_group("Output")
     _group.add_argument(
@@ -233,7 +224,7 @@ def train(arguments):
         drop_cols = [
             "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size",
             "bn_ASE", "Chrom", "Pos", "Ref", "Alt", "GeneID", "FeatureID",
-            "GeneName", "Intron", "Exon", "CCDS", "motifEName"
+            "GeneName", "Intron", "Exon", "CCDS", "motifEName", "pLI_score"
         ]
 
     min_group_size = arguments.min_group_size
@@ -251,14 +242,11 @@ def train(arguments):
     lc_n_jobs = arguments.lc_n_jobs
     lc_cvs = arguments.lc_cvs
 
-    resampling = arguments.resampling
-
     asep.trainer(
         mask=mask_out, mings=min_group_size, maxgs=max_group_size,
         limit=first_k_rows, response=reponse_col, drop_cols=drop_cols,
         outer_cvs=outer_cvs, nested_cv=nested_cv, with_lc=with_lc,
         lc_space_size=lc_space_size, lc_n_jobs=lc_n_jobs, lc_cvs=lc_cvs,
-        resampling=resampling
     )
 
     run_flag = arguments.run_flag
@@ -277,10 +265,8 @@ def validate(arguments):
     first_k_rows = arguments.first_k_rows
     input_file = arguments.input_file
     output_dir = arguments.output_dir
-    resampling = arguments.resampling
     model_obj.validator(
         input_file, output_dir, first_k_rows, response_col,
-        resampling=resampling
     )
 
 
@@ -358,7 +344,7 @@ def print_arguments(arguments, fill_width=None):
         if _arg is None:
             _arg = "None"
         print(
-            "{dst: <{wid}}: {arg: <{wid}}".format(dst=_dst, arg=_arg, wid=fill_width),
+            "{d: <{w}}: {a: <{w}}".format(d=_dst, a=_arg, w=fill_width),
             file=sys.stderr
         )
 

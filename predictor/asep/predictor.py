@@ -2,23 +2,22 @@
 # -*- coding: utf-8 -*-
 """Predicting Allele-specific expression effect"""
 
-import copy
 import os
-import pickle
 import sys
+import copy
 import time
+import pickle
 
 import numpy
-import pandas
 import scipy
+import pandas
+
 from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.model_selection import (RandomizedSearchCV, StratifiedKFold,
                                      learning_curve)
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
-
-from imblearn.over_sampling import SMOTENC
 
 from .utilities import format_print, set_sed, timmer
 
@@ -98,8 +97,7 @@ class ASEPredictor:
     @timmer
     def trainer(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
                 biclass_=True, outer_cvs=6, mings=2, maxgs=None, with_lc=False,
-                lc_space_size=10, lc_n_jobs=5, lc_cvs=5, nested_cv=False,
-                resampling=None):
+                lc_space_size=10, lc_n_jobs=5, lc_cvs=5, nested_cv=False):
         """Execute a pre-designed construct pipeline"""
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
@@ -118,7 +116,6 @@ class ASEPredictor:
             self.x_matrix, self.y_vector
         ) = self.preprocessing(
             self.input_file_name, limit, gs_mask, mask, drop_cols, response,
-            resampling
         )
 
         self.setup_pipeline(self.estimators_list, biclass=biclass_)
@@ -140,7 +137,7 @@ class ASEPredictor:
 
     @timmer
     def preprocessing(self, file_name, limit=None, gs_mask=None, mask=None,
-                      drop_cols=None, response="bb_ASE", resampling=False):
+                      drop_cols=None, response="bb_ASE"):
         """Preprocessing input data set"""
         if mask:
             pass
@@ -151,9 +148,7 @@ class ASEPredictor:
         dataframe = self.slice_dataframe(dataframe, cols=drop_cols)
         dataframe[response] = dataframe[response].apply(abs)
         dataframe = self.label_encoder(dataframe)
-        x_matrix, y_vector = self.setup_xy(
-            dataframe, y_col=response, resampling=resampling
-        )
+        x_matrix, y_vector = self.setup_xy(dataframe, y_col=response)
 
         return raw_dataframe, dataframe, x_matrix, y_vector
 
@@ -222,8 +217,7 @@ class ASEPredictor:
         return dataframe
 
     @staticmethod
-    def setup_xy(work_dataframe, x_cols=None, y_col=None, resampling=False,
-                 cg_features=None):
+    def setup_xy(work_dataframe, x_cols=None, y_col=None, cg_features=None):
         """Set up predictor variables and target variables. """
         if cg_features is None:
             cg_features = [
@@ -250,15 +244,6 @@ class ASEPredictor:
         x_matrix = copy.deepcopy(work_dataframe.loc[:, x_cols])
         x_matrix.sort_index(1, inplace=True)
         y_vector = copy.deepcopy(work_dataframe.loc[:, y_col])
-
-        if resampling:
-            features = [x_matrix.columns.get_loc(x) for x in cg_features]
-            resampler = SMOTENC(features)
-            x_matrix, y_vector = resampler.fit_resample(
-                x_matrix.values, y_vector.values
-            )
-            x_matrix = pandas.DataFrame(x_matrix, columns=x_cols)
-            y_vector = pandas.Series(y_vector, name=y_col, dtype='int8')
 
         return (x_matrix, y_vector)
 
@@ -343,7 +328,7 @@ class ASEPredictor:
             'Freq10000bp': 0, 'Rare10000bp': 0, 'Sngl10000bp': 0,
             'dbscSNV-ada_score': 0, 'dbscSNV-rf_score': 0, 'gnomAD_AF': 0.0,
             'pLI_score': 0.303188,
-            # Using the mean of 
+            # Using the mean of
             # fordist_cleaned_exac_r03_march16_z_pli_rec_null_data.txt.gz;
             # A new feature 4th Jul, 2019
         }
@@ -712,14 +697,14 @@ class ASEPredictor:
     # Validator
     @timmer
     def validator(self, input_file, output_dir="./", limit=None,
-                  response="bb_ASE", models=None, resampling=False):
+                  response="bb_ASE", models=None):
         """Validate the model using another dataset"""
         mask = self.mask_query
         gs_mask = self.gs_mask
         drop_cols = self.dropped_cols
 
         _, dataframe, x_matrix, y_vector = self.preprocessing(
-            input_file, limit, gs_mask, mask, drop_cols, response, resampling
+            input_file, limit, gs_mask, mask, drop_cols, response
         )
 
         _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
