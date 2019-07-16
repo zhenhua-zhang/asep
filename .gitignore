@@ -19,7 +19,7 @@
 
 # Ignore all starting with _
 _archived
-_asep_venv
+_asep_env
 _notes
 _syntax_test
 
