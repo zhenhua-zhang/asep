@@ -30,8 +30,7 @@ def get_args():
     train_argparser = subparser.add_parser("train", help="Train a model")
     _group = train_argparser.add_argument_group("Input")
     _group.add_argument(
-        "-i", "--input-file", dest="input_file", default=None,
-        required=True,
+        "-i", "--input-file", dest="input_file", default=None, required=True,
         help="The path to file of training dataset. Default: None"
     )
 
@@ -52,7 +51,7 @@ def get_args():
         "--min-group-size", dest="min_group_size", default=2,
         type=lambda x: int(x) > 1 and int(x) or parser.error(
             "--min-group-size must be >= 2"),
-        help="The minimum of individuals bearing the same variant (>= 2). Default: 2"
+        help="The minimum individuals bearing the same variant(>=2). Default: 2"
     )
     _group.add_argument(
         "--max-group-size", dest="max_group_size", default=None,
@@ -122,11 +121,11 @@ def get_args():
     )
     _group.add_argument(
         "--learning-curve-space-size", dest="lc_space_size", default=10,
-        type=int, help="Number of splits will be create in learning curve. Default: 10"
+        type=int, help="Number of splits created in learning curve. Default: 10"
     )
     _group.add_argument(
         "--with-rbm", dest="with_rbm", default=False, action="store_true",
-        help="Whether using Reistricted Boltzmann Machine to create training components."
+        help="Whether using Reistricted Boltzmann Machine to create data."
     )
 
     _group = train_argparser.add_argument_group("Output")

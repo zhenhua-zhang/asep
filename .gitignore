@@ -28,4 +28,4 @@ _syntax_test
 .vscode/
 
 # Ignore rsyncMe
-rs2boxy
+.rbcsIgnore
