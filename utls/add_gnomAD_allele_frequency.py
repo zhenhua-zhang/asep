@@ -20,22 +20,17 @@ done
 cd ${optd}
 """
 
+# TODO: 1 Add argument parser
+
 import sys
 
-gnmd_af = sys.argv[1]
-tnst = sys.argv[2]
-optf = sys.argv[3]
+gnmd_af = sys.argv[1]  # gnomAD allele frequency file
+tnst = sys.argv[2]  # original annotated file without allele frequency from gnomAD database
+optf = sys.argv[3]  # Output file
 
-with open(gnmd_af, 'r') as gnmd, open(tnst, 'r') as base,\
-        open(optf, "w") as opth:
-
-    gnmd_dict = {
-        tuple(lst[:2]) : lst for lst in [x.strip().split("\t") for x in gnmd]
-    }
-
-    base_dict = {
-        tuple(lst[:2]) : lst for lst in [x.strip().split("\t") for x in base]
-    }
+with open(gnmd_af, 'r') as gnmd, open(tnst, 'r') as base, open(optf, "w") as opth:
+    gnmd_dict = {tuple(lst[:2]): lst for lst in [x.strip().split("\t") for x in gnmd]}
+    base_dict = {tuple(lst[:2]): lst for lst in [x.strip().split("\t") for x in base]}
 
     gnmd_keys, base_keys = gnmd_dict.keys(), base_dict.keys()
 
@@ -48,8 +43,8 @@ with open(gnmd_af, 'r') as gnmd, open(tnst, 'r') as base,\
                 allele_frequency = gnmd_rec[4]
         elif key == ("Chrom", "Pos"):
             allele_frequency = "gnomAD_AF"
-        
+
         base_line = base_dict[key]
         base_line.insert(108, allele_frequency)
         opth.write("\t".join(base_line) + "\n")
-    
+
