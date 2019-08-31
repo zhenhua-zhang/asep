@@ -224,7 +224,7 @@ def train(arguments):
             "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size",
             "bn_ASE", "Chrom", "Pos", "Ref", "Alt", "GeneID", "FeatureID",
             "GeneName", "Intron", "Exon", "CCDS", "motifEName", "pLI_score",
-            "gnomAD_AF"
+            "EncExp"
         ]
 
     min_group_size = arguments.min_group_size
