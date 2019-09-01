@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Main interface for asep"""
+"""Main interface for asep
+
+TODO: 1. A module to parse configuration file, which could make life easier.
+"""
 import sys
 import pickle
 from argparse import ArgumentParser
@@ -224,7 +227,7 @@ def train(arguments):
             "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj", "group_size",
             "bn_ASE", "Chrom", "Pos", "Ref", "Alt", "GeneID", "FeatureID",
             "GeneName", "Intron", "Exon", "CCDS", "motifEName", "pLI_score",
-            "gnomAD_AF", "EncExp"
+            "gnomAD_AF", "EncExp", "GerpN"
         ]
 
     min_group_size = arguments.min_group_size
