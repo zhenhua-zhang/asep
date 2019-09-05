@@ -4,202 +4,96 @@
 """Main interface for asep
 
 TODO: 1. A module to parse configuration file, which could make life easier.
+      2. The `mask` argument in predictor.trainer() func doesn't function at all.
 """
 import sys
 import pickle
 from argparse import ArgumentParser
 
-from asep.configs import Config
-from asep.predictor import ASEPredictor
-from asep.utilities import timmer
+from asep.config import Config
+from asep.model import ASEP
+from asep.utils import timmer
+from asep.utils import config_parser
 
 
 def get_args():
-    """A method to get arguments from the command line"""
+    """A method to get arguments from the command line
+    
+    Returns:
+        parser: ArgumentParser -- An intance of ArgumentParser()
+    """
 
     parser = ArgumentParser()
-    _group = parser.add_argument_group("Global")
-    _group.add_argument(
-        "-V", dest="verbose_level", action="count", help="Verbose level"
-    )
-    _group.add_argument(
-        "--run-flag", dest="run_flag", default="new_task",
-        help="Flags for current run"
-    )
+    _group = parser.add_argument_group("Global") # Global-wide configs
+    _group.add_argument("--run-flag", dest="run_flag", default="new_task", help="Flags for current run. The flag will be added to the name of the output dir. Default: new_task")
+    _group.add_argument("--config-file", dest="config_file", default=None, type=str, help="The path to configuration file, and overwrite values from command line excepting -i. Default: cofig.yaml")
 
-    subparser = parser.add_subparsers(dest="subcommand")
-
-    # Argument parser for sub-command `train`
+    subparser = parser.add_subparsers(dest="subcommand") # Arguments parser for sub-command `train`
     train_argparser = subparser.add_parser("train", help="Train a model")
-    _group = train_argparser.add_argument_group("Input")
-    _group.add_argument(
-        "-i", "--input-file", dest="input_file", default=None, required=True,
-        help="The path to file of training dataset. Default: None"
-    )
 
-    _group = train_argparser.add_argument_group("Filter")
-    _group.add_argument(
-        "-f", "--first-k-rows", dest="first_k_rows", default=None, type=int,
-        help="Only read first k rows as input from input file. Default: None"
-    )
-    _group.add_argument(
-        "-m", "--mask-as", dest="mask_as", default=None, type=str,
-        help="Pattern will be kept. Default: None"
-    )
-    _group.add_argument(
-        "-M", "--mask-out", dest="mask_out", default=None, type=str,
-        help="Pattern will be masked. Default: None"
-    )
-    _group.add_argument(
-        "--min-group-size", dest="min_group_size", default=2,
-        type=lambda x: int(x) > 1 and int(x) or parser.error(
-            "--min-group-size must be >= 2"),
-        help="The minimum individuals bearing the same variant(>=2). Default: 2"
-    )
-    _group.add_argument(
-        "--max-group-size", dest="max_group_size", default=None,
-        type=lambda x: int(x) <= 1e4 and int(x) or parser.error(
-            "--max-group-size must be <= 10,000"),
-        help="""The maximum number of individuals bearing the same variant
-        (<= 10,000). Default: None"""
-    )
-    _group.add_argument(
-        "--drop-cols", dest="drop_cols", default=None, nargs='+',
-        help="""The columns will be dropped. Seperated by semi-colon and quote
-        them by ','. if there are more than one columns. Default: None"""
-    )
-    _group.add_argument(
-        "--response-col", dest="reponse_col", default='bb_ASE',
-        help="""The column name of response variable or target variable.
-        Default: bb_ASE"""
-    )
+    _group = train_argparser.add_argument_group("Input") # Arguments for Input
+    _group.add_argument("-i", "--input-file", dest="input_file", default=None, required=True, help="The path to file of training dataset. [Required]")
 
-    _group = train_argparser.add_argument_group("Configuration")
-    _group.add_argument(
-        "--test-size", dest="test_size", default=None, type=int,
-        help="The proportion of dataset for testing. Default: None"
-    )
-    _group.add_argument(
-        "-c", "--config-file", dest="config_file", default=None, type=str,
-        help="""The path to configuration file, all configuration will be get
-        from it, and overwrite values from command line except -i. Not
-        implemented yet. Default: None"""
-    )
-    _group.add_argument(
-        "--classifier", dest="classifier", default='rfc', type=str,
-        choices=["abc", "gbc", "rfc", "brfc"],
-        help="Algorithm. Choices: [abc, gbc, rfc, brfc]. Default: rfc"
-    )
-    _group.add_argument(
-        "--nested-cv", dest="nested_cv", default=False, action="store_true",
-        help="Use nested cross validation or not. Default: False"
-    )
-    _group.add_argument(
-        "--inner-cvs", dest="inner_cvs", default=6, type=int,
-        help="Fold of cross-validations for RandomizedSearchCV. Default: 6"
-    )
-    _group.add_argument(
-        "--inner-n-jobs", dest="inner_n_jobs", default=5, type=int,
-        help="Number of jobs for RandomizedSearchCV, Default: 5"
-    )
-    _group.add_argument(
-        "--inner-n-iters", dest="inner_n_iters", default=50, type=int,
-        help="Number of iters for RandomizedSearchCV. Default: 50"
-    )
-    _group.add_argument(
-        "--outer-cvs", dest="outer_cvs", default=6, type=int,
-        help="Fold of cross-validation for outer_validation. Default: 6"
-    )
-    _group.add_argument(
-        "--with-learning-curve", dest="with_lc", default=False,
-        action='store_true', help="Whether draw learning curve. Default: False"
-    )
-    _group.add_argument(
-        "--learning-curve-cvs", dest="lc_cvs", default=4, type=int,
-        help="Number of folds to draw learning curve. Default: 4"
-    )
-    _group.add_argument(
-        "--learning-curve-n-jobs", dest="lc_n_jobs", default=5, type=int,
-        help="Number of jobs to draw learning curves. Default: 5"
-    )
-    _group.add_argument(
-        "--learning-curve-space-size", dest="lc_space_size", default=10,
-        type=int, help="Number of splits created in learning curve. Default: 10"
-    )
-    _group.add_argument(
-        "--with-rbm", dest="with_rbm", default=False, action="store_true",
-        help="Whether using Reistricted Boltzmann Machine to create data."
-    )
+    _group = train_argparser.add_argument_group("Filter") # Arguments for Filter
+    _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=None, type=int, help="Only read first k rows as input from input file. Default: None")
+    _group.add_argument("-m", "--mask-as", dest="mask_as", default=None, type=str, help="Pattern will be kept. Default: None")
+    _group.add_argument("-M", "--mask-out", dest="mask_out", default=None, type=str, help="Pattern will be masked. Default: None")
+    _group.add_argument("--min-group-size", dest="min_group_size", default=2, type=lambda x: int(x) > 1 and int(x) or parser.error( "--min-group-size must be >= 2"), help="The minimum individuals bearing the same variant(>=2). Default: 2")
+    _group.add_argument("--max-group-size", dest="max_group_size", default=None, type=lambda x: int(x) <= 1e4 and int(x) or parser.error( "--max-group-size must be <= 10,000"), help="The maximum number of individuals bearing the same variant (<= 10,000). Default: None")
+    _group.add_argument("--drop-cols", dest="drop_cols", default=None, nargs='+', help="The columns will be dropped. Seperated by semi-colon and quote them by ','. if there are more than one columns. Default: None")
+    _group.add_argument("--response-col", dest="reponse_col", default='bb_ASE', help="The column name of response variable or target variable. Default: bb_ASE")
 
-    _group = train_argparser.add_argument_group("Output")
-    _group.add_argument(
-        "-o", "--output-dir", dest="output_dir", default='./', type=str,
-        help="The directory including output files. Default: ./"
-    )
+    _group = train_argparser.add_argument_group("Configuration") # Arguments for configuration
+    _group.add_argument("--random-sed", dest="random_sed", default=1234, type=int, help="The random seed. Default: 1234")
+    _group.add_argument("--classifier", dest="classifier", default='rfc', type=str, choices=["abc", "gbc", "rfc", "brfc"], help="Algorithm. Choices: [abc, gbc, rfc, brfc]. Default: rfc")
+    _group.add_argument("--nested-cv", dest="nested_cv", default=False, action="store_true", help="Use nested cross validation or not. Default: False")
+    _group.add_argument("--inner-cvs", dest="inner_cvs", default=6, type=int, help="Fold of cross-validations for RandomizedSearchCV. Default: 6")
+    _group.add_argument("--inner-n-jobs", dest="inner_n_jobs", default=5, type=int, help="Number of jobs for RandomizedSearchCV. Default: 5")
+    _group.add_argument("--inner-n-iters", dest="inner_n_iters", default=50, type=int, help="Number of iters for RandomizedSearchCV. Default: 50")
+    _group.add_argument("--outer-cvs", dest="outer_cvs", default=6, type=int, help="Fold of cross-validation for outer_validation. Default: 6")
+    _group.add_argument("--with-learning-curve", dest="with_lc", default=False, action='store_true', help="Whether draw learning curve. Default: False")
+    _group.add_argument("--learning-curve-cvs", dest="lc_cvs", default=4, type=int, help="Number of folds to draw learning curve. Default: 4")
+    _group.add_argument("--learning-curve-n-jobs", dest="lc_n_jobs", default=5, type=int, help="Number of jobs to draw learning curves. Default: 5")
+    _group.add_argument("--learning-curve-space-size", dest="lc_space_size", default=10, type=int, help="Number of splits created in learning curve. Default: 10")
+    # _group.add_argument("--test-size", dest="test_size", default=None, type=int, help="The proportion of dataset for testing. Default: None")
 
-    # Argument parser for subcommand `validate`
-    validate_argparser = subparser.add_parser(
-        "validate", help="Validate the model."
-    )
-    _group = validate_argparser.add_argument_group("Input")
-    _group.add_argument(
-        "-i", "--input-file", dest="input_file", type=str,
-        required=True, help="Path to file of validation dataset. [Required]"
-    )
-    _group.add_argument(
-        "-m", "--model-file", dest="model_file", type=str, required=True,
-        help="Model to be validated. [Required]"
-    )
+    _group = train_argparser.add_argument_group("Output") # Arguments for Output
+    _group.add_argument("-o", "--output-dir", dest="output_dir", default='./', type=str, help="The directory including output files. Default: ./")
 
-    _group = validate_argparser.add_argument_group("Filter")
-    _group.add_argument(
-        "-f", "--first-k-rows", dest="first_k_rows", default=None, type=int,
-        help="Only read first k rows as input from input file. Default: None"
-    )
-    _group.add_argument(
-        "--response-col", dest="response_col", default='bb_ASE',
-        help="""The column name of response variable or target variable.
-        Default: bb_ASE"""
-    )
+    validate_argparser = subparser.add_parser("validate", help="Validate the model.") # Argument parser for subcommand `validate`
+    _group = validate_argparser.add_argument_group("Input") # Arguments for Input
+    _group.add_argument("-i", "--input-file", dest="input_file", type=str, required=True, help="Path to file of validation dataset. [Required]")
+    _group.add_argument("-m", "--model-file", dest="model_file", type=str, required=True, help="Model to be validated. [Required]")
 
-    _group = validate_argparser.add_argument_group("Output")
-    _group.add_argument(
-        "-o", "--output-dir", dest="output_dir", default="./", type=str,
-        help="The directory including output files. Default: ./"
-    )
+    _group = validate_argparser.add_argument_group("Filter") # Arguments for Filter
+    _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=None, type=int, help="Only read first k rows as input from input file. Default: None")
+    _group.add_argument("--response-col", dest="response_col", default='bb_ASE', help="The column name of response variable or target variable. Default: bb_ASE")
 
-    # Argument parser for subcommand `predict`
-    predict_argparser = subparser.add_parser(
-        "predict", help="Predict new dataset by the trained model"
-    )
-    _group = predict_argparser.add_argument_group("Input")
-    _group.add_argument(
-        "-i", "--input-file", dest="input_file", type=str,
-        required=True, help="New dataset to be predicted. [Required]"
-    )
-    _group.add_argument(
-        "-m", "--model-file", dest="model_file", type=str, required=True,
-        help="Model to be used. [Required]"
-    )
+    _group = validate_argparser.add_argument_group("Output") # Arguments for Output
+    _group.add_argument("-o", "--output-dir", dest="output_dir", default="./", type=str, help="The directory including output files. Default: ./")
 
-    _group = predict_argparser.add_argument_group("Filter")
-    _group.add_argument(
-        "-f", "--first-k-rows", dest="first_k_rows", default=None, type=int,
-        help="Only read first k rows as input from input file. Default: None"
-    )
+    predict_argparser = subparser.add_parser("predict", help="Apply the model on new data set") # Argument parser for subcommand `predict`
+    _group = predict_argparser.add_argument_group("Input") # Arguments for Input
+    _group.add_argument("-i", "--input-file", dest="input_file", type=str, required=True, help="New dataset to be predicted. [Required]")
+    _group.add_argument("-m", "--model-file", dest="model_file", type=str, required=True, help="Model to be used. [Required]")
 
-    _group = predict_argparser.add_argument_group("Output")
-    _group.add_argument(
-        "-o", "--output-dir", dest="output_dir", type=str,
-        required=True, help="Output directory for input file. [Reqired]"
-    )
+    _group = predict_argparser.add_argument_group("Filter") # Arguments for Filter
+    _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=None, type=int, help="Only read first k rows as input from input file. Default: None")
+
+    _group = predict_argparser.add_argument_group("Output") # Arguments for Output
+    _group.add_argument("-o", "--output-dir", dest="output_dir", type=str, required=True, help="Output directory for input file. [Reqired]")
 
     return parser
 
 
 @timmer
 def train(arguments):
-    """Train the model"""
+    """Wrapper entry for `train` subcommand
+    
+    Arguments:
+        arguments {ArgumentParser} -- An `ArgumentParser` instance caught by `parse_arg()`
+    """
+
     my_config = Config()
 
     inner_cvs = arguments.inner_cvs
@@ -212,14 +106,11 @@ def train(arguments):
     classifier = arguments.classifier
     my_config.set_classifier(classifier)
 
-    with_rbm = arguments.with_rbm
-    if with_rbm:
-        my_config.set_constructor()
-
     my_config.assembly()
 
     input_file = arguments.input_file
-    asep = ASEPredictor(input_file, my_config, sed=1325)
+    random_sed = arguments.random_sed
+    asep = ASEPredictor(input_file, my_config, sed=random_sed)
 
     drop_cols = arguments.drop_cols
     if drop_cols is None:
@@ -245,6 +136,7 @@ def train(arguments):
     lc_n_jobs = arguments.lc_n_jobs
     lc_cvs = arguments.lc_cvs
 
+    # Nonused `mask` argument
     asep.trainer(
         mask=mask_out, mings=min_group_size, maxgs=max_group_size,
         limit=first_k_rows, response=reponse_col, drop_cols=drop_cols,
