@@ -4,7 +4,7 @@ import pickle
 import matplotlib.pyplot as plt
 
 sys.path.append("/home/umcg-zzhang/Documents/git/asep/predictor/")
-from asep.predictor import ASEPredictor
+from asep.model import ASEP
 
 # Expected features
 expected_features = [
@@ -64,4 +64,3 @@ current_fig.set_figwidth(width)
 current_fig.set_frameon(False)
 plt.savefig("summary_plot_bar.pdf")
 plt.savefig("summary_plot_bar.png")
-

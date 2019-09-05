@@ -8,7 +8,6 @@ from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier,
                               RandomForestClassifier)
 from sklearn.metrics import accuracy_score, make_scorer, precision_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.neural_network import BernoulliRBM
 
 
 class Config:
@@ -26,7 +25,7 @@ class Config:
         load_configs(self, fn=None):
 
     Examples:
-        >>> from configs import Config
+        >>> from config import Config
         >>> config = Config()
         >>> config.init()
     """
@@ -38,13 +37,8 @@ class Config:
 
         self.searcher_params = None
         self.init_params = None
-        self.constuctor = None
         self.classifier = None
         self.scorers = None
-
-    def set_constructor(self, **kwargs):
-        """Setup sample constructor"""
-        self.constuctor = ("rbm", BernoulliRBM(**kwargs))
 
     def set_init_params(self, classifier="rfc"):
         """A mathod get initial params for classifier"""
@@ -69,8 +63,8 @@ class Config:
                 rfc__min_samples_split=list(range(2, 10, 2)),
                 rfc__min_samples_leaf=list(range(2, 10, 2)),
                 rfc__max_depth=list(range(10, 50, 10)),
-                # rfc__bootstrap=[False, True],
                 rfc__class_weight=['balanced'],
+                # rfc__bootstrap=[False, True],
                 # rfc__max_features=['sqrt', 'log2', None],
             )
         elif classifier == 'brfc':  # For RandomForestClassifier
@@ -79,14 +73,12 @@ class Config:
                 rfc__min_samples_split=list(range(2, 10, 2)),
                 rfc__min_samples_leaf=list(range(2, 10, 2)),
                 rfc__max_depth=list(range(10, 50, 10)),
-                # rfc__bootstrap=[False, True],
                 rfc__class_weight=['balanced'],
+                # rfc__bootstrap=[False, True],
                 # rfc__max_features=['sqrt', 'log2', None],
             )
         else:
-            raise ValueError(
-                "Unknow classifier, possible choice: abc, gbc, rfc, brfc."
-            )
+            raise ValueError("Unknow classifier, choice: abc, gbc, rfc, brfc.")
 
     def set_classifier(self, classifier="rfc"):
         """Set classifier"""
@@ -101,9 +93,7 @@ class Config:
         elif classifier == 'brfc':  # For BalancedRandomForestClassifier
             self.classifier = ('brfc', BalancedRandomForestClassifier())
         else:
-            raise ValueError(
-                "Unknow type of classifier, choice [abc, gbc, rfc, brfc]"
-            )
+            raise ValueError("Unknow classifier, choice [abc, gbc, rfc, brfc]")
 
     def set_scorers(self):
         """Set scorer"""
@@ -115,8 +105,6 @@ class Config:
     def __set_scorers(self, extra_scorer=None):
         """Set scorer"""
         basic_scorers = dict(
-            # roc_auc_score=make_scorer(roc_auc_score),
-            # f1_score=make_scorer(f1_score),
             precision=make_scorer(precision_score, average="micro"),
             accuracy=make_scorer(accuracy_score),
         )
@@ -154,9 +142,7 @@ class Config:
         if self.searcher_params is None:
             self.set_searcher_params()
 
-        if self.constuctor is not None:
-            self.estimators_list = [self.constuctor, self.classifier]
-        else:
+        if self.estimators_list is None:
             self.estimators_list = [self.classifier]
 
         self.optim_params['param_distributions'] = self.init_params

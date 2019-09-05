@@ -19,12 +19,11 @@ from sklearn.multiclass import OneVsOneClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
-from .utilities import format_print, set_sed, timmer
+from .utils import format_print, set_sed, timmer
 
 try:
     from matplotlib import pyplot
 except ImportWarning as warning:
-    print(warning, file=sys.stderr)
     import matplotlib
     matplotlib.use('Agg')
     from matplotlib import pyplot
@@ -54,7 +53,7 @@ def check_model_sanity(models):
     return True
 
 
-class ASEPredictor:
+class ASEP:
     """A class implementing prediction of ASE variance of a variant"""
 
     def __init__(self, file_name, config, sed=3142):
@@ -82,7 +81,7 @@ class ASEPredictor:
         self.feature_importance_pool = None
         self.feature_importance_hist = None
 
-        self.area_under_curve_curve = None
+        self.receiver_operating_characteristic_curve = None
         self.area_under_curve_pool = None
 
         self.learning_report = None
@@ -121,7 +120,7 @@ class ASEPredictor:
         self.setup_pipeline(self.estimators_list, biclass=biclass_)
         self.outer_validation(cvs=outer_cvs, nested_cv=nested_cv)
 
-        self.area_under_curve_curve = self.draw_roc_curve_cv(
+        self.receiver_operating_characteristic_curve = self.draw_roc_curve_cv(
             self.area_under_curve_pool
         )
 
@@ -478,7 +477,6 @@ class ASEPredictor:
 
         for cv_idx, split in enumerate(split_pool):
             estimator = copy.deepcopy(self.estimator)
-            # estimator = self.estimator
             training_report, auc, feature_importance, model \
                     = self.randomized_search_cv(estimator, split)
 
@@ -601,9 +599,9 @@ class ASEPredictor:
             file_path = os.path.join(save_path, "auc_fpr_tpr.pkl")
             save_file(file_path, self.area_under_curve_pool)
 
-        if self.area_under_curve_curve:
+        if self.receiver_operating_characteristic_curve:
             file_path = os.path.join(save_path, "roc_curve.png")
-            save_file(file_path, self.area_under_curve_curve[0])
+            save_file(file_path, self.receiver_operating_characteristic_curve[0])
 
         if self.training_report_pool:
             file_path = os.path.join(save_path, "training_report.pkl")

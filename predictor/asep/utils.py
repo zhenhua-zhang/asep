@@ -9,6 +9,7 @@ import json
 import time
 import functools
 
+import yaml
 import numpy
 import scipy
 
@@ -99,3 +100,10 @@ def feature_pre_selection_by_spearman(
     pre_selected_features = candidates_pool.keys()
 
     return pre_selected_features
+
+
+def config_parser(conf_file_path):
+    """Parse config file in YAML format"""
+    with open(conf_file_path) as cfh:
+        configs = yaml.load(cfh, Loader=yaml.Loader)
+    return configs
