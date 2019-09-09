@@ -15,12 +15,11 @@ import scipy
 import joblib
 import pandas
 
-from sklearn.metrics import roc_auc_score, roc_curve
-from sklearn.model_selection import (RandomizedSearchCV, StratifiedKFold,
-                                     learning_curve)
+from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold, learning_curve
+from sklearn.preprocessing import LabelEncoder
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import roc_auc_score, roc_curve
 
 from .utils import format_print, set_sed, timmer
 
@@ -107,38 +106,21 @@ class ASEP:
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
         if maxgs:
-            _gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))"
-            gs_mask = _gs_mask.format(mings, maxgs)
+            gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))".format(mings, maxgs)
         else:
             gs_mask = "group_size >= {:n}".format(mings)
 
         self.gs_mask = gs_mask
         self.mask_query = mask
         self.dropped_cols = drop_cols
-
-        (
-            self.raw_dataframe, self.work_dataframe,
-            self.x_matrix, self.y_vector
-        ) = self.preprocessing(
-            self.input_file_name, limit, gs_mask, mask, drop_cols, response, max_na_ratio
-        )
-
+        self.raw_dataframe, self.work_dataframe, self.x_matrix, self.y_vector = self.preprocessing(self.input_file_name, limit, gs_mask, mask, drop_cols, response, max_na_ratio)
         self.setup_pipeline(self.estimators_list, biclass=biclass_)
         self.outer_validation(cvs=outer_cvs, nested_cv=nested_cv)
-
-        self.receiver_operating_characteristic_curve = self.draw_roc_curve_cv(
-            self.area_under_curve_pool
-        )
-
-        self.feature_importance_hist = self.draw_k_main_features_cv(
-            self.feature_importance_pool
-        )
+        self.receiver_operating_characteristic_curve = self.draw_roc_curve_cv(self.area_under_curve_pool)
+        self.feature_importance_hist = self.draw_k_main_features_cv(self.feature_importance_pool)
 
         if with_lc:
-            self.draw_learning_curve(
-                estimator=self.estimator, cvs=lc_cvs, n_jobs=lc_n_jobs,
-                space_size=lc_space_size
-            )
+            self.draw_learning_curve(estimator=self.estimator, cvs=lc_cvs, n_jobs=lc_n_jobs, space_size=lc_space_size)
 
     @timmer
     def preprocessing(self, file_name, limit=None, gs_mask=None, mask=None,
@@ -166,10 +148,7 @@ class ASEP:
         except PermissionError as err:
             print('File IO error: ', err, file=STDE)
         else:
-            return pandas.read_table(
-                file_handle, nrows=nrows, low_memory=False,
-                na_values=['NA', '.']
-            )
+            return pandas.read_table(file_handle, nrows=nrows, low_memory=False, na_values=['NA', '.'])
 
     @staticmethod
     def setup_work_dataframe(raw_dataframe):
@@ -199,9 +178,7 @@ class ASEP:
         def do_trim(work_dataframe, cols, rows, remove):
             if remove:
                 if cols is not None or rows is not None:
-                    work_dataframe.drop(
-                        index=rows, columns=cols, inplace=True
-                    )
+                    work_dataframe.drop(index=rows, columns=cols, inplace=True)
             else:
                 if rows is None:
                     rows = work_dataframe.index
@@ -241,15 +218,9 @@ class ASEP:
     def setup_xy(work_dataframe, x_cols=None, y_col=None, cg_features=None):
         """Set up predictor variables and target variables. """
         if cg_features is None:
-            cg_features = [
-                "ref_encoded", "alt_encoded", "oAA_encoded", "nAA_encoded",
-                "motifEHIPos", "CCDS_encoded", "Exon_encoded", "gene_encoded",
-                "Type_encoded", "group_encoded", "Segway_encoded",
-                "effect_encoded", "impact_encoded", "Intron_encoded",
-                "Domain_encoded", "SIFTcat_encoded", "AnnoType_encoded",
-                "ConsDetail_encoded", "motifEName_encoded",
-                "Dst2SplType_encoded", "Consequence_encoded",
-                "PolyPhenCat_encoded",
+            cg_features = ["ref_encoded", "alt_encoded", "oAA_encoded", "nAA_encoded", "motifEHIPos", "CCDS_encoded", "Exon_encoded", "gene_encoded",
+                "Type_encoded", "group_encoded", "Segway_encoded", "effect_encoded", "impact_encoded", "Intron_encoded", "Domain_encoded",
+                "SIFTcat_encoded", "AnnoType_encoded", "ConsDetail_encoded", "motifEName_encoded", "Dst2SplType_encoded", "Consequence_encoded", "PolyPhenCat_encoded",
             ]
 
         cols = work_dataframe.columns
@@ -268,14 +239,11 @@ class ASEP:
 
         return (x_matrix, y_vector)
 
-    def label_encoder(self, work_dataframe, target_cols=None, skip=None,
-                      remove=False):
+    def label_encoder(self, work_dataframe, target_cols=None, skip=None, remove=False):
         """Encode category columns """
         if target_cols is None:
             col_types = work_dataframe.dtypes
-            target_cols = [
-                n for n, t in col_types.items() if t is numpy.dtype('O')
-            ]
+            target_cols = [n for n, t in col_types.items() if t is numpy.dtype('O')]
 
         if isinstance(skip, str):
             if skip in target_cols:
@@ -288,12 +256,9 @@ class ASEP:
                     print('{} isn\'t in list...'.format(skip), file=STDE)
 
         if remove:
-            format_print(
-                "Deleted columns (require encoding)", "\n".join(target_cols)
-            )
+            format_print("Deleted columns (require encoding)", "\n".join(target_cols))
             work_dataframe.drop(columns=target_cols, inplace=True)
-            self.label_encoder_matrix = {
-                (x, x): "removed" for x in target_cols}
+            self.label_encoder_matrix = {(x, x): "removed" for x in target_cols}
         else:
             format_print("Encoded columns", ", ".join(target_cols))
             target_cols_encoded = [n + '_encoded' for n in target_cols]
@@ -304,11 +269,8 @@ class ASEP:
             encoder = LabelEncoder()
             for _tag, _tag_enc in zip(target_cols, target_cols_encoded):
                 try:
-                    work_dataframe[_tag_enc] = encoder.fit_transform(
-                        work_dataframe[_tag]
-                    )
-                    self.label_encoder_matrix[(
-                        _tag, _tag_enc)] = copy.deepcopy(encoder)
+                    work_dataframe[_tag_enc] = encoder.fit_transform(work_dataframe[_tag])
+                    self.label_encoder_matrix[(_tag, _tag_enc)] = copy.deepcopy(encoder)
                     del work_dataframe[_tag]
                 except ValueError as err:
                     print(err, file=STDE)
@@ -366,14 +328,9 @@ class ASEP:
         else:
             self.pipeline = OneVsOneClassifier(Pipeline(estimator))
 
-    def draw_learning_curve(self, estimator, cvs=5, n_jobs=5, space_size=10,
-                            **kwargs):
+    def draw_learning_curve(self, estimator, cvs=5, n_jobs=5, space_size=10, **kwargs):
         """Draw the learning curve of specific estimator or pipeline"""
-        train_sizes, train_scores, test_scores = learning_curve(
-            estimator=estimator, X=self.x_matrix, y=self.y_vector,
-            train_sizes=numpy.linspace(.1, 1., space_size), cv=cvs,
-            n_jobs=n_jobs, **kwargs
-        )
+        train_sizes, train_scores, test_scores = learning_curve(estimator=estimator, X=self.x_matrix, y=self.y_vector, train_sizes=numpy.linspace(.1, 1., space_size), cv=cvs, n_jobs=n_jobs, **kwargs)
 
         train_scores_mean = numpy.mean(train_scores, axis=1)
         train_scores_std = numpy.std(train_scores, axis=1)
@@ -382,32 +339,12 @@ class ASEP:
 
         fig, ax_learning = pyplot.subplots(figsize=(10, 10))
 
-        ax_learning.fill_between(
-            train_sizes,
-            train_scores_mean + train_scores_std,
-            train_scores_mean - train_scores_std,
-            alpha=0.1
-        )
-        ax_learning.plot(
-            train_sizes, train_scores_mean, color='r',
-            label='Training score'
-        )
+        ax_learning.fill_between(train_sizes, train_scores_mean + train_scores_std, train_scores_mean - train_scores_std, alpha=0.1)
+        ax_learning.plot(train_sizes, train_scores_mean, color='r', label='Training score')
 
-        ax_learning.fill_between(
-            train_sizes,
-            test_scores_mean + test_scores_std,
-            test_scores_mean - test_scores_std,
-            alpha=0.1
-        )
-        ax_learning.plot(
-            train_sizes, test_scores_mean, color='g',
-            label='Cross-validation score'
-        )
-
-        ax_learning.set(
-            title='Learning curve',
-            xlabel='Training examples', ylabel='Score'
-        )
+        ax_learning.fill_between(train_sizes, test_scores_mean + test_scores_std, test_scores_mean - test_scores_std, alpha=0.1)
+        ax_learning.plot(train_sizes, test_scores_mean, color='g', label='Cross-validation score') 
+        ax_learning.set(title='Learning curve', xlabel='Training examples', ylabel='Score')
         ax_learning.legend(loc='best')
 
         self.learning_line = (fig, ax_learning)
@@ -424,21 +361,13 @@ class ASEP:
         estimator.fit(x_train_matrix, y_train_vector)
 
         y_test_scores = estimator.predict_proba(x_test_matrix)[:, 1]
-        auc = [
-            roc_auc_score(y_test_vector, y_test_scores),
-            roc_curve(y_test_vector, y_test_scores)
-        ]
+        auc = [roc_auc_score(y_test_vector, y_test_scores), roc_curve(y_test_vector, y_test_scores) ]
 
         if isinstance(estimator, RandomizedSearchCV):
             training_report = dict(
-                Scorer=estimator.scorer_,
-                Params=estimator.get_params(),
-                Best_params=estimator.best_params_,
-                Best_score=estimator.best_score_,
-                Best_index=estimator.best_index_,
-                Cross_validations=estimator.cv_results_,
-                Best_estimator=estimator.best_estimator_,
-                Estimator_score=estimator.score(x_test_matrix, y_test_vector)
+                Scorer=estimator.scorer_, Params=estimator.get_params(), Best_params=estimator.best_params_,
+                Best_score=estimator.best_score_, Best_index=estimator.best_index_, Cross_validations=estimator.cv_results_,
+                Best_estimator=estimator.best_estimator_, Estimator_score=estimator.score(x_test_matrix, y_test_vector)
             )
 
             estimator = estimator.best_estimator_
@@ -448,10 +377,7 @@ class ASEP:
         # XXX: need update if use more estimator
         first_k_name = x_train_matrix.columns
         first_k_importance = estimator.steps[-1][-1].feature_importances_
-        feature_importance = {
-            name: importance
-            for name, importance in zip(first_k_name, first_k_importance)
-        }
+        feature_importance = { name: importance for name, importance in zip(first_k_name, first_k_importance) }
 
         return (training_report, auc, feature_importance, estimator)
 
@@ -472,14 +398,9 @@ class ASEP:
             if self.training_report_pool is None:
                 self.training_report_pool = [
                     dict(
-                        Scorer=model.scorer_,
-                        Params=model.get_params(),
-                        Best_params=model.best_params_,
-                        Best_score=model.best_score_,
-                        Best_index=model.best_index_,
-                        Cross_validations=model.cv_results_,
-                        Best_estimator=model.best_estimator_,
-                        Estimator_score=None
+                        Scorer=model.scorer_, Params=model.get_params(), Best_params=model.best_params_,
+                        Best_score=model.best_score_, Best_index=model.best_index_,
+                        Cross_validations=model.cv_results_, Best_estimator=model.best_estimator_, Estimator_score=None
                     )
                 ]
 
@@ -493,14 +414,11 @@ class ASEP:
             self.training_report_pool = []
 
         if self.feature_importance_pool is None:
-            self.feature_importance_pool = {
-                name: [0] * cvs for name in self.x_matrix.columns
-            }
+            self.feature_importance_pool = { name: [0] * cvs for name in self.x_matrix.columns }
 
         for cv_idx, split in enumerate(split_pool):
             estimator = copy.deepcopy(self.estimator)
-            training_report, auc, feature_importance, model \
-                    = self.randomized_search_cv(estimator, split)
+            training_report, auc, feature_importance, model = self.randomized_search_cv(estimator, split)
 
             self.model_pool.append(model)
             self.area_under_curve_pool.append(auc)
@@ -547,23 +465,12 @@ class ASEP:
         mean, *_ = scipy.stats.bayes_mvs(auc_pool)
         auc_mean, (auc_min, auc_max) = mean.statistic, mean.minmax
 
-        ax_roc.plot(
-            fpr_mean, tpr_mean, color="r", lw=2,
-            label="Mean: AUC={:0.3}, [{:0.3}, {:0.3}]".format(
-                auc_mean, auc_min, auc_max
-            )
-        )
+        ax_roc.plot(fpr_mean, tpr_mean, color="r", lw=2, label="Mean: AUC={:0.3}, [{:0.3}, {:0.3}]".format(auc_mean, auc_min, auc_max))
 
         mean_upper = numpy.minimum(tpr_mean + tpr_std, 1)
         mean_lower = numpy.maximum(tpr_mean - tpr_std, 0)
-        ax_roc.fill_between(
-            fpr_mean, mean_upper, mean_lower, color='green', alpha=0.1,
-            label="Standard deviation"
-        )
-        ax_roc.set(
-            title="ROC curve",
-            xlabel='False positive rate', ylabel='True positive rate'
-        )
+        ax_roc.fill_between(fpr_mean, mean_upper, mean_lower, color='green', alpha=0.1, label="Standard deviation")
+        ax_roc.set(title="ROC curve", xlabel='False positive rate', ylabel='True positive rate')
         ax_roc.plot([0, 1], color='grey', linestyle='--')
         ax_roc.legend(loc="best")
 
@@ -588,14 +495,8 @@ class ASEP:
 
         fig, ax_features = pyplot.subplots(figsize=(10, 10))
         ax_features.bar(name_pool, mean_pool, yerr=std_pool)
-        ax_features.set_xticklabels(
-            name_pool, rotation_mode='anchor', rotation=45,
-            horizontalalignment='right'
-        )
-        ax_features.set(
-            title="Feature importances(with stand deviation as error bar)",
-            xlabel='Feature name', ylabel='Importance'
-        )
+        ax_features.set_xticklabels(name_pool, rotation_mode='anchor', rotation=45, horizontalalignment='right')
+        ax_features.set(title="Feature importances(with stand deviation as error bar)", xlabel='Feature name', ylabel='Importance')
 
         return (fig, ax_features)
 
@@ -649,10 +550,7 @@ class ASEP:
     def predictor(self, input_file, output_dir="./", nrows=None, models=None):
         """Predict ASE effects for raw dataset"""
         with open(input_file) as file_handle:
-            dataframe = pandas.read_table(
-                file_handle, nrows=nrows, low_memory=False,
-                na_values=['NA', '.']
-            )
+            dataframe = pandas.read_table(file_handle, nrows=nrows, low_memory=False, na_values=['NA', '.'])
 
         x_matrix = self.setup_x_matrix(dataframe)
 
@@ -684,11 +582,7 @@ class ASEP:
 
         prob0 = numpy.array(_pre_prob0)
         prob1 = numpy.array(_pre_prob1)
-
-        prob_mean = (
-            prob0.mean(axis=0), prob0.var(axis=0),
-            prob1.mean(axis=0), prob1.var(axis=0)
-        )
+        prob_mean = (prob0.mean(axis=0), prob0.var(axis=0), prob1.mean(axis=0), prob1.var(axis=0))
 
         return prob_mean, prob1, prob0
 
@@ -702,9 +596,7 @@ class ASEP:
 
     def setup_x_matrix(self, dataframe, missing_val=1e9-1):
         """Preprocessing inputs to predict"""
-        dataframe = self.slice_dataframe(
-            dataframe, mask=self.mask_query, remove=False
-        )
+        dataframe = self.slice_dataframe(dataframe, mask=self.mask_query, remove=False)
         dataframe = self.slice_dataframe(dataframe, cols=self.dropped_cols)
         dataframe = self.simple_imputer(dataframe)
 
@@ -714,25 +606,20 @@ class ASEP:
             else:
                 classes = _encoder.classes_
                 _tmp_dict = dict(zip(classes, _encoder.transform(classes)))
-                dataframe[_tag_enc] = dataframe[_tag].apply(
-                    lambda x: _tmp_dict.get(x, missing_val)
-                )
+                dataframe[_tag_enc] = dataframe[_tag].apply(lambda x: _tmp_dict.get(x, missing_val))
                 del dataframe[_tag]
 
         return dataframe
 
     # Validator
     @timmer
-    def validator(self, input_file, output_dir="./", limit=None,
-                  response="bb_ASE", models=None):
+    def validator(self, input_file, output_dir="./", limit=None, response="bb_ASE", models=None):
         """Validate the model using another dataset"""
         mask = self.mask_query
         gs_mask = self.gs_mask
         drop_cols = self.dropped_cols
 
-        _, dataframe, x_matrix, y_vector = self.preprocessing(
-            input_file, limit, gs_mask, mask, drop_cols, response
-        )
+        _, dataframe, x_matrix, y_vector = self.preprocessing(input_file, limit, gs_mask, mask, drop_cols, response)
 
         _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
         _new_vals, prob1, _ = self.get_predict_proba(x_matrix, models)
@@ -745,10 +632,7 @@ class ASEP:
         output_path = os.path.join(output_dir, output_file)
         dataframe.to_csv(output_path, sep="\t", index=False)
 
-        auc = [
-            [roc_auc_score(y_vector, _prob1), roc_curve(y_vector, _prob1)]
-            for _prob1 in prob1
-        ]
+        auc = [[roc_auc_score(y_vector, _prob1), roc_curve(y_vector, _prob1)] for _prob1 in prob1]
 
         auc_opt = os.path.join(output_dir, "validation_roc_auc.pkl")
         with open(auc_opt, 'wb') as auc_opth:

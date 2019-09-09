@@ -12,8 +12,7 @@ from argparse import ArgumentParser
 
 from asep.config import Config
 from asep.model import ASEP
-from asep.utils import (config_parser, my_debug, print_args, print_flag, DEBUG,
-                        print_header, NameSpace, dump_default_config_to_yaml)
+from asep.utils import config_parser, my_debug, print_args, print_flag, DEBUG, print_header, NameSpace, dump_default_config_to_yaml
 
 
 def cli_parser():

@@ -7,7 +7,7 @@ import time
 import functools
 
 
-from sys import stderr as STDERR
+from sys import stderr as STDE
 from collections import OrderedDict
 
 import yaml
@@ -32,7 +32,7 @@ def timmer(func):
         value = func(*args, **kwargs)
         func_name = func.__name__ + " "
         used_time = time.perf_counter() - start_time
-        print('{:.<40} DONE, time: {:.5f} secs'.format(func_name, used_time), file=STDERR)
+        print('{:.<40} DONE, time: {:.5f} secs'.format(func_name, used_time), file=STDE)
         return value
 
     return wrapper_timmer
@@ -53,7 +53,7 @@ def my_debug(level=0):
     return decorator_debug
 
 
-def format_print(title, main_content, pipe=STDERR):
+def format_print(title, main_content, pipe=STDE):
     """A method format the prints"""
     head = '-' * 3
     flag = ' '.join([head, title, ": "])
@@ -152,7 +152,7 @@ def print_header(title=None, version=None, author=None, email=None,
     head += astr.format(bstr.format(url))
 
     head += astr.format("#" * 50)
-    print("\n", head, file=STDERR, sep="")
+    print("\n", head, file=STDE, sep="")
 
 
 @my_debug(DEBUG)
@@ -173,7 +173,7 @@ def print_flag(subc=None, flag=None):
     else:
         run_flag = "-" * 80
 
-    print("{:-^80}".format(run_flag), file=STDERR)
+    print("{:-^80}".format(run_flag), file=STDE)
 
 
 @my_debug(DEBUG)
@@ -187,7 +187,7 @@ def print_args(args, fwd=-1):
         fwd {int} -- The number of space used to fill the argument and parameter, using an optimized fill-width if it's default (default: {-1})
     """
 
-    print("Arguments for current run: ", file=STDERR)
+    print("Arguments for current run: ", file=STDE)
     args_pair = [(_d, _a) for _d, _a in vars(args).items()]
     args_pair = sorted(args_pair, key=lambda x: len(x[0]))
 
@@ -195,7 +195,7 @@ def print_args(args, fwd=-1):
         fwd = len(args_pair[-1][0]) + 1
 
     for dst, arg in args_pair:
-        print("  {d: <{w}}: {a: <{w}}".format(d=dst, a=str(arg), w=fwd), file=STDERR)
+        print("  {d: <{w}}: {a: <{w}}".format(d=dst, a=str(arg), w=fwd), file=STDE)
 
 
 def get_default_config():
@@ -310,7 +310,7 @@ class NameSpace:
         if hasattr(self, key):
             delattr(self, key)
         else:
-            print("Unknown attr: {}".format(key), STDERR)
+            print("Unknown attr: {}".format(key), STDE)
 
     def to_dict(self, ordered=False):
         """Convert NameSpace instance into a dict object which could be ordered"""
@@ -326,7 +326,7 @@ class NameSpace:
 # TODO: 目前还没找到好的解决方法,以后再试
     def clear(self):
         """Clear all attributes"""
-        print("Not yet implemented", file=STDERR)
+        print("Not yet implemented", file=STDE)
 #        keys = copy.deepcopy(self.to_dict().keys())
 #        for key in keys:
 #            self.remove(key)
