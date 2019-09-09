@@ -1,14 +1,14 @@
 # Config for asep.py
 global:
-    run_flag: "new_task_from_configs_file"  # No space is allowed
-    # config_file: config.yaml  # The configuration file it self
+    run_flag: 'new_task_from_configs_file'  # No space is allowed
+    # config_file: configs.yaml  # The configuration file it self
     # config_first: false  # Using configurations from config_file at high priority
     # subcmd: train # the default subcommand [train, predict, validate, config]
 
 train: # Configs for `train` subcommand
 
 # Input
-    input_file: ""
+    input_file: ''
 
 # Filter
     first_k_rows: null
@@ -18,14 +18,14 @@ train: # Configs for `train` subcommand
     max_group_size: 1.0E+5  # When using scientific notation, do NOT foget the decimal
     max_na_ratio: 0.6
 
-## Which columns should be abundant manually: ("pLI_score", "gnomAD_AF", "EncExp", "GerpN")
-    drop_cols: ["bb_p", "bb_p_adj", "bn_ASE", "bn_p", "bn_p_adj", "group_size", "log2FC", "Chrom", "Pos", "Ref", "Alt", "CCDS", "Exon", "FeatureID", "GeneID", "GeneName", "Intron", "motifEName"]
-    response_col: "bb_ASE"
+## Which columns should be abundant manually: ('pLI_score', 'gnomAD_AF', 'EncExp', 'GerpN')
+    drop_cols: ['bb_p', 'bb_p_adj', 'bn_ASE', 'bn_p', 'bn_p_adj', 'group_size', 'log2FC', 'Chrom', 'Pos', 'Ref', 'Alt', 'CCDS', 'Exon', 'FeatureID', 'GeneID', 'GeneName', 'Intron', 'motifEName']
+    response_col: 'bb_ASE'
 
 # Configurations
     random_sed: 1234
     # test_size: null
-    classifier: "gbc"  # Choices: abc (), gbc(gradient boosting classifier)
+    classifier: 'gbc'  # Choices: abc(ada-boost classifier), gbc(gradient boosting classifier), rfc(random forest classifier), brfc(balanced random forest classifier)
     nested_cv: false
     inner_cvs: 6
     inner_n_jobs: 5
@@ -37,28 +37,28 @@ train: # Configs for `train` subcommand
     learning_curve_space_size: 10
 
 # Output
-    output_dir: "./"
+    output_dir: './'
 
 ## How to save the model and other data to the disk. Options: [pickle, joblib]
-    save_method: "pickle"  # Library used to save the model and other data set
+    save_method: 'pickle'  # Library used to save the model and other data set
 
 # Configs for `validate` subcommand
 validate:
 # Input
-    model_file: ""
+    model_file: ''
 
 # Filter
     first_k_rows: 0
     drop_cols: null
-    response_col: "bb_ASE"
+    response_col: 'bb_ASE'
 
 # Output
-    output_dir: "./"
+    output_dir: './'
 
-predict: # Configs for `predict`
+predict:  # Configs for `predict`
 # Input
-    input_file: ""
-    model_file: ""
+    input_file: ''
+    model_file: ''
 
 # Filter
     first_k_rows: 0
@@ -71,8 +71,8 @@ predict: # Configs for `predict`
 # Configs to generate or check the sanity of given config file
 config:
 ## The name of output config file
-    output_file: "config.yaml"
+    output_file: 'configs.yaml'
 
 ## Only useful when you want to check the sanity of given config file
-    config_file: "config.yaml" 
-    overwrite: -1  # -1, 0, 1 ask, keep, overwrite
+    config_file: null
+    # overwrite: -1  # -1, 0, 1 ask, keep, overwrite

@@ -203,22 +203,23 @@ def get_default_config():
     _configs = [
         "# Config for asep.py",
         "global:",
-        "    max_na_ratio: 0.5",
-        "    run_flag: 'new_task'  # No space is allowed",
-        "    config_file: config.yaml  # The configuration file it self",
+        "    run_flag: 'new_task_from_configs_file'  # No space is allowed",
+        "    # config_file: configs.yaml  # The configuration file it self",
+        "    # config_first: false  # Using configurations from config_file at high priority",
         "    # subcmd: train # the default subcommand [train, predict, validate, config]",
         "",
         "train: # Configs for `train` subcommand",
         "",
         "# Input",
-        "    input_file: """,
+        "    input_file: ''",
         "",
         "# Filter",
-        "    first_k_rows: -1",
+        "    first_k_rows: null",
         "    mask_as: null",
         "    mask_out: null",
         "    min_group_size: 2",
         "    max_group_size: 1.0E+5  # When using scientific notation, do NOT foget the decimal",
+        "    max_na_ratio: 0.6",
         "",
         "## Which columns should be abundant manually: ('pLI_score', 'gnomAD_AF', 'EncExp', 'GerpN')",
         "    drop_cols: ['bb_p', 'bb_p_adj', 'bn_ASE', 'bn_p', 'bn_p_adj', 'group_size', 'log2FC', 'Chrom', 'Pos', 'Ref', 'Alt', 'CCDS', 'Exon', 'FeatureID', 'GeneID', 'GeneName', 'Intron', 'motifEName']",
@@ -227,7 +228,7 @@ def get_default_config():
         "# Configurations",
         "    random_sed: 1234",
         "    # test_size: null",
-        "    classifier: 'gbc'  # Choices: abc(), gbc(gradient boosting classifier)",
+        "    classifier: 'gbc'  # Choices: abc (), gbc(gradient boosting classifier)",
         "    nested_cv: false",
         "    inner_cvs: 6",
         "    inner_n_jobs: 5",
@@ -247,7 +248,7 @@ def get_default_config():
         "# Configs for `validate` subcommand",
         "validate:",
         "# Input",
-        "    model_file: """,
+        "    model_file: ''",
         "",
         "# Filter",
         "    first_k_rows: 0",
@@ -257,10 +258,10 @@ def get_default_config():
         "# Output",
         "    output_dir: './'",
         "",
-        "predict: # Configs for `predict`",
+        "predict:  # Configs for `predict`",
         "# Input",
-        "    input_file: """,
-        "    model_file: """,
+        "    input_file: ''",
+        "    model_file: ''",
         "",
         "# Filter",
         "    first_k_rows: 0",
@@ -273,16 +274,19 @@ def get_default_config():
         "# Configs to generate or check the sanity of given config file",
         "config:",
         "## The name of output config file",
-        "    output_file: 'config.yaml'",
+        "    output_file: 'configs.yaml'",
         "",
         "## Only useful when you want to check the sanity of given config file",
-        "    config_file: 'config.yaml' ",
+        "    config_file: null",
+        "    # overwrite: -1  # -1, 0, 1 ask, keep, overwrite",
     ]
     return "\n".join(_configs)
 
-
-def merge_args():
-    return ""
+def dump_default_config_to_yaml(file_name="configs.yaml"):
+    """Dump default configurations to configs.yaml"""
+    default_configs = get_default_config()
+    with open(file_name, 'w') as opt:
+        opt.write(default_configs)
 
 
 class NameSpace:
