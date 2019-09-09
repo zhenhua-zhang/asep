@@ -3,13 +3,16 @@
 """Predicting Allele-specific expression effect"""
 
 import os
-import sys
 import copy
 import time
 import pickle
 
+from sys import stderr as STDE
+from sys import exit as EXIT
+
 import numpy
 import scipy
+import joblib
 import pandas
 
 from sklearn.metrics import roc_auc_score, roc_curve
@@ -29,13 +32,15 @@ except ImportWarning as warning:
     from matplotlib import pyplot
 
 
-def save_file(filename, target):
+def save_file(filename, target, svmtd="pickle"):
     """Save your file smartly"""
     with open(filename, "wb") as opfh:
         if hasattr(target, "savefig"):
             target.savefig(opfh)
-        else:
+        elif svmtd == "pickle":
             pickle.dump(target, opfh)
+        else:
+            joblib.dump(target, opfh)
 
 
 def check_model_sanity(models):
@@ -54,7 +59,7 @@ def check_model_sanity(models):
 
 
 class ASEP:
-    """A class implementing prediction of ASE variance of a variant"""
+    """A class implementing prediction of ASE effect for a variant"""
 
     def __init__(self, file_name, config, sed=3142):
         """Set up basic variables """
@@ -157,7 +162,7 @@ class ASEP:
         try:
             file_handle = open(file_name)
         except PermissionError as err:
-            print('File IO error: ', err, file=sys.stderr)
+            print('File IO error: ', err, file=STDE)
         else:
             return pandas.read_table(
                 file_handle, nrows=nrows, low_memory=False,
@@ -263,7 +268,7 @@ class ASEP:
                 if skip in target_cols:
                     target_cols.remove(skipped)
                 else:
-                    print('{} isn\'t in list...'.format(skip), file=sys.stderr)
+                    print('{} isn\'t in list...'.format(skip), file=STDE)
 
         if remove:
             format_print(
@@ -289,7 +294,7 @@ class ASEP:
                         _tag, _tag_enc)] = copy.deepcopy(encoder)
                     del work_dataframe[_tag]
                 except ValueError as err:
-                    print(err, file=sys.stderr)
+                    print(err, file=STDE)
 
         return work_dataframe
 
@@ -578,8 +583,15 @@ class ASEP:
         return (fig, ax_features)
 
     @timmer
-    def save_to(self, save_path="./", run_flag=''):
-        """Save configs, results and etc. to disk"""
+    def save_to(self, save_path="./", run_flag='', save_method="pickle"):
+        """Save configs, results and model to the disk
+
+        Keyword Arguments:
+            save_path {str} -- The path of the saved files (default: {"./"})
+            run_flag {str} -- The suffix for current run (default: {''})
+            save_method {str} -- The method to save serialize model, specific output, etc. (default: {"pickle"})
+        """
+        # TODO: Finish the save_method parameters
         time_stamp = self.time_stamp
         time_stamp = self.time_stamp + "_" + run_flag
         save_path = os.path.join(save_path, time_stamp)
@@ -666,8 +678,8 @@ class ASEP:
     def fetch_models(self):
         """Use specific model to predict new dataset"""
         if self.model_pool is None:
-            print("Please train a model first.", file=sys.stderr)
-            sys.exit(1)
+            print("Please train a model first.", file=STDE)
+            EXIT(1)
         else:
             return [copy.deepcopy(m.steps[-1][-1]) for m in self.model_pool]
 

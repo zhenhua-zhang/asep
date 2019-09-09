@@ -4,25 +4,14 @@
 
 import numpy
 from imblearn.ensemble import BalancedRandomForestClassifier
-from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier,
-                              RandomForestClassifier)
+
+from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier)
 from sklearn.metrics import accuracy_score, make_scorer, precision_score
 from sklearn.model_selection import StratifiedKFold
 
 
 class Config:
     """configs module for the ASEPredictor
-
-    Attributes:
-        estimators_list (list): required, no default
-            A list of 2D-tuple, where tuple is (NAME, sklearn_estimator)
-        optim_params (dict): options, default dict()
-            A `dict` form built-in `collections` module
-
-    Methods:
-        get_configs(self):
-        dump_configs(self, fn=None): dump configurations into a pickle file
-        load_configs(self, fn=None):
 
     Examples:
         >>> from config import Config
