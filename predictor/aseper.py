@@ -120,6 +120,7 @@ def train(args):
     drop_cols = args.drop_cols
     min_group_size = args.min_group_size
     max_group_size = args.max_group_size
+    max_na_ratio = args.max_na_ratio
     _mask_as = args.mask_as
     mask_out = args.mask_out
     response_col = args.response_col
@@ -139,7 +140,7 @@ def train(args):
         limit=first_k_rows, response=response_col, drop_cols=drop_cols,
         outer_cvs=outer_cvs, nested_cv=nested_cv, with_lc=with_lc,
         lc_space_size=learning_curve_space_size, lc_n_jobs=learning_curve_n_jobs,
-        lc_cvs=learning_curve_cvs,
+        lc_cvs=learning_curve_cvs, max_na_ratio=max_na_ratio
     )
 
     run_flag = args.run_flag

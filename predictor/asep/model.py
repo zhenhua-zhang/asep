@@ -101,7 +101,8 @@ class ASEP:
     @timmer
     def trainer(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
                 biclass_=True, outer_cvs=6, mings=2, maxgs=None, with_lc=False,
-                lc_space_size=10, lc_n_jobs=5, lc_cvs=5, nested_cv=False):
+                lc_space_size=10, lc_n_jobs=5, lc_cvs=5, nested_cv=False,
+                max_na_ratio=0.5):
         """Execute a pre-designed construct pipeline"""
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
@@ -119,7 +120,7 @@ class ASEP:
             self.raw_dataframe, self.work_dataframe,
             self.x_matrix, self.y_vector
         ) = self.preprocessing(
-            self.input_file_name, limit, gs_mask, mask, drop_cols, response,
+            self.input_file_name, limit, gs_mask, mask, drop_cols, response, max_na_ratio
         )
 
         self.setup_pipeline(self.estimators_list, biclass=biclass_)
@@ -141,15 +142,16 @@ class ASEP:
 
     @timmer
     def preprocessing(self, file_name, limit=None, gs_mask=None, mask=None,
-                      drop_cols=None, response="bb_ASE"):
+                      drop_cols=None, response="bb_ASE", max_na_ratio=0.5):
         """Preprocessing input data set"""
         if mask:
             pass
         raw_dataframe = self.read_file(file_name, limit)
         dataframe = self.setup_work_dataframe(raw_dataframe)
         dataframe = self.slice_dataframe(dataframe, mask=gs_mask, remove=False)
-        dataframe = self.simple_imputer(dataframe)
         dataframe = self.slice_dataframe(dataframe, cols=drop_cols)
+        dataframe = self.remove_high_na_features(dataframe, max_na_ratio)
+        dataframe = self.simple_imputer(dataframe)
         dataframe[response] = dataframe[response].apply(abs)
         dataframe = self.label_encoder(dataframe)
         x_matrix, y_vector = self.setup_xy(dataframe, y_col=response)
@@ -219,6 +221,21 @@ class ASEP:
             dataframe = do_mask(dataframe, mask=mask, remove=remove)
 
         return dataframe
+
+    def remove_high_na_features(self, dataframe, max_na_ratio=0.5):
+        """Remove features with high NA ratio"""
+        na_count_table = dataframe.isna().sum()
+        nr_rows, _ = dataframe.shape
+        na_freq_table = na_count_table / float(nr_rows)
+        _dropped_cols = na_freq_table.loc[na_freq_table <= max_na_ratio].index
+
+        if isinstance(self.dropped_cols, list):
+            self.dropped_cols.extend(_dropped_cols)
+        else:
+            self.dropped_cols = _dropped_cols
+        dataframe = dataframe.loc[:, na_freq_table <= max_na_ratio]
+        return dataframe
+
 
     @staticmethod
     def setup_xy(work_dataframe, x_cols=None, y_col=None, cg_features=None):

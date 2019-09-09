@@ -16,7 +16,7 @@ train: # Configs for `train` subcommand
     mask_out: null
     min_group_size: 2
     max_group_size: 1.0E+5  # When using scientific notation, do NOT foget the decimal
-    max_na_ratio: 0.5
+    max_na_ratio: 0.6
 
 ## Which columns should be abundant manually: ("pLI_score", "gnomAD_AF", "EncExp", "GerpN")
     drop_cols: ["bb_p", "bb_p_adj", "bn_ASE", "bn_p", "bn_p_adj", "group_size", "log2FC", "Chrom", "Pos", "Ref", "Alt", "CCDS", "Exon", "FeatureID", "GeneID", "GeneName", "Intron", "motifEName"]
