@@ -1,9 +1,11 @@
 import sys
-import shap
 import pickle
+
+from sys import stderr as STDE
+
+import shap
 import matplotlib.pyplot as plt
 
-sys.path.append("/home/umcg-zzhang/Documents/git/asep/predictor/")
 from asep.model import ASEP
 
 # Expected features
@@ -27,16 +29,16 @@ my_x_matrix = my_object.x_matrix.loc[:first_k_rows, ]
 my_model = my_object.fetch_models()[0]
 plt.clf()  # Clean figures created in model
 
-print("Creating explainer ...", file=sys.stderr)
+print("Creating explainer ...", file=STDE)
 explainer = shap.TreeExplainer(my_model)
 
-print("Creating shap values ...", file=sys.stderr)
+print("Creating shap values ...", file=STDE)
 shap_values = explainer.shap_values(my_x_matrix)
 
 with open("shap_values.pkl", 'wb') as pkl_opt:
     pickle.dump(shap_values, pkl_opt)
 
-print("Creating dots summary plot ...", file=sys.stderr)
+print("Creating dots summary plot ...", file=STDE)
 shap.summary_plot(shap_values, my_x_matrix, plot_type='dot', show=False)
 current_fig = plt.gcf()
 current_fig.set_figheight(height)
@@ -46,7 +48,7 @@ plt.savefig("summary_plot_dots.pdf")
 plt.savefig("summary_plot_dots.png")
 plt.clf()
 
-print("Creating violin summary plot ...", file=sys.stderr)
+print("Creating violin summary plot ...", file=STDE)
 shap.summary_plot(shap_values, my_x_matrix, plot_type="violin", show=False)
 current_fig = plt.gcf()
 current_fig.set_figheight(height)
@@ -56,7 +58,7 @@ plt.savefig("summary_plot_violin.pdf")
 plt.savefig("summary_plot_violin.png")
 plt.clf()
 
-print("Creating bar summary plot ...", file=sys.stderr)
+print("Creating bar summary plot ...", file=STDE)
 shap.summary_plot(shap_values, my_x_matrix, plot_type='bar', show=False)
 current_fig = plt.gcf()
 current_fig.set_figheight(height)
