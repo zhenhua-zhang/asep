@@ -14,4 +14,4 @@ imbalanced-learn == 0.4.0
 joblib == 0.12.5
 cycler == 0.10.0
 kiwisolver == 1.0.1
-PyYMAL == 3.12
+PyYAML == 3.12
