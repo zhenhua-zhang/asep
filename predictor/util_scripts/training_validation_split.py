@@ -5,8 +5,11 @@
 import os
 import sys
 import copy
+
 from optparse import OptionParser
 from optparse import OptionGroup
+
+import numpy
 import pandas
 
 def option_parser():

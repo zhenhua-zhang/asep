@@ -8,18 +8,23 @@
 # License    : MIT
 #
 
+#SBATCH --time=0:3:0
+#SBATCH --output=%j-%u-transform_expression_abundance_into_binary_sbatch_v0.0.2.log
+#SBATCH --job-name=teaibs
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=10G
+# module load R/3.3.3-foss-2015b
+# Rscript  transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
+
 rm(list = ls())
 
 library(dplyr)
 
-#
 # Customized paste function
-#
 ppaste <- function(...){ paste(..., sep = "/") }
 
-#
 # Log-likelihood function under Binomial distritbution
-#
 bn_llik <- function(p, alts, refs) {
   totals <- alts + refs
   r <- -sum(lchoose(totals, alts) + alts * log(p) + refs * log(1 - p))
@@ -33,9 +38,7 @@ bn_llik <- function(p, alts, refs) {
   }
 }
 
-#
 # Likelihood ratio test under binomial likelihood
-#
 bn_lrt <- function(alt_counts, ref_counts) {
 
   nul_p <- 0.5
@@ -66,9 +69,7 @@ bn_lrt <- function(alt_counts, ref_counts) {
   return(r)
 }
 
-#
 # Log-likelihood function under Beta-Binomial distribution
-#
 bb_llik <- function(p_od, alts, refs){
   alts_len <- length(alts)
   refs_len <- length(refs)
@@ -107,9 +108,7 @@ bb_llik <- function(p_od, alts, refs){
   }
 }
 
-#
 # Likelihood ratio test under Beta-Binomial distribution
-#
 bb_lrt <- function(alt_counts, ref_counts){
   alts_len <- length(alt_counts)
   refs_len <- length(ref_counts)
@@ -164,26 +163,30 @@ bb_lrt <- function(alt_counts, ref_counts){
 }
 
 
-trans_into_bin <- function(rtb, cr, pv = 0.05, min_depth = 5){
+trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
   cat("FILTER: BY refCountsBios and altCountsBios ...\n")
   gp <- rtb %>% 
     filter(
-    refCountsBios >= min_depth 
-    & altCountsBios >= min_depth 
-    & refCountsBios != altCountsBios
-  )
+    (refCountsBios >= min_dep_per)
+    & (altCountsBios >= min_dep_per)
+    & (refCountsBios != altCountsBios)
+    & (refCountsBios + altCountsBios >= min_dep)
+    & (!is.na(GeneID))
+    & (!is.na(FeatureID))
+    & (!is.na(GeneName))
+  ) 
 
-  cat("MUTATE: ADD binom_p, group_size, and binom_p_adj ...\n")
+  cat("MUTATE: ADD bn_p, bb_p, group_size, and log2FC ...\n")
   gp <- gp %>%
-    group_by(chr, pos, ref, alt) %>%
+    group_by(Chrom, Pos, Ref, Alt, GeneID) %>%
     mutate(
       log2FC = log2(sum(altCountsBios) / sum(refCountsBios)),
 	  bn_p = bn_lrt(altCountsBios, refCountsBios)$p_value, 
 	  bb_p = bb_lrt(altCountsBios, refCountsBios)$p_value,
-	  group_size = length(log2FC)
+	  group_size = n_distinct(sampleBios)
     )
 
-  cat("MUTATE: ADD binom_p_adj, ASE ...\n")
+  cat("MUTATE: ADD bn_p_adj, bn_ASE, bb_p_adj, bb_ASE ...\n")
   gp <- gp %>%
     ungroup() %>%
     mutate(
@@ -192,52 +195,38 @@ trans_into_bin <- function(rtb, cr, pv = 0.05, min_depth = 5){
       bn_ASE = ifelse(bn_p_adj < pv, ifelse(log2FC < 0, -1, 1), 0),
       bb_ASE = ifelse(bb_p_adj < pv, ifelse(log2FC < 0, -1, 1), 0)
     ) %>%
-    select(rn) %>%
-    arrange(chr, pos, ref, alt) %>%
+    select(rn)
+
+  cat("ARRANGE: Filter ...\n")
+  gp <- gp %>%
+    arrange(Chrom, Pos, Ref, Alt) %>%
     distinct() %>%
     as.data.frame()
 
   return(gp)
 }
 
-#
 # Deal with input and output
-#
-hmd <- path.expand("~")
-pjd <- ppaste(hmd, "Documents", "projects", "ASEPrediction")
-opd <- ppaste(pjd, "training", "outputs", "biosGavinOverlapCov10")
-ipd <- ppaste(pjd, "training", "outputs", "biosGavinOverlapCov10")
-
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) == 0){
-  ipf <- ppaste(ipd, "biosGavinOverlapCov10Anno.tsv")
-  opf <- ppaste(opd, "biosGavinOlCv10AntUfltCstBin.tsv")
-} else if(length(args) == 1){
-  ipf <- args[1]
-  opf <- ppaste(opd, "biosGavinOlCv10AntUfltCstBin.tsv")
-} else if(length(args) == 2){
+if(length(args) == 2){
   ipf <- args[1]
   opf <- args[2]
+} else {
+  stop("Wrong number of arguments. Require 2...\n")
 }
 
-#
 # Deal with `tar` compressed files
-#
 if (endsWith(ipf, '.tar.gz') || endsWith(ipf, '.tgz')){ ipf <- untar(ipf) }
 rtb <- read.csv(ipf, header = TRUE, sep = "\t")
 rn <- c(
-  colnames(rtb)[1:117], "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj",
+  colnames(rtb)[1:107], "log2FC", "bn_p", "bn_p_adj", "bb_p", "bb_p_adj",
   "group_size", "bn_ASE", "bb_ASE"
 )
 
-#
 # Calculate
-#
 odf <- trans_into_bin(rtb, rn)
-cat(dim(odf[which(abs(odf$bn_ASE)==1), ]), " in bn_ASE(1, -1)\n")
-cat(dim(odf[which(abs(odf$bb_ASE)==1), ]), " in bb_ASE(1, -1)\n")
+# cat(dim(odf[which(abs(odf$bn_ASE)==1), ]), " in bn_ASE(1, -1)\n")
+# cat(dim(odf[which(abs(odf$bb_ASE)==1), ]), " in bb_ASE(1, -1)\n")
 
-#
 # Dump out results
-#
 write.table(odf, file = opf, quote = FALSE, sep = "\t", row.names = FALSE)

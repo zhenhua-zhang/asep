@@ -1,9 +1,3 @@
-# Ignore all ipython notebook checkpoints directories
-**/.ipynb_checkpoints/
-
-# Ignore all rope project directories
-**/.ropeproject/
-
 # Ignore all python cache directories
 **/__pycache__/
 
@@ -11,35 +5,27 @@
 **/*.bai
 **/*.bam
 **/*.bed
+**/*.docx
 **/*.fa
 **/*.fai
-**/*.png
-**/*.sam
-**/*.tsv
-**/*.tbi
-**/*.vcf
-**/*.docx
 **/*.html
+**/*.png
+**/*.pyc
+**/*.sam
+**/*.tbi
+**/*.tsv
+**/*.vcf
+**/*.pdf
 
 # Ignore all starting with _
-**/_*
-
-# Ignore all backup dirs
-**/backup
-
-# Ignore pycharm project directory
-.idea/
-
-# Ignore Python virtual environment files
-_asep_env
-
-# Ignore archived files
 _archived
+_asep_env
+_notes
+_syntax_test
 
-# Ignore all syntax test files
-_syntax_test/
+# Ignore some hidden files or directories
+.pylintrc
+.vscode/
 
-# Misc
-_notes.md
-_explore_log2FC
-**/2019*
+# Ignore rsyncMe
+.rbcsIgnore
