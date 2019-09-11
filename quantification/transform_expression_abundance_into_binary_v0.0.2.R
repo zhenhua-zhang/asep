@@ -1,8 +1,8 @@
 #!/usr/bin/env Rscript
 #
 # File Name  : transform_log2fc_into_binary_by_ttest.R
-# Author     : zhzhang
-# E-mail     : zhzhang2015@sina.com
+# Author     : Zhenhua Zhang
+# E-mail     : zhenhua.zhang217@gmail.com
 # Created on : Fri 25 Jan 2019 10:51:30 AM CET
 # Version    : v0.0.2
 # License    : MIT
@@ -17,6 +17,9 @@
 # module load R/3.3.3-foss-2015b
 # Rscript  transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
 
+# TODO: 1. Using fread() to speed up it read.csv()
+# TODO: 2. Add more comments to help the coming maintenances
+
 rm(list = ls())
 
 library(dplyr)
@@ -24,7 +27,7 @@ library(dplyr)
 # Customized paste function
 ppaste <- function(...){ paste(..., sep = "/") }
 
-# Log-likelihood function under Binomial distritbution
+# Log-likelihood function under Binomial distribution
 bn_llik <- function(p, alts, refs) {
   totals <- alts + refs
   r <- -sum(lchoose(totals, alts) + alts * log(p) + refs * log(1 - p))
