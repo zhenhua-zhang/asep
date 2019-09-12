@@ -111,16 +111,17 @@ def main():
         record_string = "\n".join(record_list) + "\n"
         record_string = set(record_string.split("\n"))
         all_record_string = all_record_string.union(record_string)
-        record_string = "\n".join(record_string)
+        record_string = "\n".join(sorted(record_string, key=lambda x: x.split("\t")[0]))
+
         if split_output:
             output_file = input_file.replace(".txt", ".vcf")
             with open(output_file, "w") as opfh:
                 opfh.write(record_string)
 
     if not split_output:
-        all_record_string = "\n".join(all_record_string)
+        all_record_string = "\n".join(sorted(all_record_string, key=lambda x: x.split("\t")[0]))
         with open(output_file, "a") as opfh:
-            opfh.write(record_string)
+            opfh.write(all_record_string)
 
 
 def expand_variants_to_vcf_record(variants: str):
@@ -140,37 +141,37 @@ def my_filter(line, **kwargs):
 
     # TODO: 1. contig could be chr1, but here only take integer in account.
     # TODO: 2. without consideration of moultiple variants for the position check.
-    because = lambda x: print("because: {}".format(x))
+    # because = lambda x: print("because: {}".format(x))
     if "contigs" in kwargs:
         if 0 not in kwargs["contigs"]:
             if contig not in kwargs["contigs"]:
-                because("contigs")
+                # because("contigs")
                 return False
 
         if "start" in kwargs:
-            because("start")
+            # because("start")
             if start < kwargs["start"]:
                 return False
 
         if "stop" in kwargs:
-            because("stop")
+            # because("stop")
             if stop > kwargs["stop"]:
                 return False
 
     if "min_respec_counts" in kwargs:
         min_respec_counts = kwargs["min_respec_counts"]
         if a_counts <= min_respec_counts or b_counts <= min_respec_counts:
-            because("min_respec_counts")
+            # because("min_respec_counts")
             return False
 
     if "min_total_counts" in kwargs:
         if total_counts < kwargs["min_total_counts"]:
-            because("min_total_counts")
+            # because("min_total_counts")
             return False
 
     if "max_haplo_maf" in kwargs:
         if max_haplo_maf < kwargs["max_haplo_maf"]:
-            because("min_haplo_maf")
+            # because("min_haplo_maf")
             return False
 
     return True
