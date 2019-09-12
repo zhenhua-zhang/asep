@@ -168,7 +168,7 @@ bb_lrt <- function(alt_counts, ref_counts){
 
 trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
   cat("FILTER: BY refCountsBios and altCountsBios ...\n")
-  gp <- rtb %>% 
+  gp <- rtb %>%
     filter(
     (refCountsBios >= min_dep_per)
     & (altCountsBios >= min_dep_per)
@@ -177,16 +177,16 @@ trans_into_bin <- function(rtb, cr, pv = 0.05, min_dep = 10, min_dep_per = 3){
     & (!is.na(GeneID))
     & (!is.na(FeatureID))
     & (!is.na(GeneName))
-  ) 
+  )
 
   cat("MUTATE: ADD bn_p, bb_p, group_size, and log2FC ...\n")
   gp <- gp %>%
     group_by(Chrom, Pos, Ref, Alt, GeneID) %>%
     mutate(
       log2FC = log2(sum(altCountsBios) / sum(refCountsBios)),
-	  bn_p = bn_lrt(altCountsBios, refCountsBios)$p_value, 
-	  bb_p = bb_lrt(altCountsBios, refCountsBios)$p_value,
-	  group_size = n_distinct(sampleBios)
+    bn_p = bn_lrt(altCountsBios, refCountsBios)$p_value,
+    bb_p = bb_lrt(altCountsBios, refCountsBios)$p_value,
+    group_size = n_distinct(sampleBios)
     )
 
   cat("MUTATE: ADD bn_p_adj, bn_ASE, bb_p_adj, bb_ASE ...\n")
