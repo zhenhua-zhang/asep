@@ -115,10 +115,8 @@ $$
 $$
 while let $\rho=\frac{1}{\alpha+\beta+1}$, then the variance is
 $$
-\begin{align}
-\sigma^2&=\frac{n\alpha\beta(\alpha+\beta+n)}{(\alpha+\beta)^2(\alpha+\beta+1)} \\
-  &=n\pi(1-\pi)[1+(n-1)\rho]
-\end{align}
+\sigma^2 =\frac{n\alpha\beta(\alpha+\beta+n)}{(\alpha+\beta)^2(\alpha+\beta+1)} \\
+  =n\pi(1-\pi)[1+(n-1)\rho]
 $$
 The $\pi$ here is the mean probability of success in Bernoulli trials, while the
 $\rho$ is the over-dispersion of the distribution.
@@ -129,19 +127,15 @@ hypothesis.
 First, we need to know the relation among $\pi, \rho, \alpha, \beta$.
 Let $\gamma=\frac{(1-\rho)}{\rho}$
 $$
-\begin{align}
-\alpha &=\frac{\pi(1-\rho)}{\rho} \\
-  &=\gamma\pi \\
-\beta &=\frac{(1-\pi)(1-\rho)}{\rho} \\
-  &=\gamma(1-\pi)
-\end{align}
+\alpha =\frac{\pi(1-\rho)}{\rho} \\
+  = \gamma\pi \\
+\beta =\frac{(1-\pi)(1-\rho)}{\rho} \\
+  =\gamma(1-\pi)
 $$
 Correspondingly,
 $$
-\begin{align}
-\pi &=\frac{\alpha}{\alpha+\beta} \\
-\gamma &= \alpha+\beta
-\end{align}
+\pi =\frac{\alpha}{\alpha+\beta} \\
+\gamma = \alpha+\beta
 $$
 
 Then, we use $\pi, \gamma$ as the variables of our likelihood function, where
@@ -269,3 +263,15 @@ bb_lrt <- function(alt_counts, ref_counts){
 
 One of goals in this studies is to connect the DNA annotations and ASE effects
 by machine learning.
+
+## Are predicting ASE or othe thing?
+1. 如果把所有的跟表达量相关的数据去掉会有什么结果？
+   Features related to expression: cHmm*, EncExp
+   To remove the influence of EncExp which representes the expression level for each allele, I plan
+   to compare the diference of expression between loci with ASE effects and loci without ASE effects.
+   However, theoretically, there a batch effect between the EncExp which is "Maximum ENCODE
+   expression value" from ENCODE and exon-level expression data from BIOS.
+
+2. 比较ASE位点的平均表达量和非ASE位点的平均表达量？
+   我们的数据显示ASE跟表达量和AF相关，这是合理的。因为ASE是应该受到选择。
+   Useless features: Chrom, Pos, Type, Length, oAA, nAA, GeneID, FeatureID, GeneName, CCDS, Intron, Exon,
