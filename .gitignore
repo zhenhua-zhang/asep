@@ -25,7 +25,12 @@ _syntax_test
 
 # Ignore some hidden files or directories
 .pylintrc
-.vscode/
 
 # Ignore rsyncMe
 .rbcsIgnore
+
+# Remove the .vscode
+.vscode
+
+# Remove the .idea
+.idea
