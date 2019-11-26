@@ -130,7 +130,7 @@ module load Python/3.5.1-foss-2015b
 module list
 echo "Current directory: $(pwd)"
 
-export OPENBLAS_NUM_THREADS=2  # conflicts of threads usage between OPENBLAS and n_jobs in RandomForestClassifier
+export OPENBLAS_NUM_THREADS=2  # conflicts of threads usage between OPENBLAS and n_jobs in GradientBoostingTree
 source /groups/umcg-gcc/tmp03/umcg-zzhang/git/asep/_asep_env/bin/activate
 python /groups/umcg-gcc/tmp03/umcg-zzhang/git/asep/predictor/asep.py \
  	--run-flag brfc_ini50_oc10_mings5 \

@@ -22,6 +22,13 @@ def cli_parser():
         parser: ArgumentParser -- An intance of ArgumentParser()
     """
 
+    default_discarded_cols = [
+        "bb_p", "bb_p_adj", "bn_ASE", "bn_p", "bn_p_adj", "group_size", "log2FC",
+        "Chrom", "Pos", "Annotype", "ConsScore", "ConsDetail",
+        "motifEName", "FeatureID", "GeneID", "GeneName", "CCDS", "Intron",
+        "Exon"
+    ]
+
     parser = ArgumentParser()
     _group = parser.add_argument_group("Global") # Global-wide configs
     _group.add_argument("--run-flag", dest="run_flag", default="new_task", help="Flags for current run. The flag will be added to the name of the output dir. Default: new_task")
@@ -41,7 +48,7 @@ def cli_parser():
     _group.add_argument("--min-group-size", dest="min_group_size", default=2, type=lambda x: int(x) > 1 and int(x) or parser.error("--min-group-size must be >= 2"), help="The minimum individuals bearing the same variant(>=2). Default: 2")
     _group.add_argument("--max-group-size", dest="max_group_size", default=1.0E5, type=lambda x: int(x) <= 1e4 and int(x) or parser.error("--max-group-size must be <= 10,000"), help="The maximum number of individuals bearing the same variant (<= 10,000). Default: None")
     _group.add_argument("--max-na-ratio", dest="max_na_ratio", default=0.6, type=float, help="The maximum ratio of NA in each feature, otherwise, the feature will be abundant")
-    _group.add_argument("--drop-cols", dest="drop_cols", default=['bb_p', 'bb_p_adj', 'bn_ASE', 'bn_p', 'bn_p_adj', 'group_size', 'log2FC', 'Chrom', 'Pos', 'CCDS', 'Exon', 'FeatureID', 'GeneID', 'GeneName', 'Intron', 'motifEName'], nargs='+', help="The columns will be dropped. Seperated by semi-colon and quote them by ','. if there are more than one columns. Default: None")
+    _group.add_argument("--drop-cols", dest="drop_cols", default=default_discarded_cols, nargs='+', help="The columns will be dropped. Seperated by semi-colon and quote them by ','. if there are more than one columns. Default: None")
     _group.add_argument("--response-col", dest="response_col", default='bb_ASE', help="The column name of response variable or target variable. Default: bb_ASE")
 
     _group = train_argparser.add_argument_group("Configuration") # Arguments for configuration
