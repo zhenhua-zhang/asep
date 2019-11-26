@@ -21,6 +21,8 @@ from sklearn.multiclass import OneVsOneClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import roc_auc_score, roc_curve
 
+import prince
+
 from .utils import format_print, set_sed, timmer
 
 try:
@@ -114,6 +116,7 @@ class ASEP:
         self.mask_query = mask
         self.dropped_cols = drop_cols
         self.raw_dataframe, self.work_dataframe, self.x_matrix, self.y_vector = self.preprocessing(self.input_file_name, limit, gs_mask, mask, drop_cols, response, max_na_ratio)
+        self.factor_analysis_decomp()
         self.setup_pipeline(self.estimators_list, biclass=biclass_)
         self.outer_validation(cvs=outer_cvs, nested_cv=nested_cv)
         self.receiver_operating_characteristic_curve = self.draw_roc_curve_cv(self.area_under_curve_pool)
@@ -218,7 +221,8 @@ class ASEP:
     def setup_xy(work_dataframe, x_cols=None, y_col=None, cg_features=None):
         """Set up predictor variables and target variables. """
         if cg_features is None:
-            cg_features = ["ref_encoded", "alt_encoded", "oAA_encoded", "nAA_encoded", "motifEHIPos", "CCDS_encoded", "Exon_encoded", "gene_encoded",
+            cg_features = [
+                "ref_encoded", "alt_encoded", "oAA_encoded", "nAA_encoded", "motifEHIPos", "CCDS_encoded", "Exon_encoded", "gene_encoded",
                 "Type_encoded", "group_encoded", "Segway_encoded", "effect_encoded", "impact_encoded", "Intron_encoded", "Domain_encoded",
                 "SIFTcat_encoded", "AnnoType_encoded", "ConsDetail_encoded", "motifEName_encoded", "Dst2SplType_encoded", "Consequence_encoded", "PolyPhenCat_encoded",
             ]
@@ -320,6 +324,19 @@ class ASEP:
             dataframe.replace(target, defaults, inplace=True)
 
         return dataframe
+
+    def factor_analysis_decomp(self):
+        """Do a factor analysis to find latent variables.
+        """
+        famd = prince.FAMD(
+            n_components=2,
+            n_iter=3,
+            copy=True,
+            check_input=True,
+            engine="auto",
+        )
+        famd = famd.fit(self.x_matrix)
+        print(famd.row_coordinates)
 
     def setup_pipeline(self, estimator=None, biclass=True):
         """Setup a training pipeline """
@@ -510,7 +527,6 @@ class ASEP:
             save_method {str} -- The method to save serialize model, specific output, etc. (default: {"pickle"})
         """
         # TODO: Finish the save_method parameters
-        time_stamp = self.time_stamp
         time_stamp = self.time_stamp + "_" + run_flag
         save_path = os.path.join(save_path, time_stamp)
 

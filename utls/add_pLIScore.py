@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import math
 
 pli_score_file = sys.argv[1]  # pLI score file from ExAC
 training_set_file = sys.argv[2]
@@ -21,7 +20,6 @@ with open(pli_score_file, 'r') as pli_score_file_handle, \
     ]
 
     with open("output.tsv", 'w') as output_file_handler:
-        for line_list in (training_set_added_pLI_list):
+        for line_list in training_set_added_pLI_list:
             line = "\t".join(line_list)
             output_file_handler.writelines(line)
-

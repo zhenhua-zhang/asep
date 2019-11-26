@@ -10,9 +10,9 @@ import pickle
 
 from argparse import ArgumentParser
 
-from asep.config import Config
-from asep.model import ASEP
-from asep.utils import config_parser, my_debug, print_args, print_flag, DEBUG, print_header, NameSpace, dump_default_config_to_yaml
+from .asep.config import Config
+from .asep.model import ASEP
+from .asep.utils import *
 
 
 def cli_parser():
@@ -41,7 +41,7 @@ def cli_parser():
     _group.add_argument("--min-group-size", dest="min_group_size", default=2, type=lambda x: int(x) > 1 and int(x) or parser.error("--min-group-size must be >= 2"), help="The minimum individuals bearing the same variant(>=2). Default: 2")
     _group.add_argument("--max-group-size", dest="max_group_size", default=1.0E5, type=lambda x: int(x) <= 1e4 and int(x) or parser.error("--max-group-size must be <= 10,000"), help="The maximum number of individuals bearing the same variant (<= 10,000). Default: None")
     _group.add_argument("--max-na-ratio", dest="max_na_ratio", default=0.6, type=float, help="The maximum ratio of NA in each feature, otherwise, the feature will be abundant")
-    _group.add_argument("--drop-cols", dest="drop_cols", default=['bb_p', 'bb_p_adj', 'bn_ASE', 'bn_p', 'bn_p_adj', 'group_size', 'log2FC', 'Chrom', 'Pos', 'Ref', 'Alt', 'CCDS', 'Exon', 'FeatureID', 'GeneID', 'GeneName', 'Intron', 'motifEName'], nargs='+', help="The columns will be dropped. Seperated by semi-colon and quote them by ','. if there are more than one columns. Default: None")
+    _group.add_argument("--drop-cols", dest="drop_cols", default=['bb_p', 'bb_p_adj', 'bn_ASE', 'bn_p', 'bn_p_adj', 'group_size', 'log2FC', 'Chrom', 'Pos', 'CCDS', 'Exon', 'FeatureID', 'GeneID', 'GeneName', 'Intron', 'motifEName'], nargs='+', help="The columns will be dropped. Seperated by semi-colon and quote them by ','. if there are more than one columns. Default: None")
     _group.add_argument("--response-col", dest="response_col", default='bb_ASE', help="The column name of response variable or target variable. Default: bb_ASE")
 
     _group = train_argparser.add_argument_group("Configuration") # Arguments for configuration
@@ -133,7 +133,7 @@ def train(args):
     learning_curve_n_jobs = args.learning_curve_n_jobs
     learning_curve_cvs = args.learning_curve_cvs
 
-    # FIXME: Nonused `mask` argument
+    # TODO: Nonused `mask` argument
     asep.trainer(
         mask=mask_out, mings=min_group_size, maxgs=max_group_size,
         limit=first_k_rows, response=response_col, drop_cols=drop_cols,
@@ -187,7 +187,6 @@ def configurate(args):
         print("Not implemented yet")
     else:
         dump_default_config_to_yaml(output_file)
-
 
 
 def main():
