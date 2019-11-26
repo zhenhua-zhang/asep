@@ -275,6 +275,7 @@ by machine learning.
 2. 比较ASE位点的平均表达量和非ASE位点的平均表达量？
    我们的数据显示ASE跟表达量和AF相关，这是合理的。因为ASE是应该受到选择。
    Useless features: Chrom, Pos, Type, Length, oAA, nAA, GeneID, FeatureID, GeneName, CCDS, Intron, Exon,
+<<<<<<< HEAD
 
 
 ## How to improve the model?
@@ -284,3 +285,5 @@ by machine learning.
   Principal componet analysis (PCA) when variables are quantitative.
   Multiple correspondence analysis (MCA) when variables are qualitative.
   Multiple factor analysis (MAF) when variables are the mixture of the quantitative and the qualitative.
+=======
+>>>>>>> ebb62347c8acc13fb1f5d4800cc78729c8073262
