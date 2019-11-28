@@ -12,6 +12,10 @@ parser <- add_option(
     dest = "input_file", help = "The input file"
 )
 parser <- add_option(
+    parser, c("-p", "--draw-pic"), action = "store_true", type = "boolean",
+    dest = "draw_pic", help = "Whether draw pics."
+)
+parser <- add_option(
     parser, c("-o", "--output-file"), action = "store", type = "character",
     dest = "output_file", help = "The output file"
 )
@@ -22,6 +26,11 @@ opts <- parsed_args$options
 
 input_file <- opts$input_file
 output_file <- opts$output_file
+draw_pic <- opts$draw_pic
+
+if (is.null(draw_pic)) {
+  draw_pic <- FALSE
+}
 
 # variant_by_feature_data_frame
 if (is.null(input_file)) {
@@ -81,7 +90,7 @@ quanti_features <- c(
 
 # variant_by_feature_data_frame_quantitative
 vbfdf_quanti <- vbfdf[, quanti_features]
-vbfdf_quanti[, "dbscSNV-rf_score"] <- as.numeric(vbfdf_quanti[, "dbscSNV-rf_score"])
+vbfdf_quanti[, "dbscSNV-rf_score"] <- as.double(vbfdf_quanti[, "dbscSNV-rf_score"])
 
 vbfdf_quali[is.na(vbfdf_quali)] <- 0
 vbfdf_quanti[is.na(vbfdf_quanti)] <- 0
@@ -90,62 +99,58 @@ pcamix_res <- PCAmix(
     vbfdf_quanti, vbfdf_quali, ndim = 80, rename.level = TRUE, graph = FALSE
 )
 
-# summary(pcamix_res)
-plot(1:length(pcamix_res$eig[, "Cumulative"]), pcamix_res$eig[, "Cumulative"])
+summary(pcamix_res)
 
-png("PCAmixdata_allVariables.png", width = 1920, height = 1920)
-plot(
-    pcamix_res,
-	choice = "sqload",
-	coloring.var = TRUE,
-	leg = TRUE,
-	posleg = "topright",
-	main = "All variables",
-	lim.cos2.plot = 0.01
-)
-dev.off()
+if (draw_pic == TRUE) {
+    png("PCAmixdata_allVariables.png", width = 1920, height = 1920)
+    plot(
+      pcamix_res, choice = "sqload", coloring.var = TRUE, leg = TRUE,
+      posleg = "topright", main = "All variables", lim.cos2.plot = 0.01
+    )
+    dev.off()
 
-bb_ASE <- vbfdf_quali$bb_ASE
-png("PCAmixdata_ind.png", width = 1920, height = 1920)
-plot(
-    pcamix_res,
-	axes = c(1, 2),
-	choice = "ind",
-	label = FALSE,
-	coloring.ind = bb_ASE,
-	main = "Observations (ind)"
-)
-dev.off()
+    bb_ase <- vbfdf_quali$bb_ase
+    png("PCAmixdata_ind.png", width = 1920, height = 1920)
+    plot(
+      pcamix_res, axes = c(1, 2), choice = "ind", label = FALSE,
+      coloring.ind = bb_ase, main = "Observations (ind)"
+    )
+    dev.off()
+}
+
+# plot(
+#   seq_len(length(pcamix_res$eig[, "Cumulative"])),
+#   pcamix_res$eig[, "Cumulative"]
+# )
 
 # pcarot_res <- PCArot(pcamix_res, dim = 10, graph = FALSE)
 # print(pcarot_res$eig)
-# 
+
 # png("PCAmixdata_rot_cor.png", width = 1920, height = 1920)
 # plot(
 #   pcarot_res,
-# 	choice = "cor",
-# 	coloring.var = TRUE,
-# 	leg = TRUE,
-# 	main = "Numerical variables after rotation(cor)"
+#     choice = "cor",
+#     coloring.var = TRUE,
+#     leg = TRUE,
+#     main = "Numerical variables after rotation(cor)"
 # )
 # dev.off()
-# 
+
 # png("PCAmixdata_numericalVariables.png", width = 1920, height = 1920)
 # plot(
 #     pcamix_res,
-# 	choice = "cor",
-# 	lim.cos2.plot = 0.01,
-# 	main = "Numerical variables (cor)"
+#     choice = "cor",
+#     lim.cos2.plot = 0.01,
+#     main = "Numerical variables (cor)"
 # )
 # dev.off()
 
 # png("PCAmixdata_levels.png", width = 1920, height = 1920)
 # plot(
 #     pcamix_res,
-# 	choice = "levels",
-# 	coloring.var = TRUE,
-# 	main = "Levels (levels)",
-# 	lim.cos2.plot = 0.01
+#     choice = "levels",
+#     coloring.var = TRUE,
+#     main = "Levels (levels)",
+#     lim.cos2.plot = 0.01
 # )
 # dev.off()
-
