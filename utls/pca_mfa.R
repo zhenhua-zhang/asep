@@ -144,7 +144,7 @@ trainer <- function(dtfm, fml, tmd, cvm = "cv", cvn = 10, sample_size = 1000, se
     train_control <- trainControl(method = cvm, number = cvn, classProbs = TRUE)
 
     if (tmd == "glm") {
-        cv10_fit <- train(
+        fitted <- train(
             form = fml,
             method = "glm",
             family = "binomial",
@@ -152,7 +152,7 @@ trainer <- function(dtfm, fml, tmd, cvm = "cv", cvn = 10, sample_size = 1000, se
             trControl = train_control
         )
     } else if (tmd == "rf") {
-        cv10_fit <- train(
+        fitted <- train(
             form = fml,
             method = "rf",
             data = training_set,
@@ -160,7 +160,7 @@ trainer <- function(dtfm, fml, tmd, cvm = "cv", cvn = 10, sample_size = 1000, se
         )
     } else {
         warning("No traning method is given, using glm")
-        cv10_fit <- train(
+        fitted <- train(
             form = fml,
             method = "glm",
             family = "binomial",
@@ -171,12 +171,12 @@ trainer <- function(dtfm, fml, tmd, cvm = "cv", cvn = 10, sample_size = 1000, se
 
     # Variable importance
     cat("\n")
-    cv10_fit_varimp <- varImp(cv10_fit, scale = FALSE)
-    print(cv10_fit_varimp)
+    fitted_varimp <- varImp(fitted, scale = FALSE)
+    print(fitted_varimp)
     cat("-------------------------------------------------------------------\n\n")
 
-    pred <- predict(cv10_fit, newdata = testing_set)
-    prob <- predict(cv10_fit, newdata = testing_set, type = "prob")
+    pred <- predict(fitted, newdata = testing_set)
+    prob <- predict(fitted, newdata = testing_set, type = "prob")
 
     obs_vs_pred <- data.frame(
         obs = testing_set$bb_ASE, pred = pred, YES = prob$YES, NO = prob$NO
@@ -200,7 +200,7 @@ trainer <- function(dtfm, fml, tmd, cvm = "cv", cvn = 10, sample_size = 1000, se
     print(summary_tc)
     cat("-------------------------------------------------------------------\n\n")
 
-    return(cv10_fit)
+    return(fitted)
 }
 #>> Function to train GLM/RF on give data set
 
