@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=4:59:0
+#SBATCH --time=5:59:0
 #SBATCH --mem=15G
 #SBATCH --cpus=5
 #SBATCH --output=%j-%u-pca_mfa.log

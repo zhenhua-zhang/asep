@@ -276,14 +276,28 @@ by machine learning.
    我们的数据显示ASE跟表达量和AF相关，这是合理的。因为ASE是应该受到选择。
    Useless features: Chrom, Pos, Type, Length, oAA, nAA, GeneID, FeatureID, GeneName, CCDS, Intron, Exon,
 
-## How to improve the model?
+## How to improve the model or prove the model doesn't function?
 ### Using Multiple factor analysis
-  Using mulitple factor analysis [MFA](https://en.wikipedia.org/wiki/Multiple_factor_analysis) analysis before the training. There's an implementation of MAF in scikit-learn. The implementation is called `FactorAnalysis` in `decomposition` package.
-  1. Why using MAF?
-  Principal componet analysis (PCA) when variables are quantitative.
-  Multiple correspondence analysis (MCA) when variables are qualitative.
-  Multiple factor analysis (MAF) when variables are the mixture of the quantitative and the qualitative.
+Using mulitple factor analysis
+[MFA](https://en.wikipedia.org/wiki/Multiple_factor_analysis) analysis before
+the training. There's an implementation of MAF in scikit-learn. The
+implementation is called `FactorAnalysis` in `decomposition` package.
 
-  2. Polychoric correlation (DOSEN'T fit) is a thechnique for estimating the correlation between two theorised normally distributed continuous latent variables, from two observed ordinal variables
+1. Why using MAF?
+  Principal componet analysis (PCA) when variables are quantitative.  Multiple
+  correspondence analysis (MCA) when variables are qualitative.  Multiple factor
+  analysis (MAF) when variables are the mixture of the quantitative and the
+  qualitative.
 
-  3. `PCAmixdata` package. Implements principal component analysis, orthogonal rotation and multiple factor analysis for a mixture of quantitative and qualitative variables.
+2. Polychoric correlation (DOSEN'T fit) is a thechnique for estimating the
+   correlation between two theorised normally distributed continuous latent
+   variables, from two observed ordinal variables
+
+3. `PCAmixdata` package. Implements principal component analysis, orthogonal
+   rotation and multiple factor analysis for a mixture of quantitative and
+   qualitative variables.
+
+4. After the testing using PCAmixdata package in R, there's no improvement
+   regarding AUC (TP-FP)\: 0.78 vs 0.80. A bonus finding is: there's no
+   significant difference between prediciton rate (0.90) and no information rate
+   (0.882), in terms of accuracy.
