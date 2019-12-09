@@ -34,3 +34,6 @@ _syntax_test
 
 # Remove the .idea
 .idea
+
+# Remove the .vim
+.vim

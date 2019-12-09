@@ -20,84 +20,92 @@
 # nolint end
 
 loadings <- list(
-    "data.table", "doParallel", "PCAmixdata", "MLmetrics",
-    "optparse", "stringr", "MLeval", "caret", "dplyr", "tidyr"
+    "data.table", "PCAmixdata", "MLmetrics", "gbm", "optparse", "stringr",
+    "MLeval", "caret", "dplyr", "tidyr"
 )
 
 loaded <- lapply(loadings, library, character.only = TRUE)
 
-
-parser <- OptionParser(
-    description = "Do PCA and MAF on training data set"
-)
-
+parser <- OptionParser(description = "Do PCA and MAF on training data set")
 #<< Flags
 parser <- add_option(
-    parser, c("-p", "--draw-pic"),
-    action = "store_true", type = "boolean",
-    dest = "draw_picture", help = "Whether draw pics and save them into the disk."
+    parser, c("-p", "--draw-pcamix"),
+    action = "store_true", dest = "draw_pcamix",
+    help = "Whether draw pics and save them into the disk."
 )
 
 parser <- add_option(
     parser, c("-s", "--save-res"),
-    action = "store_true", type = "boolean",
-    dest = "save_res", help = "Whether save the PCAmix analysis results into the disk"
+    action = "store_true", dest = "save_res",
+    help = "Whether save the PCAmix analysis results into the disk"
+)
+
+parser <- add_option(
+    parser, c("--balance-train"),
+    action = "store_true", dest = "balance_train",
+    help = "Whether subsample the larger proportion data to make the training set balanced."
 )
 #>> Flags
 
 #<< Options
 parser <- add_option(
     parser, c("-i", "--input-file"),
-    action = "store", type = "character",
-    dest = "input_file", help = "The input file"
+    action = "store", type = "character", dest = "input_file",
+    help = "The input file."
 )
 
 parser <- add_option(
     parser, c("--first-n-pcs"),
-    action = "store", type = "integer", default = 3,
-    dest = "first_n_pcs", help = "Draw scatter plot of individuals using first n PCs"
+    action = "store", type = "integer", default = 3, dest = "first_n_pcs",
+    help = "Draw scatter plot of individuals using first n PCs. Default: %default"
 )
 
 parser <- add_option(
     parser, c("--first-n-dims"),
-    action = "store", type = "integer", default = 80,
-    dest = "first_n_dims", help = "How many dims will be kept for the training"
+    action = "store", type = "integer", default = 80, dest = "first_n_dims",
+    help = "How many dims will be kept for the training. Default: %default"
 )
 
 parser <- add_option(
     parser, c("--min-group-size"),
-    action = "store", type = "integer", default = 5,
-    dest = "min_group_size", help = "Minimal group size for variants to be used"
+    action = "store", type = "integer", default = 5, dest = "min_group_size",
+    help = "Minimal group size for variants to be used. Default: %default"
 )
 
 parser <- add_option(
     parser, c("--max-group-size"),
-    action = "store", type = "integer", default = 10000,
-    dest = "max_group_size", help = "Maximum group size for variants to be used"
+    action = "store", type = "integer", default = 10000, dest = "max_group_size",
+    help = "Maximum group size for variants to be used. Default: %default"
 )
 
 parser <- add_option(
     parser, c("--remove-features"),
-    action = "store", type = "character",
-    dest = "rmd_features", help = "Features excluded in the analysis, delimited by comma"
+    action = "store", type = "character", dest = "rmd_features",
+    help = "Features excluded in the analysis, delimited by comma."
 )
 
 parser <- add_option(
     parser, c("--quantitative-features"),
-    action = "store", type = "character",
-    dest = "quant_features", help = "Quantitative features, delimited by comma"
+    action = "store", type = "character", dest = "quant_features",
+    help = "Quantitative features, delimited by comma."
 )
 
 parser <- add_option(
     parser, c("--quali-features"),
-    action = "store", type = "character",
-    dest = "quali_features", help = "Qualitative features, delimited by comma"
+    action = "store", type = "character", dest = "quali_features",
+    help = "Qualitative features, delimited by comma."
 )
 
 parser <- add_option(
     parser, c("--pcamix-ndim"),
-    action = "store", type = "integer", default = 100,
-    dest = "pcamix_ndim", help = "The `ndim` parameters in PCAmix function"
+    action = "store", type = "integer", default = 100, dest = "pcamix_ndim",
+    help = "The `ndim` parameters in PCAmix function. Default: %default"
+)
+
+parser <- add_option(
+    parser, c("--random-seed"),
+    action = "store", type = "integer", default = 31415, dest = "random_seed",
+    help = "The random seed for both sampling and cross validation. Default: %default"
 )
 #>> Options
 
@@ -105,8 +113,9 @@ parsed_args <- parse_args2(parser)
 args <- parsed_args$args
 opts <- parsed_args$options
 
-save_res <- opts$save_res
-draw_picture <- opts$draw_picture
+save_res <- ifelse(is.null(opts$save_res), FALSE, opts$save_res)
+draw_pcamix <- ifelse(is.null(opts$draw_pcamix), FALSE, opts$draw_pcamix)
+balance_train <- ifelse(is.null(opts$balance_train), FALSE, opts$balance_train)
 
 input_file <- opts$input_file
 first_n_pcs <- opts$first_n_pcs
@@ -120,21 +129,14 @@ quali_features <- opts$quali_features
 quanti_features <- opts$quanti_features
 
 pcamix_ndim <- opts$pcamix_ndim
-
-if (is.null(save_res)) {
-    save_res <- FALSE
-}
-
-if (is.null(draw_picture)) {
-    draw_picture <- FALSE
-}
+random_seed <- opts$random_seed
 
 # variant_by_feature_data_frame
 if (is.null(input_file)) {
     stop("The -i/--input-file is required")
 }
 
-#<< Function to train GLM/GDM on give data set
+#<< Function to train GLM/GBM on give data set
 trainer <- function(dtfm, fml, tmd, prx, cvm = "cv", cvn = 6, sms = 1000, rsd = 31415) {
     # dtfm -> dataset for training and testing
     # fml -> formula for training
@@ -163,13 +165,10 @@ trainer <- function(dtfm, fml, tmd, prx, cvm = "cv", cvn = 6, sms = 1000, rsd = 
             form = fml, method = "glm", family = "binomial", data = training_set,
             trControl = train_control
         )
-    } else if (tmd == "gdm") {
-        clusters <- makePSOCKcluster(5)
-        registerDoParallel(clusters)
+    } else if (tmd == "gbm") {
         fitted <- train(
-            form = fml, method = "gdm", data = training_set, trControl = train_control
+            form = fml, method = "gbm", data = training_set, trControl = train_control
         )
-        stopCluster(clusters)
     } else {
         warning("No traning method is given, using glm")
         fitted <- train(
@@ -207,7 +206,7 @@ trainer <- function(dtfm, fml, tmd, prx, cvm = "cv", cvn = 6, sms = 1000, rsd = 
     print(confu_mtrx)
     cat("-------------------------------------------------------------------\n\n")
 
-    lev <- c("NonASE", "ASE")
+    lev <- c("ASE", "NonASE")
 
     summary_df <- defaultSummary(obs_vs_pred, lev = lev)
     print(summary_df)
@@ -223,7 +222,7 @@ trainer <- function(dtfm, fml, tmd, prx, cvm = "cv", cvn = 6, sms = 1000, rsd = 
 
     return(fitted)
 }
-#>> Function to train GLM/GDM on give data set
+#>> Function to train GLM/gbm on give data set
 
 #<< Function to save plots to depict the PCA + MFA transform
 plot_pcamix <- function(pm_res, first_n_dims, first_n_pcs, color_ind) {
@@ -232,7 +231,7 @@ plot_pcamix <- function(pm_res, first_n_dims, first_n_pcs, color_ind) {
     # first_n_pcs -> draw individuals plots for the first n PCs
     # coloc_ind -> a factor vector to draw color the individuals in the individuals plot
 
-    eigs <- pm_res$eigs
+    eigs <- as.data.frame(pm_res$eig)
     g <- ggplot(data = eigs) + theme_bw()
     g <- g + geom_point(aes(x = seq_len(length(eigs$Cumulative)), y = Cumulative))
     g <- g + geom_vline(xintercept = first_n_dims)
@@ -284,6 +283,7 @@ plot_pcamix <- function(pm_res, first_n_dims, first_n_pcs, color_ind) {
         main = "Levels (levels)",
         lim.cos2.plot = 0.01
     )
+    dev.off()
 
     pr_res <- PCArot(pm_res, dim = 10, graph = FALSE)
     png("PCAmixdata_rot_cor.png", width = 1920, height = 1920)
@@ -304,8 +304,8 @@ vbfdf <- fread(
     data.table = FALSE, verbose = FALSE, stringsAsFactors = FALSE
 )
 
-vbfdf <- vbfdf[vbfdf$group_size >= min_group_size, ]
-vbfdf <- vbfdf[vbfdf$group_size <= max_group_size, ]
+vbfdf <- vbfdf[vbfdf[, "group_size"] >= min_group_size, ]
+vbfdf <- vbfdf[vbfdf[, "group_size"] <= max_group_size, ]
 colnames(vbfdf) <- make.names(colnames(vbfdf))
 
 vbfdf[, "bb_ASE"] <- sapply(
@@ -319,6 +319,22 @@ vbfdf[, "bb_ASE"] <- sapply(
         }
     }
 )
+
+if (balance_train) {
+    warning("[WARN] Will do balance training!")
+    # max subsample size
+    mxsmsz <- min(table(vbfdf["bb_ASE"]))
+    smid_vec <- c()
+
+    set.seed(random_seed)
+    all_rownames <- row.names(vbfdf)
+    for (smid in unique(vbfdf[, "bb_ASE"])) {
+        smid_rownames <- all_rownames[vbfdf[, "bb_ASE"] == smid]
+            smid_vec <- c(smid_vec, sample(smid_rownames, mxsmsz))
+    }
+
+    vbfdf <- vbfdf[smid_vec, ]
+}
 
 ## removed_features
 #
@@ -344,7 +360,7 @@ vbfdf_quali <- vbfdf[, quali_features]  # variant_by_feature_data_frame_qualitat
 
 #<< quantitative_features
 # nolint start
-quanti_features <- make.names(c( "cHmmTssA", "cHmmTssAFlnk", "cHmmTxFlnk", "cHmmTx", "cHmmTxWk", "cHmmEnhG", "cHmmEnh", "cHmmZnfRpts", "cHmmHet", "cHmmTssBiv", "cHmmBivFlnk", "cHmmEnhBiv", "cHmmReprPC", "cHmmReprPCWk", "cHmmQuies", "minDistTSS", "minDistTSE", "Freq100bp", "Rare100bp", "Sngl100bp", "Freq1000bp", "Rare1000bp", "Sngl1000bp", "Freq10000bp", "Rare10000bp", "Sngl10000bp", "gnomAD_AF", "Dst2Splice", "TFBS", "TFBSPeaks", "TFBSPeaksMax", "GC", "CpG", "motifECount", "motifEScoreChng", "cDNApos", "relcDNApos", "CDSpos", "relCDSpos", "protPos", "relProtPos", "SIFTval", "PolyPhenVal", "priPhCons", "mamPhCons", "verPhCons", "priPhyloP", "mamPhyloP", "verPhyloP", "bStatistic", "targetScan", "mirSVR-Score", "mirSVR-E", "mirSVR-Aln", "GerpRS", "GerpRSpval", "GerpN", "GerpS", "EncH3K27Ac", "motifDist", "EncH3K4Me1", "EncH3K4Me3", "EncExp", "EncNucleo", "EncOCC", "EncOCCombPVal", "EncOCDNasePVal", "EncOCFairePVal", "EncOCpolIIPVal", "EncOCctcfPVal", "EncOCmycPVal", "EncOCDNaseSig", "EncOCFaireSig", "EncOCpolIISig", "EncOCctcfSig", "EncOCmycSig", "Grantham", "dbscSNV-ada_score", "tOverlapMotifs", "dbscSNV-rf_score", "Dist2Mutation", "RawScore", "PHRED", "pLI_score")) #, "exon_exp")
+quanti_features <- make.names(c( "cHmmTssA", "cHmmTssAFlnk", "cHmmTxFlnk", "cHmmTx", "cHmmTxWk", "cHmmEnhG", "cHmmEnh", "cHmmZnfRpts", "cHmmHet", "cHmmTssBiv", "cHmmBivFlnk", "cHmmEnhBiv", "cHmmReprPC", "cHmmReprPCWk", "cHmmQuies", "minDistTSS", "minDistTSE", "Freq100bp", "Rare100bp", "Sngl100bp", "Freq1000bp", "Rare1000bp", "Sngl1000bp", "Freq10000bp", "Rare10000bp", "Sngl10000bp", "gnomAD_AF", "Dst2Splice", "TFBS", "TFBSPeaks", "TFBSPeaksMax", "GC", "CpG", "motifECount", "motifEScoreChng", "cDNApos", "relcDNApos", "CDSpos", "relCDSpos", "protPos", "relProtPos", "SIFTval", "PolyPhenVal", "priPhCons", "mamPhCons", "verPhCons", "priPhyloP", "mamPhyloP", "verPhyloP", "bStatistic", "targetScan", "mirSVR-Score", "mirSVR-E", "mirSVR-Aln", "GerpRS", "GerpRSpval", "GerpN", "GerpS", "EncH3K27Ac", "motifDist", "EncH3K4Me1", "EncH3K4Me3", "EncExp", "EncNucleo", "EncOCC", "EncOCCombPVal", "EncOCDNasePVal", "EncOCFairePVal", "EncOCpolIIPVal", "EncOCctcfPVal", "EncOCmycPVal", "EncOCDNaseSig", "EncOCFaireSig", "EncOCpolIISig", "EncOCctcfSig", "EncOCmycSig", "Grantham", "dbscSNV-ada_score", "tOverlapMotifs", "dbscSNV-rf_score", "Dist2Mutation", "RawScore", "PHRED", "pLI_score", "exon_exp"))
 # nolint end
 
 vbfdf[, "gnomAD_AF"] <- as.double(vbfdf[, "gnomAD_AF"])
@@ -368,18 +384,18 @@ if (save_res) {
 #>> Save PCA + MAF results
 
 #<< Save plots to show the decomposition results
-if (draw_picture) {
+if (draw_pcamix) {
     plot_pcamix(
         pm_res = pcamix_res, first_n_dims = first_n_dims,
-        first_n_pcs = first_n_pcs, color_ind = as.factor(vbfdf[, "bb_ASE"])
+        first_n_pcs = first_n_pcs, color_ind = factor(vbfdf[, "bb_ASE"], levels = c("NonASE", "ASE"))
     )
 }
 #>> Save plots to show the decomposition results
 
 #<< Train the model on PCA + MAF transformed data
 ind_coord[, "bb_ASE"] <- vbfdf[, "bb_ASE"]
-glm_idcd <- trainer(dtfm = ind_coord, fml = bb_ASE ~ ., tmd = "glm", prx = "glm_idcd")
-gdm_idcd <- trainer(dtfm = ind_coord, fml = bb_ASE ~ ., tmd = "gdm", prx = "gdm_idcd")
+glm_idcd <- trainer(dtfm = ind_coord, fml = bb_ASE ~ ., tmd = "glm", prx = "glm_idcd", rsd = random_seed)
+gbm_idcd <- trainer(dtfm = ind_coord, fml = bb_ASE ~ ., tmd = "gbm", prx = "gbm_idcd", rsd = random_seed)
 #>> Train the model on PCA + MAF transformed data
 
 #<< Train the model on raw data
@@ -398,6 +414,6 @@ for (col_name in colnames(vbfdf_raw)) {
     }
 }
 
-glm_raw <- trainer(dtfm = vbfdf_raw, fml = bb_ASE ~ ., tmd = "glm", prx = "glm_raw")
-gdm_raw <- trainer(dtfm = vbfdf_raw, fml = bb_ASE ~ ., tmd = "gdm", prx = "gdm_raw")
+glm_raw <- trainer(dtfm = vbfdf_raw, fml = bb_ASE ~ ., tmd = "glm", prx = "glm_raw", rsd = random_seed)
+gbm_raw <- trainer(dtfm = vbfdf_raw, fml = bb_ASE ~ ., tmd = "gbm", prx = "gbm_raw", rsd = random_seed)
 #>> Train the model on raw data

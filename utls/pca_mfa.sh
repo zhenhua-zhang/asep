@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=5:59:0
+#SBATCH --time=0:19:0
 #SBATCH --mem=15G
 #SBATCH --cpus=5
 #SBATCH --output=%j-%u-pca_mfa.log
@@ -14,4 +14,6 @@ module list
 
 pjd="/home/umcg-zzhang/Documents/projects/ASEPrediction"
 Rscript $pjd/scripts/utls/pca_mfa.R \
-	-i $pjd/training/outputs/annotCadd/allelicReadsCounts/trainingset_withpLIScore_withGnomADAF_exon_FDR0.05.tsv.gz
+	-i $pjd/training/outputs/annotCadd/allelicReadsCounts/trainingset_withpLIScore_withGnomADAF_withExonExpVal_exon_FDR0.01.tsv.gz \
+    --random-seed 1415 \
+    --balance-train
