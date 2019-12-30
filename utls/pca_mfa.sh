@@ -14,6 +14,5 @@ module list
 
 pjd="/home/umcg-zzhang/Documents/projects/ASEPrediction"
 Rscript $pjd/scripts/utls/pca_mfa.R \
-	-i $pjd/training/outputs/annotCadd/allelicReadsCounts/trainingset_withpLIScore_withGnomADAF_withExonExpVal_exon_FDR0.01.tsv.gz \
-    --random-seed 1415 \
-    --balance-train
+	-i $pjd/training/outputs/annotCadd/allelicReadsCounts/trainingset_withpLIScore_withGnomADAF_withExonExpVal_exon_FDR0.05.tsv.gz \
+    --random-seed 1415

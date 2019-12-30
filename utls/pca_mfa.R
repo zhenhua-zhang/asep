@@ -377,6 +377,7 @@ eigs <- as.data.frame(pcamix_res$eig)
 ind_coord <- as.data.frame(pcamix_res$ind$coord)
 
 #<< Save PCA + MAF results
+ind_coord[, "bb_ASE"] <- vbfdf[, "bb_ASE"]
 if (save_res) {
     fwrite(eigs, file = "PCAmixdata_eigenvalues.tsv", sep = "\t", row.names = TRUE)
     fwrite(ind_coord, file = "PCAmixdata_indCoord.tsv", sep = "\t", row.names = TRUE)
@@ -393,7 +394,6 @@ if (draw_pcamix) {
 #>> Save plots to show the decomposition results
 
 #<< Train the model on PCA + MAF transformed data
-ind_coord[, "bb_ASE"] <- vbfdf[, "bb_ASE"]
 glm_idcd <- trainer(dtfm = ind_coord, fml = bb_ASE ~ ., tmd = "glm", prx = "glm_idcd", rsd = random_seed)
 gbm_idcd <- trainer(dtfm = ind_coord, fml = bb_ASE ~ ., tmd = "gbm", prx = "gbm_idcd", rsd = random_seed)
 #>> Train the model on PCA + MAF transformed data
