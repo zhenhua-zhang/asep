@@ -19,7 +19,6 @@
 
 # Ignore all starting with _
 _archived
-_asep_env
 _notes
 _syntax_test
 
@@ -37,3 +36,6 @@ _syntax_test
 
 # Remove the .vim
 .vim
+
+# Virtualenv
+.env
