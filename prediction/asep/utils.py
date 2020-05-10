@@ -2,16 +2,15 @@
 # -*- coding: utf-8 -*-
 """Utilities for package asep"""
 
+import functools
 import json
 import time
-import functools
-
-
-from sys import stderr as STDE
 from collections import OrderedDict
+from sys import stderr as STDE
 
-import yaml
 import numpy
+import yaml
+
 import scipy
 
 DEBUG = 1
@@ -83,9 +82,9 @@ def check_keys(pool_a, pool_b):
 def set_sed(sed=None):
     """Set the random seed of numpy"""
     if sed:
-        numpy.random.seed(sed)
+        numpy.random.RandomState(sed)
     else:
-        numpy.random.seed(3142)
+        numpy.random.RandomState(3142)
 
 
 def feature_pre_selection_by_spearman(

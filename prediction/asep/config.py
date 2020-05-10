@@ -3,9 +3,10 @@
 """configs module"""
 
 import numpy
-from imblearn.ensemble import BalancedRandomForestClassifier
 
-from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier)
+from imblearn.ensemble import BalancedRandomForestClassifier
+from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier,
+                              RandomForestClassifier)
 from sklearn.metrics import accuracy_score, make_scorer, precision_score
 from sklearn.model_selection import StratifiedKFold
 

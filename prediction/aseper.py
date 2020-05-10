@@ -7,12 +7,18 @@ TODO: 1. A module to parse configuration file, which could make life easier.
       2. The `mask` argument in predictor.trainer() func doesn't function at all.
 """
 import pickle
-
+import sys
 from argparse import ArgumentParser
 
-from .asep.config import Config
-from .asep.model import ASEP
-from .asep.utils import *
+try:
+    from asep.config import Config
+    from asep.model import ASEP
+    from asep.utils import *
+except ImportError("") as ime:
+    sys.path.append(".")
+    from asep.config import Config
+    from asep.model import ASEP
+    from asep.utils import *
 
 
 def cli_parser():
@@ -22,18 +28,11 @@ def cli_parser():
         parser: ArgumentParser -- An intance of ArgumentParser()
     """
 
-    default_discarded_cols = [
-        "bb_p", "bb_p_adj", "bn_ASE", "bn_p", "bn_p_adj", "group_size", "log2FC",
-        "Chrom", "Pos", "Annotype", "ConsScore", "ConsDetail",
-        "motifEName", "FeatureID", "GeneID", "GeneName", "CCDS", "Intron",
-        "Exon"
-    ]
+    # default_discarded_cols = ["bb_p", "bb_p_adj", "bn_ASE", "bn_p", "bn_p_adj", "group_size", "log2FC", "Chrom", "Pos", "Annotype", "ConsScore", "ConsDetail", "motifEName", "FeatureID", "GeneID", "GeneName", "CCDS", "Intron", "Exon", "EncExp", "gnomAD_AF"]
 
     parser = ArgumentParser()
     _group = parser.add_argument_group("Global") # Global-wide configs
     _group.add_argument("--run-flag", dest="run_flag", default="new_task", help="Flags for current run. The flag will be added to the name of the output dir. Default: new_task")
-    _group.add_argument("--config-file", dest="config_file", default="./configs.yaml", type=str, help="The path to configuration file, and overwrite values from command line excepting -i. Default: cofig.yaml")
-    _group.add_argument("--config-first", dest="config_first", action="store_true", help="Whether using configurations from config file first or not.")
 
     subparser = parser.add_subparsers(dest="subcmd") # Arguments parser for sub-command `train`
     train_argparser = subparser.add_parser("train", help="Train a model")
@@ -48,12 +47,12 @@ def cli_parser():
     _group.add_argument("--min-group-size", dest="min_group_size", default=2, type=lambda x: int(x) > 1 and int(x) or parser.error("--min-group-size must be >= 2"), help="The minimum individuals bearing the same variant(>=2). Default: 2")
     _group.add_argument("--max-group-size", dest="max_group_size", default=1.0E5, type=lambda x: int(x) <= 1e4 and int(x) or parser.error("--max-group-size must be <= 10,000"), help="The maximum number of individuals bearing the same variant (<= 10,000). Default: None")
     _group.add_argument("--max-na-ratio", dest="max_na_ratio", default=0.6, type=float, help="The maximum ratio of NA in each feature, otherwise, the feature will be abundant")
-    _group.add_argument("--drop-cols", dest="drop_cols", default=default_discarded_cols, nargs='+', help="The columns will be dropped. Seperated by semi-colon and quote them by ','. if there are more than one columns. Default: None")
+    _group.add_argument("--drop-cols", dest="drop_cols", default=[], nargs='*', help="The columns will be dropped. Seperated by semi-colon and quote them by ','. if there are more than one columns. Default: None")
     _group.add_argument("--response-col", dest="response_col", default='bb_ASE', help="The column name of response variable or target variable. Default: bb_ASE")
 
     _group = train_argparser.add_argument_group("Configuration") # Arguments for configuration
-    _group.add_argument("--random-sed", dest="random_sed", default=1234, type=int, help="The random seed. Default: 1234")
-    _group.add_argument("--classifier", dest="classifier", default='rfc', type=str, choices=["abc", "gbc", "rfc", "brfc"], help="Algorithm. Choices: [abc, gbc, rfc, brfc]. Default: rfc")
+    _group.add_argument("--random-seed", dest="random_seed", default=1234, type=int, help="The random seed. Default: %(default)s")
+    _group.add_argument("--classifier", dest="classifier", default='gbc', type=str, choices=["abc", "gbc", "rfc", "brfc"], help="Algorithm. Choices: [abc, gbc, rfc, brfc]. Default: rfc")
     _group.add_argument("--nested-cv", dest="nested_cv", default=False, action="store_true", help="Use nested cross validation or not. Default: False")
     _group.add_argument("--inner-cvs", dest="inner_cvs", default=6, type=int, help="Fold of cross-validations for RandomizedSearchCV. Default: 6")
     _group.add_argument("--inner-n-jobs", dest="inner_n_jobs", default=5, type=int, help="Number of jobs for RandomizedSearchCV. Default: 5")
@@ -63,7 +62,6 @@ def cli_parser():
     _group.add_argument("--learning-curve-cvs", dest="learning_curve_cvs", default=4, type=int, help="Number of folds to draw learning curve. Default: 4")
     _group.add_argument("--learning-curve-n-jobs", dest="learning_curve_n_jobs", default=5, type=int, help="Number of jobs to draw learning curves. Default: 5")
     _group.add_argument("--learning-curve-space-size", dest="learning_curve_space_size", default=10, type=int, help="Number of splits created in learning curve. Default: 10")
-    # _group.add_argument("--test-size", dest="test_size", default=None, type=int, help="The proportion of dataset for testing. Default: None")
 
     _group = train_argparser.add_argument_group("Output") # Arguments for Output
     _group.add_argument("-o", "--output-dir", dest="output_dir", default='./', type=str, help="The directory including output files. Default: ./")
@@ -75,8 +73,9 @@ def cli_parser():
     _group.add_argument("-m", "--model-file", dest="model_file", type=str, help="Model to be validated. [Required]")
 
     _group = validate_argparser.add_argument_group("Filter") # Arguments for Filter
-    _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=-1, type=int, help="Only read first k rows as input from input file. Default: None")
+    _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=None, type=int, help="Only read first k rows as input from input file. Default: None")
     _group.add_argument("--response-col", dest="response_col", default='bb_ASE', help="The column name of response variable or target variable. Default: bb_ASE")
+    _group.add_argument("--random-seed", dest="random_seed", default=1234, type=int, help="The random seed. Default: %(default)s")
 
     _group = validate_argparser.add_argument_group("Output") # Arguments for Output
     _group.add_argument("-o", "--output-dir", dest="output_dir", default="./", type=str, help="The directory including output files. Default: ./")
@@ -92,10 +91,6 @@ def cli_parser():
     _group = predict_argparser.add_argument_group("Output") # Arguments for Output
     _group.add_argument("-o", "--output-dir", dest="output_dir", type=str, help="Output directory for input file. [Reqired]")
 
-    config_argparser = subparser.add_parser("config", help="Generate a config template")
-    config_argparser.add_argument("-o", "--output-file", dest="output_file", type=str, default="configs.yaml", help="File path to the default configs. Default: configs.yaml")
-    config_argparser.add_argument("-c", "--check-config-file", dest="check_config_file", type=str, default=None, help="Check whether the config file in current directory is default. Default: configs.yaml")
-
     return parser
 
 
@@ -106,6 +101,7 @@ def train(args):
     Arguments:
         args {ArgumentParser} -- An `ArgumentParser` instance caught by `parse_arg()`
     """
+    set_sed(args.random_seed)  # The RandomState
 
     my_config = Config()
 
@@ -120,8 +116,7 @@ def train(args):
     my_config.assembly()
 
     input_file = args.input_file
-    random_sed = args.random_sed
-    asep = ASEP(input_file, my_config, sed=random_sed)
+    asep = ASEP(input_file, my_config)
 
     drop_cols = args.drop_cols
     min_group_size = args.min_group_size
@@ -158,6 +153,8 @@ def train(args):
 @my_debug(level=DEBUG)
 def validate(args):
     """Validate the model using extra dataset"""
+    set_sed(args.random_seed)  # The RandomState
+
     model_file = args.model_file
     with open(model_file, 'rb') as model_file_handle:
         model_obj = pickle.load(model_file_handle)
@@ -172,6 +169,8 @@ def validate(args):
 @my_debug(level=DEBUG)
 def predict(args):
     """Predict new dataset based on constructed model"""
+    set_sed(args.random_seed)  # The RandomState
+
     model_file = args.model_file
     with open(model_file, 'rb') as model_file_handle:
         model_obj = pickle.load(model_file_handle)
@@ -182,64 +181,28 @@ def predict(args):
     model_obj.predictor(input_file, output_dir, first_k_rows)
 
 
-@my_debug(DEBUG)
-def configurate(args):
-    """Manipulations on config files"""
-    output_file = args.output_file
-    check_config_file = args.check_config_file
-    if output_file is None:
-        output_file = "configs.yaml"
-
-    if check_config_file:  # TODO: A function to check the sanity of config file
-        print("Not implemented yet")
-    else:
-        dump_default_config_to_yaml(output_file)
-
-
 def main():
     """Main function to run the module """
     parser = cli_parser()
     cli_args = parser.parse_args()
-    config_first = cli_args.config_first
-    config_file = cli_args.config_file
-    configs = config_parser(config_file)
 
-    glbcfgs_ns = NameSpace()
-    glbcfgs_ns.from_dict(configs.get("global"))
-
-    if config_first:
-        run_flag = glbcfgs_ns.run_flag
-    else:
-        run_flag = cli_args.run_flag
+    run_flag = cli_args.run_flag
     cli_args.run_flag = run_flag
-    subcmd = cli_args.subcmd  # Not configurable by config_file
+    subcmd = cli_args.subcmd
 
-    if subcmd not in ["train", "validate", "predict", "config"]:
+    if subcmd not in ["train", "validate", "predict"]:
         parser.print_help()
     else:
         print_header()
         print_flag(subcmd, run_flag)
-
-        cli_args = vars(cli_args)
-        subcmdcfg = configs.get(subcmd)
-        nmsp = NameSpace()
-        if config_first:
-            cli_args.update(subcmdcfg)
-            nmsp.from_dict(cli_args)
-        else:
-            subcmdcfg.update(cli_args)
-            nmsp.from_dict(subcmdcfg)
-
-        print_args(nmsp)
+        print_args(cli_args)
 
         if subcmd == "train":
-            train(nmsp)
+            train(cli_args)
         elif subcmd == "validate":
-            validate(nmsp)
+            validate(cli_args)
         elif subcmd == "predict":
-            predict(nmsp)
-        elif subcmd == "config":
-            configurate(nmsp)
+            predict(cli_args)
 
         print_flag(subcmd, run_flag)
 

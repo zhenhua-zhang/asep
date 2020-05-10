@@ -2,28 +2,29 @@
 # -*- coding: utf-8 -*-
 """Predicting Allele-specific expression effect"""
 
-import os
 import copy
-import time
+import os
 import pickle
-
-from sys import stderr as STDE
+import sys
+import time
 from sys import exit as EXIT
+from sys import stderr as STDE
 
-import numpy
-import scipy
 import joblib
+import numpy
 import pandas
-
-from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold, learning_curve
-from sklearn.preprocessing import LabelEncoder
-from sklearn.multiclass import OneVsOneClassifier
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import roc_auc_score, roc_curve
-
 import prince
 
-from .utils import format_print, set_sed, timmer
+import scipy
+from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.model_selection import (RandomizedSearchCV, StratifiedKFold,
+                                     learning_curve)
+from sklearn.multiclass import OneVsOneClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder
+from sklearn.utils import shuffle
+
+from .utils import format_print, timmer
 
 try:
     from matplotlib import pyplot
@@ -62,9 +63,8 @@ def check_model_sanity(models):
 class ASEP:
     """A class implementing prediction of ASE effect for a variant"""
 
-    def __init__(self, file_name, config, sed=3142):
+    def __init__(self, file_name, config):
         """Set up basic variables """
-        set_sed(sed)
         self.time_stamp = None
 
         self.input_file_name = file_name
@@ -103,7 +103,7 @@ class ASEP:
     def trainer(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
                 biclass_=True, outer_cvs=6, mings=2, maxgs=None, with_lc=False,
                 lc_space_size=10, lc_n_jobs=5, lc_cvs=5, nested_cv=False,
-                max_na_ratio=0.5):
+                max_na_ratio=0.6):
         """Execute a pre-designed construct pipeline"""
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
@@ -116,7 +116,6 @@ class ASEP:
         self.mask_query = mask
         self.dropped_cols = drop_cols
         self.raw_dataframe, self.work_dataframe, self.x_matrix, self.y_vector = self.preprocessing(self.input_file_name, limit, gs_mask, mask, drop_cols, response, max_na_ratio)
-        self.factor_analysis_decomp()
         self.setup_pipeline(self.estimators_list, biclass=biclass_)
         self.outer_validation(cvs=outer_cvs, nested_cv=nested_cv)
         self.receiver_operating_characteristic_curve = self.draw_roc_curve_cv(self.area_under_curve_pool)
@@ -127,7 +126,7 @@ class ASEP:
 
     @timmer
     def preprocessing(self, file_name, limit=None, gs_mask=None, mask=None,
-                      drop_cols=None, response="bb_ASE", max_na_ratio=0.5):
+                      drop_cols=None, response="bb_ASE", max_na_ratio=None):
         """Preprocessing input data set"""
         if mask:
             pass
@@ -135,10 +134,14 @@ class ASEP:
         dataframe = self.setup_work_dataframe(raw_dataframe)
         dataframe = self.slice_dataframe(dataframe, mask=gs_mask, remove=False)
         dataframe = self.slice_dataframe(dataframe, cols=drop_cols)
-        dataframe = self.remove_high_na_features(dataframe, max_na_ratio)
+
+        if isinstance(max_na_ratio, float):
+            dataframe = self.remove_high_na_features(dataframe, max_na_ratio)
+
         dataframe = self.simple_imputer(dataframe)
         dataframe[response] = dataframe[response].apply(abs)
         dataframe = self.label_encoder(dataframe)
+        dataframe = shuffle(dataframe)
         x_matrix, y_vector = self.setup_xy(dataframe, y_col=response)
 
         return raw_dataframe, dataframe, x_matrix, y_vector
@@ -146,12 +149,7 @@ class ASEP:
     @staticmethod
     def read_file(file_name, nrows=None):
         """Read input file into pandas DataFrame."""
-        try:
-            file_handle = open(file_name)
-        except PermissionError as err:
-            print('File IO error: ', err, file=STDE)
-        else:
-            return pandas.read_table(file_handle, nrows=nrows, low_memory=False, na_values=['NA', '.'])
+        return pandas.read_csv(file_name, sep="\t", compression="infer", nrows=nrows, low_memory=False, na_values=['NA', '.'])
 
     @staticmethod
     def setup_work_dataframe(raw_dataframe):
@@ -207,7 +205,7 @@ class ASEP:
         na_count_table = dataframe.isna().sum()
         nr_rows, _ = dataframe.shape
         na_freq_table = na_count_table / float(nr_rows)
-        _dropped_cols = na_freq_table.loc[na_freq_table <= max_na_ratio].index
+        _dropped_cols = na_freq_table.loc[na_freq_table >= max_na_ratio].index
 
         if isinstance(self.dropped_cols, list):
             self.dropped_cols.extend(_dropped_cols)
@@ -222,9 +220,14 @@ class ASEP:
         """Set up predictor variables and target variables. """
         if cg_features is None:
             cg_features = [
-                "ref_encoded", "alt_encoded", "oAA_encoded", "nAA_encoded", "motifEHIPos", "CCDS_encoded", "Exon_encoded", "gene_encoded",
-                "Type_encoded", "group_encoded", "Segway_encoded", "effect_encoded", "impact_encoded", "Intron_encoded", "Domain_encoded",
-                "SIFTcat_encoded", "AnnoType_encoded", "ConsDetail_encoded", "motifEName_encoded", "Dst2SplType_encoded", "Consequence_encoded", "PolyPhenCat_encoded",
+                "ref_encoded", "alt_encoded", "oAA_encoded", "nAA_encoded",
+                "motifEHIPos", "CCDS_encoded", "Exon_encoded", "gene_encoded",
+                "Type_encoded", "group_encoded", "Segway_encoded",
+                "effect_encoded", "impact_encoded", "Intron_encoded",
+                "Domain_encoded", "SIFTcat_encoded", "AnnoType_encoded",
+                "ConsDetail_encoded", "motifEName_encoded",
+                "Dst2SplType_encoded", "Consequence_encoded",
+                "PolyPhenCat_encoded",
             ]
 
         cols = work_dataframe.columns
@@ -630,10 +633,18 @@ class ASEP:
     # Validator
     @timmer
     def validator(self, input_file, output_dir="./", limit=None, response="bb_ASE", models=None):
-        """Validate the model using another dataset"""
+        """Validate the model using another dataset.
+
+        Note:
+            1. Should not remove NA of validation data set based on the ratio of
+            NA, as the validation data set could have different ratio of NA from
+            the ratio of training data set.
+        """
         mask = self.mask_query
         gs_mask = self.gs_mask
         drop_cols = self.dropped_cols
+        if response in drop_cols:
+            drop_cols.remove(response)
 
         _, dataframe, x_matrix, y_vector = self.preprocessing(input_file, limit, gs_mask, mask, drop_cols, response)
 
@@ -649,7 +660,6 @@ class ASEP:
         dataframe.to_csv(output_path, sep="\t", index=False)
 
         auc = [[roc_auc_score(y_vector, _prob1), roc_curve(y_vector, _prob1)] for _prob1 in prob1]
-
         auc_opt = os.path.join(output_dir, "validation_roc_auc.pkl")
         with open(auc_opt, 'wb') as auc_opth:
             pickle.dump(auc, auc_opth)
