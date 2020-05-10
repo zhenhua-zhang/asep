@@ -63,8 +63,9 @@ def check_model_sanity(models):
 class ASEP:
     """A class implementing prediction of ASE effect for a variant"""
 
-    def __init__(self, file_name, config):
+    def __init__(self, file_name, config, random_state=31415):
         """Set up basic variables """
+        self.random_state = random_state
         self.time_stamp = None
 
         self.input_file_name = file_name
@@ -141,7 +142,7 @@ class ASEP:
         dataframe = self.simple_imputer(dataframe)
         dataframe[response] = dataframe[response].apply(abs)
         dataframe = self.label_encoder(dataframe)
-        dataframe = shuffle(dataframe)
+        dataframe = shuffle(dataframe, random_state=self.random_state)
         x_matrix, y_vector = self.setup_xy(dataframe, y_col=response)
 
         return raw_dataframe, dataframe, x_matrix, y_vector
@@ -385,14 +386,28 @@ class ASEP:
 
         if isinstance(estimator, RandomizedSearchCV):
             training_report = dict(
-                Scorer=estimator.scorer_, Params=estimator.get_params(), Best_params=estimator.best_params_,
-                Best_score=estimator.best_score_, Best_index=estimator.best_index_, Cross_validations=estimator.cv_results_,
-                Best_estimator=estimator.best_estimator_, Estimator_score=estimator.score(x_test_matrix, y_test_vector)
+                Scorer=estimator.scorer_,
+                Params=estimator.get_params(),
+                Best_params=estimator.best_params_,
+                Best_score=estimator.best_score_,
+                Best_index=estimator.best_index_,
+                Cross_validations=estimator.cv_results_,
+                Best_estimator=estimator.best_estimator_,
+                Estimator_score=estimator.score(x_test_matrix, y_test_vector)
             )
 
             estimator = estimator.best_estimator_
         else:
-            training_report = None
+            training_report = dict(
+                Scorer=model.scorer_,
+                Params=model.get_params(),
+                Best_params=model.best_params_,
+                Best_score=model.best_score_,
+                Best_index=model.best_index_,
+                Cross_validations=model.cv_results_,
+                Best_estimator=model.best_estimator_,
+                Estimator_score=None
+            )
 
         # XXX: need update if use more estimator
         first_k_name = x_train_matrix.columns
@@ -407,7 +422,8 @@ class ASEP:
         skf = StratifiedKFold(n_splits=cvs, **kwargs)
         split_pool = skf.split(self.x_matrix, self.y_vector)
 
-        model = RandomizedSearchCV(self.pipeline, **self.optim_params)
+        model = RandomizedSearchCV(self.pipeline, **self.optim_params,
+                                   random_state=self.random_state)
         if nested_cv:
             self.estimator = model
         else:

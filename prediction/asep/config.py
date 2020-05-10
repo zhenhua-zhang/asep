@@ -20,8 +20,9 @@ class Config:
         >>> config.init()
     """
 
-    def __init__(self):
+    def __init__(self, random_state=31415):
         """Initializing configuration metrics"""
+        self.random_state = random_state
         self.estimators_list = None
         self.optim_params = dict()
 
@@ -75,13 +76,13 @@ class Config:
         self.set_init_params(classifier=classifier)
 
         if classifier == "abc":  # For AdaboostClassifier
-            self.classifier = ('abc', AdaBoostClassifier())
+            self.classifier = ('abc', AdaBoostClassifier(random_state=self.random_state))
         elif classifier == "gbc":  # For GradientBoostingClassifier
-            self.classifier = ('gbc', GradientBoostingClassifier())
+            self.classifier = ('gbc', GradientBoostingClassifier(random_state=self.random_state))
         elif classifier == 'rfc':  # For RandomForestClassifier
-            self.classifier = ('rfc', RandomForestClassifier())
+            self.classifier = ('rfc', RandomForestClassifier(random_state=self.random_state))
         elif classifier == 'brfc':  # For BalancedRandomForestClassifier
-            self.classifier = ('brfc', BalancedRandomForestClassifier())
+            self.classifier = ('brfc', BalancedRandomForestClassifier(random_state=self.random_state))
         else:
             raise ValueError("Unknow classifier, choice [abc, gbc, rfc, brfc]")
 
