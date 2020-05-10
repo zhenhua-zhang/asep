@@ -8,15 +8,15 @@ refers the phenomenon that various abundance of transcripts from maternal and
 paternal alleles at heterozygous loci in diploid organisms.
 
 ### Causation
-Genetic variants (e.g. `eQTL`), epigenetic markers (e.g. `eQTM`), non-sense 
+Genetic variants (e.g. `eQTL`), epigenetic markers (e.g. `eQTM`), non-sense
 mediated decay(i.e. `NMD`) and alternative splicing etc.
 
-### Measurements  
+### Measurements
 
 - Allele-specific PCR
 - Fluorescence in situ hybridization (`FISH`)
 - Array-based method
-- RNA sequencing 
+- RNA sequencing
 
 ### Applications
 
@@ -27,19 +27,19 @@ mediated decay(i.e. `NMD`) and alternative splicing etc.
 
 ## Measurement of ASE Effects
 In previous studies, there many different method to estimate the ASE effects at
-different level. 
+different level.
 
 ### Binomial model
-We assume the outcomes of each individual for each locus are independent and 
+We assume the outcomes of each individual for each locus are independent and
 identical distributed(i.i.d.).
 Generally, for the observed locus, a simple distribution of allele-specific
 expression result is respected to Binomial distribution.
 $$
 f(k|n,\theta) \sim Binom(n, \theta)
 $$
-where `k` is the amount of success and means the abundance of alternative 
-alleles in our case. We use a maximum likelihood estimation (`MLE`) under a 
-Binomial distribution to estimate the parameter $\theta$ at first. Then a 
+where `k` is the amount of success and means the abundance of alternative
+alleles in our case. We use a maximum likelihood estimation (`MLE`) under a
+Binomial distribution to estimate the parameter $\theta$ at first. Then a
 log-likelihood ratio test (`LRT`) was done to determine the goodness of fit to
 the balanced model in which the expression of two are identical or gently
 different(i.e. $\theta \approx 0.5$).
@@ -141,7 +141,7 @@ $$
 Then, we use $\pi, \gamma$ as the variables of our likelihood function, where
 $\pi$ is the probability of success, and $\gamma$ is the over-dispersion parameter.
 
-Here is our null model: $\pi=0.5, \gamma=100$ which means the probability of 
+Here is our null model: $\pi=0.5, \gamma=100$ which means the probability of
 success is 0.5 and less over-dispersion.
 
 ```{R}
@@ -301,3 +301,11 @@ implementation is called `FactorAnalysis` in `decomposition` package.
    regarding AUC (TP-FP)\: 0.78 vs 0.80. A bonus finding is: there's no
    significant difference between prediciton rate (0.90) and no information rate
    (0.882), in terms of accuracy.
+
+## Problems
+1. If the `--nested-cv` is not given, then the scripts picks up a model fitted
+   by `RandomizedSearchCV` as a estimator for the cross validation. In this
+   case, the validation is called outer validation, which enables the script to
+   draw a ROC-AUC plot. However, th training report will be useless as it only
+   records the report of the first fitting. (The code should be modified to fix
+   this potential problem)
