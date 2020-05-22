@@ -14,17 +14,17 @@ TODO:
     1. Handle categorical features. One idea is to use the PCAmixdata indCoord results.
 """
 
+import argparse
 import os
 import sys
 import time
-import argparse
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 
+import tensorflow as tf
 from tensorflow import feature_column
-from tensorflow.keras import layers, Sequential
+from tensorflow.keras import sequential, layers
 
 
 def get_args():

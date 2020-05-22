@@ -8,10 +8,12 @@ import time
 from collections import OrderedDict
 from sys import stderr as STDE
 
-import numpy
+import numpy as np
 import yaml
 
 import scipy
+
+np.random.seed(31415)
 
 DEBUG = 1
 
@@ -82,9 +84,9 @@ def check_keys(pool_a, pool_b):
 def set_sed(sed=None):
     """Set the random seed of numpy"""
     if sed:
-        numpy.random.RandomState(sed)
+        np.random.RandomState(sed)
     else:
-        numpy.random.RandomState(3142)
+        np.random.RandomState(3142)
 
 
 def feature_pre_selection_by_spearman(

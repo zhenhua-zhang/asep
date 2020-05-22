@@ -2,13 +2,15 @@
 # -*- coding: utf-8 -*-
 """configs module"""
 
-import numpy
+import numpy as np
 
 from imblearn.ensemble import BalancedRandomForestClassifier
 from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier,
                               RandomForestClassifier)
 from sklearn.metrics import accuracy_score, make_scorer, precision_score
 from sklearn.model_selection import StratifiedKFold
+
+np.random.seed(31415)
 
 
 class Config:
@@ -20,9 +22,8 @@ class Config:
         >>> config.init()
     """
 
-    def __init__(self, random_state=31415):
+    def __init__(self):
         """Initializing configuration metrics"""
-        self.random_state = random_state
         self.estimators_list = None
         self.optim_params = dict()
 
@@ -36,12 +37,12 @@ class Config:
         if classifier == "abc":  # For AdaboostClassifier
             self.init_params = dict(
                 abc__n_estimators=list(range(50, 1000, 50)),
-                abc__learning_rate=numpy.linspace(.01, 1., 50),
+                abc__learning_rate=np.linspace(.01, 1., 50),
                 abc__algorithm=["SAMME", "SAMME.R"],
             )
         elif classifier == "gbc":  # For GradientBoostingClassifier
             self.init_params = dict(
-                gbc__learning_rate=numpy.linspace(.01, 1., 50),
+                gbc__learning_rate=np.linspace(.01, 1., 50),
                 gbc__n_estimators=list(range(50, 1000, 50)),
                 gbc__min_samples_split=list(range(2, 12)),
                 gbc__min_samples_leaf=list(range(1, 11)),
@@ -76,13 +77,13 @@ class Config:
         self.set_init_params(classifier=classifier)
 
         if classifier == "abc":  # For AdaboostClassifier
-            self.classifier = ('abc', AdaBoostClassifier(random_state=self.random_state))
+            self.classifier = ('abc', AdaBoostClassifier())
         elif classifier == "gbc":  # For GradientBoostingClassifier
-            self.classifier = ('gbc', GradientBoostingClassifier(random_state=self.random_state))
+            self.classifier = ('gbc', GradientBoostingClassifier())
         elif classifier == 'rfc':  # For RandomForestClassifier
-            self.classifier = ('rfc', RandomForestClassifier(random_state=self.random_state))
+            self.classifier = ('rfc', RandomForestClassifier())
         elif classifier == 'brfc':  # For BalancedRandomForestClassifier
-            self.classifier = ('brfc', BalancedRandomForestClassifier(random_state=self.random_state))
+            self.classifier = ('brfc', BalancedRandomForestClassifier())
         else:
             raise ValueError("Unknow classifier, choice [abc, gbc, rfc, brfc]")
 

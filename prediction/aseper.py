@@ -10,6 +10,8 @@ import pickle
 import sys
 from argparse import ArgumentParser
 
+import numpy as np
+
 try:
     from asep.config import Config
     from asep.model import ASEP
@@ -20,6 +22,7 @@ except ImportError("") as ime:
     from asep.model import ASEP
     from asep.utils import *
 
+np.random.seed(31415)
 
 def cli_parser():
     """A method to get arguments from the command line
@@ -101,7 +104,7 @@ def train(args):
     Arguments:
         args {ArgumentParser} -- An `ArgumentParser` instance caught by `parse_arg()`
     """
-    set_sed(args.random_seed)  # The RandomState
+    # np.random.seed(args.random_seed)
 
     my_config = Config()
 
@@ -153,7 +156,7 @@ def train(args):
 @my_debug(level=DEBUG)
 def validate(args):
     """Validate the model using extra dataset"""
-    set_sed(args.random_seed)  # The RandomState
+    # np.random.seed(args.random_seed)
 
     model_file = args.model_file
     with open(model_file, 'rb') as model_file_handle:
@@ -169,7 +172,7 @@ def validate(args):
 @my_debug(level=DEBUG)
 def predict(args):
     """Predict new dataset based on constructed model"""
-    set_sed(args.random_seed)  # The RandomState
+    # np.random.seed(args.random_seed)
 
     model_file = args.model_file
     with open(model_file, 'rb') as model_file_handle:

@@ -11,7 +11,7 @@ from sys import exit as EXIT
 from sys import stderr as STDE
 
 import joblib
-import numpy
+import numpy as np
 import pandas
 import prince
 
@@ -25,6 +25,8 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import shuffle
 
 from .utils import format_print, timmer
+
+np.random.seed(31415)
 
 try:
     from matplotlib import pyplot
@@ -63,9 +65,8 @@ def check_model_sanity(models):
 class ASEP:
     """A class implementing prediction of ASE effect for a variant"""
 
-    def __init__(self, file_name, config, random_state=31415):
+    def __init__(self, file_name, config):
         """Set up basic variables """
-        self.random_state = random_state
         self.time_stamp = None
 
         self.input_file_name = file_name
@@ -142,7 +143,7 @@ class ASEP:
         dataframe = self.simple_imputer(dataframe)
         dataframe[response] = dataframe[response].apply(abs)
         dataframe = self.label_encoder(dataframe)
-        dataframe = shuffle(dataframe, random_state=self.random_state)
+        dataframe = shuffle(dataframe)
         x_matrix, y_vector = self.setup_xy(dataframe, y_col=response)
 
         return raw_dataframe, dataframe, x_matrix, y_vector
@@ -251,7 +252,7 @@ class ASEP:
         """Encode category columns """
         if target_cols is None:
             col_types = work_dataframe.dtypes
-            target_cols = [n for n, t in col_types.items() if t is numpy.dtype('O')]
+            target_cols = [n for n, t in col_types.items() if t is np.dtype('O')]
 
         if isinstance(skip, str):
             if skip in target_cols:
@@ -286,7 +287,7 @@ class ASEP:
         return work_dataframe
 
     @staticmethod
-    def simple_imputer(dataframe, targets=(numpy.NaN, '.')):
+    def simple_imputer(dataframe, targets=(np.NaN, '.')):
         """A simple imputater based on pandas DataFrame.replace method."""
         defaults = {
             'motifEName': 'unknown', 'GeneID': 'unknown', 'GeneName':
@@ -351,12 +352,12 @@ class ASEP:
 
     def draw_learning_curve(self, estimator, cvs=5, n_jobs=5, space_size=10, **kwargs):
         """Draw the learning curve of specific estimator or pipeline"""
-        train_sizes, train_scores, test_scores = learning_curve(estimator=estimator, X=self.x_matrix, y=self.y_vector, train_sizes=numpy.linspace(.1, 1., space_size), cv=cvs, n_jobs=n_jobs, **kwargs)
+        train_sizes, train_scores, test_scores = learning_curve(estimator=estimator, X=self.x_matrix, y=self.y_vector, train_sizes=np.linspace(.1, 1., space_size), cv=cvs, n_jobs=n_jobs, **kwargs)
 
-        train_scores_mean = numpy.mean(train_scores, axis=1)
-        train_scores_std = numpy.std(train_scores, axis=1)
-        test_scores_mean = numpy.mean(test_scores, axis=1)
-        test_scores_std = numpy.std(test_scores, axis=1)
+        train_scores_mean = np.mean(train_scores, axis=1)
+        train_scores_std = np.std(train_scores, axis=1)
+        test_scores_mean = np.mean(test_scores, axis=1)
+        test_scores_std = np.std(test_scores, axis=1)
 
         fig, ax_learning = pyplot.subplots(figsize=(10, 10))
 
@@ -398,16 +399,7 @@ class ASEP:
 
             estimator = estimator.best_estimator_
         else:
-            training_report = dict(
-                Scorer=model.scorer_,
-                Params=model.get_params(),
-                Best_params=model.best_params_,
-                Best_score=model.best_score_,
-                Best_index=model.best_index_,
-                Cross_validations=model.cv_results_,
-                Best_estimator=model.best_estimator_,
-                Estimator_score=None
-            )
+            training_report = None
 
         # XXX: need update if use more estimator
         first_k_name = x_train_matrix.columns
@@ -422,8 +414,7 @@ class ASEP:
         skf = StratifiedKFold(n_splits=cvs, **kwargs)
         split_pool = skf.split(self.x_matrix, self.y_vector)
 
-        model = RandomizedSearchCV(self.pipeline, **self.optim_params,
-                                   random_state=self.random_state)
+        model = RandomizedSearchCV(self.pipeline, **self.optim_params)
         if nested_cv:
             self.estimator = model
         else:
@@ -479,7 +470,7 @@ class ASEP:
             if len(fpr) > space_len:
                 space_len = len(fpr)
 
-        lspace = numpy.linspace(0, 1, space_len)
+        lspace = np.linspace(0, 1, space_len)
         interp_fpr_pool, interp_tpr_pool = [], []
         for fpr, tpr in zip(fpr_pool, tpr_pool):
             fpr_interped = scipy.interp(lspace, fpr, fpr)
@@ -493,9 +484,9 @@ class ASEP:
         for fpr, tpr in zip(interp_fpr_pool, interp_tpr_pool):
             ax_roc.plot(fpr, tpr, lw=0.5)
 
-        fpr_mean = numpy.mean(interp_fpr_pool, axis=0)
-        tpr_mean = numpy.mean(interp_tpr_pool, axis=0)
-        tpr_std = numpy.std(interp_tpr_pool, axis=0)
+        fpr_mean = np.mean(interp_fpr_pool, axis=0)
+        tpr_mean = np.mean(interp_tpr_pool, axis=0)
+        tpr_std = np.std(interp_tpr_pool, axis=0)
 
         # A 95% confidence interval for the mean of AUC by Bayesian mvs
         mean, *_ = scipy.stats.bayes_mvs(auc_pool)
@@ -503,8 +494,8 @@ class ASEP:
 
         ax_roc.plot(fpr_mean, tpr_mean, color="r", lw=2, label="Mean: AUC={:0.3}, [{:0.3}, {:0.3}]".format(auc_mean, auc_min, auc_max))
 
-        mean_upper = numpy.minimum(tpr_mean + tpr_std, 1)
-        mean_lower = numpy.maximum(tpr_mean - tpr_std, 0)
+        mean_upper = np.minimum(tpr_mean + tpr_std, 1)
+        mean_lower = np.maximum(tpr_mean - tpr_std, 0)
         ax_roc.fill_between(fpr_mean, mean_upper, mean_lower, color='green', alpha=0.1, label="Standard deviation")
         ax_roc.set(title="ROC curve", xlabel='False positive rate', ylabel='True positive rate')
         ax_roc.plot([0, 1], color='grey', linestyle='--')
@@ -517,8 +508,8 @@ class ASEP:
         """Draw feature importance for the model with cross-validation"""
         name_mean_std_pool = []
         for name, importances in feature_importance_pool.items():
-            mean = numpy.mean(importances)
-            std = numpy.std(importances, ddof=1)
+            mean = np.mean(importances)
+            std = np.std(importances, ddof=1)
             name_mean_std_pool.append([name, mean, std])
 
         name_mean_std_pool = sorted(name_mean_std_pool, key=lambda x: -x[1])
@@ -615,8 +606,8 @@ class ASEP:
             _pre_prob0.append(_pre_prob[:, 0])
             _pre_prob1.append(_pre_prob[:, 1])
 
-        prob0 = numpy.array(_pre_prob0)
-        prob1 = numpy.array(_pre_prob1)
+        prob0 = np.array(_pre_prob0)
+        prob1 = np.array(_pre_prob1)
         prob_mean = (prob0.mean(axis=0), prob0.var(axis=0), prob1.mean(axis=0), prob1.var(axis=0))
 
         return prob_mean, prob1, prob0
