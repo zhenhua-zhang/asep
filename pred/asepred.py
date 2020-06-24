@@ -4,13 +4,10 @@
 """Main interface for asep
 
 TODO: 1. A module to parse configuration file, which could make life easier.
-      2. The `mask` argument in predictor.trainer() func doesn't function at all.
+      2. The `mask` argument in predictor.train() func doesn't function at all.
 """
 import argparse
-import collections
 import copy
-import functools
-import json
 import os
 import pickle
 import sys
@@ -21,8 +18,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import prince
-import yaml
-
 import scipy as sp
 from imblearn.ensemble import BalancedRandomForestClassifier
 from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier,
@@ -36,45 +31,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import shuffle
 
-DEBUG = 1
-
-np.random.seed(31415)
-
-
-def timmer(func):
-    """Print the runtime of the decorated function
-
-    Arguments:
-        func {callable} -- A function name that will be decorated
-
-    Returns:
-        Unknown -- Any object return by the decorated function
-    """
-    @functools.wraps(func)
-    def wrapper_timmer(*args, **kwargs):
-        start_time = time.perf_counter()
-        value = func(*args, **kwargs)
-        func_name = func.__name__ + " "
-        used_time = time.perf_counter() - start_time
-        print('{:.<40} DONE, time: {:.5f} secs'.format(func_name, used_time), file=sys.stderr)
-        return value
-
-    return wrapper_timmer
-
-
-def my_debug(level=0):
-    """A debug decorator function"""
-    def decorator_debug(func):
-        @functools.wraps(func)
-        def wrapper_debug(*args, **kwargs):
-            value = ""
-            if level:
-                value = func(*args, **kwargs)
-            else:
-                print("[debug] Skipping " + func.__name__)
-            return value
-        return wrapper_debug
-    return decorator_debug
+g_random_state = 31415
+np.random.seed(g_random_state)
 
 
 def format_print(title, main_content, pipe=sys.stderr):
@@ -84,61 +42,7 @@ def format_print(title, main_content, pipe=sys.stderr):
     print(flag, '\n   ', main_content, "\n\n", file=pipe)
 
 
-def check_keys(pool_a, pool_b):
-    """Check if all elements in pool_a are also in pool_b"""
-    if not isinstance(pool_a, (list, tuple)):
-        raise TypeError('Require iterable value for pool_a...')
-    if not isinstance(pool_b, (list, tuple)):
-        raise TypeError('Require iterable value for pool_b...')
-
-    pool_a_size = len(pool_a)
-    pool_b_size = len(pool_b)
-    if pool_a_size >= pool_b_size:
-        for key in pool_b:
-            if key not in pool_a:
-                raise KeyError('Invalid element {}'.format(key))
-    else:
-        for key in pool_a:
-            if key not in pool_b:
-                raise KeyError('Invalid element {}'.format(key))
-    return True
-
-
-def feature_pre_selection_by_spearman(
-        input_dataframe, drop_list, target=None, pvalue_threshhold=0.1):
-    """Drop features with low correlation to target variables."""
-
-    if not isinstance(drop_list, (list, tuple)):
-        raise TypeError("drop_list should be list, tuple")
-
-    candidates_pool = {}
-    feature_pool = input_dataframe['columns']
-    for _, candidate in enumerate(feature_pool):
-        spearman_r = sp.stats.spearmanr(input_dataframe[candidate], target)
-        correlation = spearman_r.correlation
-        pvalue = spearman_r.pvalue
-        if pvalue <= pvalue_threshhold and candidate not in drop_list:
-            candidates_pool[candidate] = dict(
-                pvalue=pvalue, correlation=correlation
-            )
-
-    with open('pre_selected_features.json', 'w') as json_file:
-        json.dump(candidates_pool, json_file, sort_keys=True, indent=4)
-
-    pre_selected_features = candidates_pool.keys()
-
-    return pre_selected_features
-
-
-def config_parser(conf_file_path="./configs.yaml"):
-    """Parse config file in YAML format"""
-    with open(conf_file_path) as cfh:
-        configs = yaml.safe_load(cfh)
-    return configs
-
-
-def print_header(title=None, version=None, author=None, email=None,
-                 institute=None, url=None):
+def print_header(title=None, version=None, author=None, email=None, institute=None, url=None):
     """A function to print a header including information of the package"""
     astr = "{: ^80}\n"
     bstr = "#{: ^48}#"
@@ -197,7 +101,8 @@ def print_args(args, fwd=-1):
         args {NameSpace} -- A NameSpace containing commandline arguments
 
     Keyword Arguments:
-        fwd {int} -- The number of space used to fill the argument and parameter, using an optimized fill-width if it's default (default: {-1})
+        fwd {int} -- The number of space used to fill the argument and
+        parameter, using an optimized fill-width if it's default (default: {-1})
     """
 
     print("Arguments for current run: ", file=sys.stderr)
@@ -210,138 +115,6 @@ def print_args(args, fwd=-1):
     for dst, arg in args_pair:
         print("  {d: <{w}}: {a: <{w}}".format(d=dst, a=str(arg), w=fwd), file=sys.stderr)
 
-
-def get_default_config():
-    """Retrun the default configurations for the command line interface"""
-    _configs = [
-        "# Config for asep.py",
-        "global:",
-        "    run_flag: 'new_task_from_configs_file'  # No space is allowed",
-        "    # config_file: configs.yaml  # The configuration file it self",
-        "    # config_first: false  # Using configurations from config_file at high priority",
-        "    # subcmd: train # the default subcommand [train, predict, validate, config]",
-        "",
-        "train: # Configs for `train` subcommand",
-        "",
-        "# Input",
-        "    input_file: ''",
-        "",
-        "# Filter",
-        "    first_k_rows: null",
-        "    mask_as: null",
-        "    mask_out: null",
-        "    min_group_size: 2",
-        "    max_group_size: 1.0E+5  # When using scientific notation, do NOT foget the decimal",
-        "    max_na_ratio: 0.6",
-        "",
-        "## Which columns should be abundant manually: ('pLI_score', 'gnomAD_AF', 'EncExp', 'GerpN')",
-        "    drop_cols: ['bb_p', 'bb_p_adj', 'bn_ASE', 'bn_p', 'bn_p_adj', 'group_size', 'log2FC', 'Chrom', 'Pos', 'Ref', 'Alt', 'CCDS', 'Exon', 'FeatureID', 'GeneID', 'GeneName', 'Intron', 'motifEName']",
-        "    response_col: 'bb_ASE'",
-        "",
-        "# Configurations",
-        "    random_sed: 1234",
-        "    # test_size: null",
-        "    classifier: 'gbc'  # Choices: abc (), gbc(gradient boosting classifier)",
-        "    nested_cv: false",
-        "    inner_cvs: 6",
-        "    inner_n_jobs: 5",
-        "    inner_n_iters: 50",
-        "    outer_cvs: 6",
-        "    with_learning_curve: false",
-        "    learning_curve_cvs: 4",
-        "    learning_curve_n_jobs: 5",
-        "    learning_curve_space_size: 10",
-        "",
-        "# Output",
-        "    output_dir: './'",
-        "",
-        "## How to save the model and other data to the disk. Options: [pickle, joblib]",
-        "    save_method: 'pickle'  # Library used to save the model and other data set",
-        "",
-        "# Configs for `validate` subcommand",
-        "validate:",
-        "# Input",
-        "    model_file: ''",
-        "",
-        "# Filter",
-        "    first_k_rows: 0",
-        "    drop_cols: null",
-        "    response_col: 'bb_ASE'",
-        "",
-        "# Output",
-        "    output_dir: './'",
-        "",
-        "predict:  # Configs for `predict`",
-        "# Input",
-        "    input_file: ''",
-        "    model_file: ''",
-        "",
-        "# Filter",
-        "    first_k_rows: 0",
-        "    drop_cols: null",
-        "",
-        "# Output",
-        "## Normally the same to the model file",
-        "    output_dir: null",
-        "",
-        "# Configs to generate or check the sanity of given config file",
-        "config:",
-        "## The name of output config file",
-        "    output_file: 'configs.yaml'",
-        "",
-        "## Only useful when you want to check the sanity of given config file",
-        "    config_file: null",
-        "    # overwrite: -1  # -1, 0, 1 ask, keep, overwrite",
-    ]
-    return "\n".join(_configs)
-
-def dump_default_config_to_yaml(file_name="configs.yaml"):
-    """Dump default configurations to configs.yaml"""
-    default_configs = get_default_config()
-    with open(file_name, 'w') as opt:
-        opt.write(default_configs)
-
-
-class NameSpace:
-    """A local NameSpace class"""
-    def __init__(self, name="NameSpace"):
-        pass
-
-    def add(self, key, val):
-        """Add member for NameSpace"""
-        setattr(self, key, val)
-
-    def update(self, key, val):
-        """Update member for NameSpace instance"""
-        if hasattr(self, key):
-            setattr(self, key, val)
-        else:
-            self.add(key, val)
-
-    def remove(self, key):
-        """Remove given memeber"""
-        if hasattr(self, key):
-            delattr(self, key)
-        else:
-            print("Unknown attr: {}".format(key), sys.stderr)
-
-    def to_dict(self, ordered=False):
-        """Convert NameSpace instance into a dict object which could be ordered"""
-        if ordered:
-            return collections.OrderedDict(vars(self))
-        return vars(self)
-
-    def from_dict(self, my_dict: dict):
-        """Create an NameSpace instance from a dict object"""
-        for key, val in my_dict.items():
-            self.add(key, val)
-
-    def clear(self):
-        """Clear all attributes"""
-        print("Not yet implemented", file=sys.stderr)
-#        keys = copy.deepcopy(self.to_dict().keys())
-#        for key in keys:
-#            self.remove(key)
 
 class ASEP:
     """A class implementing prediction of ASE effect for a variant"""
@@ -370,38 +143,39 @@ class ASEP:
         self.feature_importance_pool = None
         self.feature_importance_hist = None
 
-        self.receiver_operating_characteristic_curve = None
+        self.ROC_curve = None
         self.area_under_curve_pool = None
 
         self.learning_report = None
         self.learning_line = None
 
-        self.label_encoder_matrix = None
+        self.label_rename_mtrx = None
         self.dropped_cols = None
         self.mask_query = None
         self.gs_mask = None
 
-    # trainer
-    @timmer
-    def trainer(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
-                biclass_=True, outer_cvs=6, mings=2, maxgs=None, with_lc=False,
-                lc_space_size=10, lc_n_jobs=5, lc_cvs=5, nested_cv=False,
-                max_na_ratio=0.6):
+    # train
+    def train(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
+              biclass_=True, outer_cvs=6, mings=2, maxgs=None, with_lc=False,
+              lc_space_size=10, lc_n_jobs=5, lc_cvs=5, nested_cv=False,
+              max_na_ratio=0.6):
         """Execute a pre-designed construct pipeline"""
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
 
         if maxgs:
-            gs_mask = "((group_size >= {:n}) & (group_size <= {:n}))".format(mings, maxgs)
+            gs_mask = "((group_size>={:n})&(group_size<={:n}))".format(mings, maxgs)
         else:
             gs_mask = "group_size >= {:n}".format(mings)
 
         self.gs_mask = gs_mask
         self.mask_query = mask
         self.dropped_cols = drop_cols
-        self.raw_dataframe, self.work_dataframe, self.x_matrix, self.y_vector = self.preprocessing(self.input_file_name, limit, gs_mask, mask, drop_cols, response, max_na_ratio)
+        self.raw_dataframe, self.work_dataframe, self.x_matrix, self.y_vector \
+                = self.preprocessing(self.input_file_name, limit, gs_mask, mask,
+                                     drop_cols, response, max_na_ratio)
         self.setup_pipeline(self.estimators_list, biclass=biclass_)
         self.outer_validation(cvs=outer_cvs, nested_cv=nested_cv)
-        self.receiver_operating_characteristic_curve = self.draw_roc_curve_cv(self.area_under_curve_pool)
+        self.ROC_curve = self.draw_roc_curve_cv(self.area_under_curve_pool)
         self.feature_importance_hist = self.draw_k_main_features_cv(self.feature_importance_pool)
 
         if with_lc:
@@ -409,7 +183,6 @@ class ASEP:
 
         return self
 
-    @timmer
     def preprocessing(self, file_name, limit=None, gs_mask=None, mask=None,
                       drop_cols=None, response="bb_ASE", max_na_ratio=None):
         """Preprocessing input data set"""
@@ -426,7 +199,7 @@ class ASEP:
         dataframe = self.simple_imputer(dataframe)
         dataframe[response] = dataframe[response].apply(abs)
         dataframe = self.label_encoder(dataframe)
-        dataframe = shuffle(dataframe)
+        dataframe = shuffle(dataframe, random_state=g_random_state)
         x_matrix, y_vector = self.setup_xy(dataframe, y_col=response)
 
         return raw_dataframe, dataframe, x_matrix, y_vector
@@ -434,7 +207,8 @@ class ASEP:
     @staticmethod
     def read_file(file_name, nrows=None):
         """Read input file into pandas DataFrame."""
-        return pd.read_csv(file_name, sep="\t", compression="infer", nrows=nrows, low_memory=False, na_values=['NA', '.'])
+        return pd.read_csv(file_name, sep="\t", compression="infer",
+                           nrows=nrows, low_memory=False, na_values=['NA', '.'])
 
     @staticmethod
     def setup_work_dataframe(raw_dataframe):
@@ -448,7 +222,6 @@ class ASEP:
     def slice_dataframe(dataframe, rows=None, cols=None, mask=None,
                         remove=True, mask_first=True):
         """Slice the DataFrame base on rows, columns, and mask."""
-        # XXX: mask and rows, cols could be conflict
         if not isinstance(remove, bool):
             raise TypeError('remove should be bool')
 
@@ -531,7 +304,8 @@ class ASEP:
 
         return (x_matrix, y_vector)
 
-    def label_encoder(self, work_dataframe, target_cols=None, skip=None, remove=False):
+    def label_encoder(self, work_dataframe, target_cols=None, skip=None,
+                      remove=False):
         """Encode category columns """
         if target_cols is None:
             col_types = work_dataframe.dtypes
@@ -548,21 +322,21 @@ class ASEP:
                     print('{} isn\'t in list...'.format(skip), file=sys.stderr)
 
         if remove:
-            format_print("Deleted columns (require encoding)", "\n".join(target_cols))
+            format_print("Deleted cols(require encode)", "\n".join(target_cols))
             work_dataframe.drop(columns=target_cols, inplace=True)
-            self.label_encoder_matrix = {(x, x): "removed" for x in target_cols}
+            self.label_rename_mtrx = {(x, x): "removed" for x in target_cols}
         else:
             format_print("Encoded columns", ", ".join(target_cols))
             target_cols_encoded = [n + '_encoded' for n in target_cols]
 
-            if self.label_encoder_matrix is None:
-                self.label_encoder_matrix = {}
+            if self.label_rename_mtrx is None:
+                self.label_rename_mtrx = {}
 
             encoder = LabelEncoder()
             for _tag, _tag_enc in zip(target_cols, target_cols_encoded):
                 try:
                     work_dataframe[_tag_enc] = encoder.fit_transform(work_dataframe[_tag])
-                    self.label_encoder_matrix[(_tag, _tag_enc)] = copy.deepcopy(encoder)
+                    self.label_rename_mtrx[(_tag, _tag_enc)] = copy.deepcopy(encoder)
                     del work_dataframe[_tag]
                 except ValueError as err:
                     print(err, file=sys.stderr)
@@ -654,7 +428,6 @@ class ASEP:
 
         self.learning_line = (fig, ax_learning)
 
-    @timmer
     def randomized_search_cv(self, estimator, split):  # Nested cv
         """Hyper-parameters optimization by RandomizedSearchCV """
         train_idx, test_idx = split
@@ -691,7 +464,6 @@ class ASEP:
 
         return (training_report, auc, feature_importance, estimator)
 
-    @timmer
     def outer_validation(self, cvs=6, nested_cv=False, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
         skf = StratifiedKFold(n_splits=cvs, **kwargs)
@@ -708,9 +480,14 @@ class ASEP:
             if self.training_report_pool is None:
                 self.training_report_pool = [
                     dict(
-                        Scorer=model.scorer_, Params=model.get_params(), Best_params=model.best_params_,
-                        Best_score=model.best_score_, Best_index=model.best_index_,
-                        Cross_validations=model.cv_results_, Best_estimator=model.best_estimator_, Estimator_score=None
+                        Scorer=model.scorer_,
+                        Params=model.get_params(),
+                        Best_params=model.best_params_,
+                        Best_score=model.best_score_,
+                        Best_index=model.best_index_,
+                        Cross_validations=model.cv_results_,
+                        Best_estimator=model.best_estimator_,
+                        Estimator_score=None
                     )
                 ]
 
@@ -724,19 +501,20 @@ class ASEP:
             self.training_report_pool = []
 
         if self.feature_importance_pool is None:
-            self.feature_importance_pool = {name: [0] * cvs for name in self.x_matrix.columns}
+            self.feature_importance_pool = {
+                name: [0]*cvs for name in self.x_matrix.columns}
 
         for cv_idx, split in enumerate(split_pool):
             estimator = copy.deepcopy(self.estimator)
-            training_report, auc, feature_importance, model = self.randomized_search_cv(estimator, split)
+            tn_report, auc, ft_impot, model = self.randomized_search_cv(estimator, split)
 
             self.model_pool.append(model)
             self.area_under_curve_pool.append(auc)
 
-            if training_report:
-                self.training_report_pool.append(training_report)
+            if tn_report:
+                self.training_report_pool.append(tn_report)
 
-            for name, importance in feature_importance.items():
+            for name, importance in ft_impot.items():
                 self.feature_importance_pool[name][cv_idx] = importance
 
     @staticmethod
@@ -775,12 +553,16 @@ class ASEP:
         mean, *_ = sp.stats.bayes_mvs(auc_pool)
         auc_mean, (auc_min, auc_max) = mean.statistic, mean.minmax
 
-        ax_roc.plot(fpr_mean, tpr_mean, color="r", lw=2, label="Mean: AUC={:0.3}, [{:0.3}, {:0.3}]".format(auc_mean, auc_min, auc_max))
+        label = "Mean: AUC={:0.3}, [{:0.3}, {:0.3}]".format(auc_mean,
+                                                            auc_min, auc_max)
+        ax_roc.plot(fpr_mean, tpr_mean, color="r", lw=2, label=label)
 
         mean_upper = np.minimum(tpr_mean + tpr_std, 1)
         mean_lower = np.maximum(tpr_mean - tpr_std, 0)
-        ax_roc.fill_between(fpr_mean, mean_upper, mean_lower, color='green', alpha=0.1, label="Standard deviation")
-        ax_roc.set(title="ROC curve", xlabel='False positive rate', ylabel='True positive rate')
+        ax_roc.fill_between(fpr_mean, mean_upper, mean_lower, color='green',
+                            alpha=0.1, label="Standard deviation")
+        ax_roc.set(title="ROC curve", xlabel='False positive rate',
+                   ylabel='True positive rate')
         ax_roc.plot([0, 1], color='grey', linestyle='--')
         ax_roc.legend(loc="best")
 
@@ -788,7 +570,8 @@ class ASEP:
 
     @staticmethod
     def draw_k_main_features_cv(feature_importance_pool, first_k=20):
-        """Draw feature importance for the model with cross-validation"""
+        """Draw feature importance for the model with cross-validation.
+        """
         name_mean_std_pool = []
         for name, importances in feature_importance_pool.items():
             mean = np.mean(importances)
@@ -805,21 +588,19 @@ class ASEP:
 
         fig, ax_features = plt.subplots(figsize=(10, 10))
         ax_features.bar(name_pool, mean_pool, yerr=std_pool)
-        ax_features.set_xticklabels(name_pool, rotation_mode='anchor', rotation=45, horizontalalignment='right')
-        ax_features.set(title="Feature importances(with stand deviation as error bar)", xlabel='Feature name', ylabel='Importance')
+        ax_features.set_xticklabels(name_pool, rotation_mode='anchor',
+                                    rotation=45, horizontalalignment='right')
+        ax_features.set(
+            title="Feature importances(with stand deviation as error bar)",
+            xlabel='Feature name', ylabel='Importance')
 
         return (fig, ax_features)
 
-    @timmer
     def save_to(self, save_path="./", run_flag='', save_method="pickle"):
-        """Save configs, results and model to the disk
+        """Save configs, results and model to the disk.
 
-        Keyword Arguments:
-            save_path {str} -- The path of the saved files (default: {"./"})
-            run_flag {str} -- The suffix for current run (default: {''})
-            save_method {str} -- The method to save serialize model, specific output, etc. (default: {"pickle"})
+        TODO: Finish the save_method parameters
         """
-        # TODO: Finish the save_method parameters
         time_stamp = self.time_stamp + "_" + run_flag
         save_path = os.path.join(save_path, time_stamp)
 
@@ -838,9 +619,9 @@ class ASEP:
             file_path = os.path.join(save_path, "auc_fpr_tpr.pkl")
             save_file(file_path, self.area_under_curve_pool)
 
-        if self.receiver_operating_characteristic_curve:
+        if self.ROC_curve:
             file_path = os.path.join(save_path, "roc_curve.png")
-            save_file(file_path, self.receiver_operating_characteristic_curve[0])
+            save_file(file_path, self.ROC_curve[0])
 
         if self.training_report_pool:
             file_path = os.path.join(save_path, "training_report.pkl")
@@ -855,11 +636,12 @@ class ASEP:
             pickle.dump(self, opfh)
 
     # Predictor
-    @timmer
     def predictor(self, input_file, output_dir="./", nrows=None, models=None):
-        """Predict ASE effects for raw dataset"""
+        """Predict ASE effects for raw dataset.
+        """
         with open(input_file) as file_handle:
-            dataframe = pd.read_table(file_handle, nrows=nrows, low_memory=False, na_values=['NA', '.'])
+            dataframe = pd.read_table(file_handle, nrows=nrows,
+                                      low_memory=False, na_values=['NA', '.'])
 
         x_matrix = self.setup_x_matrix(dataframe)
 
@@ -876,8 +658,8 @@ class ASEP:
         dataframe.to_csv(output_path, sep="\t", index=False)
 
     def get_predict_proba(self, x_matrix, models=None):
-        """Get the predicted probability"""
-
+        """Get the predicted probability.
+        """
         if models is None:
             models = self.fetch_models()
         else:
@@ -896,7 +678,8 @@ class ASEP:
         return prob_mean, prob1, prob0
 
     def fetch_models(self):
-        """Use specific model to predict new dataset"""
+        """Use specific model to predict new dataset.
+        """
         if self.model_pool is None:
             print("Please train a model first.", file=sys.stderr)
             sys.exit(1)
@@ -904,31 +687,26 @@ class ASEP:
             return [copy.deepcopy(m.steps[-1][-1]) for m in self.model_pool]
 
     def setup_x_matrix(self, dataframe, missing_val=1e9-1):
-        """Preprocessing inputs to predict"""
+        """Preprocessing inputs to predict.
+        """
         dataframe = self.slice_dataframe(dataframe, mask=self.mask_query, remove=False)
         dataframe = self.slice_dataframe(dataframe, cols=self.dropped_cols)
         dataframe = self.simple_imputer(dataframe)
 
-        for (_tag, _tag_enc), _encoder in self.label_encoder_matrix.items():
+        for (_tag, _tag_enc), _encoder in self.label_rename_mtrx.items():
             if _encoder == "removed":
                 del dataframe[_tag]
             else:
                 classes = _encoder.classes_
-                _tmp_dict = dict(zip(classes, _encoder.transform(classes)))
-                dataframe[_tag_enc] = dataframe[_tag].apply(lambda x: _tmp_dict.get(x, missing_val))
+                tmp_dict = dict(zip(classes, _encoder.transform(classes)))
+                dataframe[_tag_enc] = dataframe[_tag].apply(lambda x: tmp_dict[x] if x in tmp_dict else missing_val)
                 del dataframe[_tag]
 
         return dataframe
 
-    # Validator
-    @timmer
-    def validator(self, input_file, output_dir="./", limit=None, response="bb_ASE", models=None):
+    # Validate
+    def validate(self, input_file, output_dir="./", limit=None, response="bb_ASE", models=None):
         """Validate the model using another dataset.
-
-        Note:
-            1. Should not remove NA of validation data set based on the ratio of
-            NA, as the validation data set could have different ratio of NA from
-            the ratio of training data set.
         """
         mask = self.mask_query
         gs_mask = self.gs_mask
@@ -960,16 +738,12 @@ class ASEP:
 
 
 class Config:
-    """configs module for the ASEPredictor
-
-    Examples:
-        >>> from config import Config
-        >>> config = Config()
-        >>> config.init()
+    """Configs module for the ASEPredictor.
     """
 
     def __init__(self):
-        """Initializing configuration metrics"""
+        """Initializing configuration metrics.
+        """
         self.estimators_list = None
         self.optim_params = dict()
 
@@ -979,7 +753,8 @@ class Config:
         self.scorers = None
 
     def set_init_params(self, classifier="rfc"):
-        """A mathod get initial params for classifier"""
+        """A mathod get initial params for classifier.
+        """
         if classifier == "abc":  # For AdaboostClassifier
             self.init_params = dict(
                 abc__n_estimators=list(range(50, 1000, 50)),
@@ -1045,20 +820,10 @@ class Config:
         ]
         return self
 
-    def __set_scorers(self, extra_scorer=None):
-        """Set scorer"""
-        basic_scorers = dict(
-            precision=make_scorer(precision_score, average="micro"),
-            accuracy=make_scorer(accuracy_score),
-        )
-
-        if extra_scorer:
-            basic_scorers['extra_scorer'] = extra_scorer
-        self.scorers = basic_scorers
-
     def set_searcher_params(self, cvs=None, ncvs=10, n_jobs=5, n_iter=25,
                             refit=None):
-        """Set params for the searcher"""
+        """Set params for the searcher.
+        """
         if cvs is None:
             cvs = StratifiedKFold(n_splits=ncvs, shuffle=True)
 
@@ -1073,8 +838,8 @@ class Config:
         return self
 
     def assembly(self):
-        """Set up default configuration"""
-
+        """Set up default configuration.
+        """
         if self.classifier is None:
             self.set_classifier()
 
@@ -1098,7 +863,8 @@ class Config:
 
 
 def save_file(filename, target, svmtd="pickle"):
-    """Save your file smartly"""
+    """Save your file smartly.
+    """
     with open(filename, "wb") as opfh:
         if hasattr(target, "savefig"):
             target.savefig(opfh)
@@ -1109,7 +875,8 @@ def save_file(filename, target, svmtd="pickle"):
 
 
 def check_model_sanity(models):
-    """Check the sanity of given model"""
+    """Check the sanity of given model.
+    """
     if not isinstance(models, (list, tuple)):
         models = [models]
 
@@ -1124,10 +891,7 @@ def check_model_sanity(models):
 
 
 def cli_parser():
-    """A method to get arguments from the command line
-
-    Returns:
-        parser: ArgumentParser -- An intance of ArgumentParser()
+    """A method to get arguments from the command line.
     """
     # default_discarded_cols = ["bb_p", "bb_p_adj", "bn_ASE", "bn_p",
     # "bn_p_adj", "group_size", "log2FC", "Chrom", "Pos", "Annotype",
@@ -1155,7 +919,7 @@ def cli_parser():
     _group.add_argument("--response-col", dest="response_col", default='bb_ASE', help="The column name of response variable or target variable. Default: bb_ASE")
 
     _group = train_argparser.add_argument_group("Configuration") # Arguments for configuration
-    _group.add_argument("--random-seed", dest="random_seed", default=1234, type=int, help="The random seed. Default: %(default)s")
+    _group.add_argument("--random-seed", dest="random_seed", default=31415, type=int, help="The random seed. Default: %(default)s")
     _group.add_argument("--classifier", dest="classifier", default='gbc', type=str, choices=["abc", "gbc", "rfc", "brfc"], help="Algorithm. Choices: [abc, gbc, rfc, brfc]. Default: rfc")
     _group.add_argument("--nested-cv", dest="nested_cv", default=False, action="store_true", help="Use nested cross validation or not. Default: False")
     _group.add_argument("--inner-cvs", dest="inner_cvs", default=6, type=int, help="Fold of cross-validations for RandomizedSearchCV. Default: 6")
@@ -1179,7 +943,7 @@ def cli_parser():
     _group = validate_argparser.add_argument_group("Filter") # Arguments for Filter
     _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=None, type=int, help="Only read first k rows as input from input file. Default: None")
     _group.add_argument("--response-col", dest="response_col", default='bb_ASE', help="The column name of response variable or target variable. Default: bb_ASE")
-    _group.add_argument("--random-seed", dest="random_seed", default=1234, type=int, help="The random seed. Default: %(default)s")
+    _group.add_argument("--random-seed", dest="random_seed", default=31415, type=int, help="The random seed. Default: %(default)s")
 
     _group = validate_argparser.add_argument_group("Output") # Arguments for Output
     _group.add_argument("-o", "--output-dir", dest="output_dir", default="./", type=str, help="The directory including output files. Default: ./")
@@ -1198,48 +962,55 @@ def cli_parser():
     return parser
 
 
-@my_debug(level=DEBUG)
 def train(args):
-    """Wrapper entry for `train` subcommand
-
-    Arguments:
-        args {ArgumentParser} -- An `ArgumentParser` instance caught by `parse_arg()`
+    """Wrapper entry for `train` subcommand.
     """
     my_config = Config() \
-            .set_searcher_params(n_jobs=args.inner_n_jobs, n_iter=args.inner_n_iters, ncvs=args.inner_cvs) \
+            .set_searcher_params(n_jobs=args.inner_n_jobs,
+                                 n_iter=args.inner_n_iters,
+                                 ncvs=args.inner_cvs) \
             .set_classifier(args.classifier) \
             .assembly()
 
     ASEP(args.input_file, my_config) \
-        .trainer(mask=args.mask_out, mings=args.min_group_size,
-                 maxgs=args.max_group_size, limit=args.first_k_rows,
-                 response=args.response_col, drop_cols=args.drop_cols,
-                 outer_cvs=args.outer_cvs, nested_cv=args.nested_cv,
-                 with_lc=args.with_learning_curve,
-                 lc_space_size=args.learning_curve_space_size,
-                 lc_n_jobs=args.learning_curve_n_jobs,
-                 lc_cvs=args.learning_curve_cvs, max_na_ratio=args.max_na_ratio) \
-        .save_to(args.output_dir, run_flag=args.run_flag, save_method=args.save_method)
+            .train(mask=args.mask_out,
+                   mings=args.min_group_size,
+                   maxgs=args.max_group_size,
+                   limit=args.first_k_rows,
+                   response=args.response_col,
+                   drop_cols=args.drop_cols,
+                   outer_cvs=args.outer_cvs,
+                   nested_cv=args.nested_cv,
+                   with_lc=args.with_learning_curve,
+                   lc_space_size=args.learning_curve_space_size,
+                   lc_n_jobs=args.learning_curve_n_jobs,
+                   lc_cvs=args.learning_curve_cvs,
+                   max_na_ratio=args.max_na_ratio) \
+            .save_to(args.output_dir,
+                     run_flag=args.run_flag,
+                     save_method=args.save_method)
 
 
-@my_debug(level=DEBUG)
 def validate(args):
-    """Validate the model using extra dataset"""
+    """Validate the model using extra dataset.
+    """
     with open(args.model_file, 'rb') as model_file_handle:
         model_obj = pickle.load(model_file_handle)
-    model_obj.validator(args.input_file, args.output_dir, args.first_k_rows, args.response_col)
+    model_obj.validate(args.input_file, args.output_dir, args.first_k_rows,
+                       args.response_col)
 
 
-@my_debug(level=DEBUG)
 def predict(args):
-    """Predict new dataset based on constructed model"""
+    """Predict new dataset based on constructed model.
+    """
     with open(args.model_file, 'rb') as model_file_handle:
         model_obj = pickle.load(model_file_handle)
     model_obj.predictor(args.input_file, args.output_dir, args.first_k_rows)
 
 
 def main():
-    """Main function to run the module """
+    """Main function to run the module.
+    """
     parser = cli_parser()
     cli_args = parser.parse_args()
 
