@@ -6,33 +6,37 @@
 TODO: 1. A module to parse configuration file, which could make life easier.
       2. The `mask` argument in predictor.train() func doesn't function at all.
 """
-import argparse
-import copy
 import os
-import pickle
 import sys
+import copy
 import time
+import pickle
+import argparse
 
 import joblib
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 import prince
+import numpy as np
 import scipy as sp
-from imblearn.ensemble import BalancedRandomForestClassifier
-from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier,
-                              RandomForestClassifier)
-from sklearn.metrics import (accuracy_score, make_scorer, precision_score,
-                             roc_auc_score, roc_curve)
-from sklearn.model_selection import (RandomizedSearchCV, StratifiedKFold,
-                                     learning_curve)
-from sklearn.multiclass import OneVsOneClassifier
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import LabelEncoder
-from sklearn.utils import shuffle
+import pandas as pd
+import matplotlib.pyplot as plt
 
-g_random_state = 31415
-np.random.seed(g_random_state)
+from sklearn.utils import shuffle
+from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import classification_report
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.multiclass import OneVsOneClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import learning_curve
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import RandomizedSearchCV
+
+from imblearn.ensemble import BalancedRandomForestClassifier
 
 
 def format_print(title, main_content, pipe=sys.stderr):
@@ -40,38 +44,6 @@ def format_print(title, main_content, pipe=sys.stderr):
     head = '-' * 3
     flag = ' '.join([head, title, ": "])
     print(flag, '\n   ', main_content, "\n\n", file=pipe)
-
-
-def print_header(title=None, version=None, author=None, email=None, institute=None, url=None):
-    """A function to print a header including information of the package"""
-    astr = "{: ^80}\n"
-    bstr = "#{: ^48}#"
-    head = astr.format("#" * 50)
-
-    if title is None:
-        title = "Allele-Specific Expression Predictor"
-    head += astr.format(bstr.format(title))
-    if version is None:
-        version = 'Version 0.1.0'
-    head += astr.format(bstr.format(version))
-    if author is None:
-        author = 'Zhen-hua Zhang'
-    head += astr.format(bstr.format(author))
-    if email is None:
-        email = 'zhenhua.zhang217@gmail.com'
-    head += astr.format(bstr.format(email))
-    if institute is None:
-        head += astr.format(bstr.format('Genomics Coordination Centre'))
-        head += astr.format(bstr.format("University Medical Centre Groningen"))
-    elif isinstance(institute, (tuple, list)):
-        for i in institute:
-            head += astr.format(bstr.format(i))
-    if url is None:
-        url = 'https://github.com/zhenhua-zhang/asep'
-    head += astr.format(bstr.format(url))
-
-    head += astr.format("#" * 50)
-    print("\n", head, file=sys.stderr, sep="")
 
 
 def print_flag(subc=None, flag=None):
@@ -119,9 +91,10 @@ def print_args(args, fwd=-1):
 class ASEP:
     """A class implementing prediction of ASE effect for a variant"""
 
-    def __init__(self, file_name, config):
+    def __init__(self, file_name, config, random_state=42, test_pp=0):
         """Set up basic variables """
         self.time_stamp = None
+        self.random_state = random_state
 
         self.input_file_name = file_name
 
@@ -134,6 +107,10 @@ class ASEP:
         self.x_matrix = None
         self.y_vector = None
 
+        self.test_pp = test_pp
+        self.x_test_matrix = None
+        self.y_test_vector = None
+
         self.estimator = None
         self.pipeline = None
 
@@ -143,7 +120,7 @@ class ASEP:
         self.feature_importance_pool = None
         self.feature_importance_hist = None
 
-        self.ROC_curve = None
+        self.roc_curve_pool = None
         self.area_under_curve_pool = None
 
         self.learning_report = None
@@ -173,14 +150,63 @@ class ASEP:
         self.raw_dataframe, self.work_dataframe, self.x_matrix, self.y_vector \
                 = self.preprocessing(self.input_file_name, limit, gs_mask, mask,
                                      drop_cols, response, max_na_ratio)
+        if 0 < self.test_pp < 1:
+            self.x_matrix, self.y_vector, self.x_test_matrix, self.y_test_vector \
+                    = train_test_split(self.x_matrix, self.y_vector, test_size=self.test_pp, random_state=self.random_state, shuffle=True)
+
         self.setup_pipeline(self.estimators_list, biclass=biclass_)
         self.outer_validation(cvs=outer_cvs, nested_cv=nested_cv)
-        self.ROC_curve = self.draw_roc_curve_cv(self.area_under_curve_pool)
+        self.roc_curve_pool = self.draw_roc_curve_cv(self.area_under_curve_pool)
         self.feature_importance_hist = self.draw_k_main_features_cv(self.feature_importance_pool)
 
         if with_lc:
             self.draw_learning_curve(estimator=self.estimator, cvs=lc_cvs, n_jobs=lc_n_jobs, space_size=lc_space_size)
 
+        return self
+
+    def test(self, output_prefix):
+        """Do test on n% left out samples."""
+
+        if self.x_test_matrix is None or self.y_test_vector is None:
+            print("[E]: It looks you setted --test-propotion to 0, which means no test dataset will be setup from the whole input dataset.")
+            return self
+
+        y_true = self.y_test_vector
+        y_pred = self.get_predict_label(self.x_test_matrix)[0]
+
+        creport = classification_report(y_true, y_pred, labels=[1, 0], target_names=["ASE", "Non-ASE"])
+        clsf_report = output_prefix + "test_classification_report.txt"
+        conf_matrix = confusion_matrix(y_true, y_pred, labels=[1, 0])
+        conf_matrix = pd.DataFrame(conf_matrix, index=["ASE", "Non-ASE"], columns=["ASE", "Non-ASE"])
+        conf_matrix.columns.name = "Pred"
+        conf_matrix.index.name = "True"
+        with open(clsf_report, "w") as fh:
+            fh.write("Classification report:\n")
+            fh.write(creport)
+            fh.write("\nConfusion matrix:\n")
+            fh.write(conf_matrix.to_string())
+            fh.write("\n")
+
+        # Output test results
+        output_path = output_prefix + "test_pred.tsv"
+        dataframe = self.x_test_matrix
+        dataframe["ASE_true"] = self.y_true
+        dataframe["ASE_pred"] = self.y_pred
+        dataframe.to_csv(output_path, sep="\t", index=False)
+
+        _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
+        _new_vals, prob1, _ = self.get_predict_proba(self.x_test_matrix)
+        for col_key, col_val in zip(_new_cols, _new_vals):
+            dataframe[col_key] = col_val
+
+        auc = [[roc_auc_score(y_true, _prob1), roc_curve(y_true, _prob1)] for _prob1 in prob1]
+        auc_opt = output_prefix + "test_roc_auc.pkl"
+        with open(auc_opt, 'wb') as auc_opth:
+            pickle.dump(auc, auc_opth)
+
+        fig, _ = self.draw_roc_curve_cv(auc)
+        file_path = output_prefix + "test_roc_auc.png"
+        save_file(file_path, fig)
         return self
 
     def preprocessing(self, file_name, limit=None, gs_mask=None, mask=None,
@@ -199,7 +225,7 @@ class ASEP:
         dataframe = self.simple_imputer(dataframe)
         dataframe[response] = dataframe[response].apply(abs)
         dataframe = self.label_encoder(dataframe)
-        dataframe = shuffle(dataframe, random_state=g_random_state)
+        dataframe = shuffle(dataframe, random_state=self.random_state)
         x_matrix, y_vector = self.setup_xy(dataframe, y_col=response)
 
         return raw_dataframe, dataframe, x_matrix, y_vector
@@ -258,7 +284,7 @@ class ASEP:
 
         return dataframe
 
-    def remove_high_na_features(self, dataframe, max_na_ratio=0.5):
+    def remove_high_na_features(self, dataframe, max_na_ratio=0.4):
         """Remove features with high NA ratio"""
         na_count_table = dataframe.isna().sum()
         nr_rows, _ = dataframe.shape
@@ -466,10 +492,10 @@ class ASEP:
 
     def outer_validation(self, cvs=6, nested_cv=False, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
-        skf = StratifiedKFold(n_splits=cvs, **kwargs)
+        skf = StratifiedKFold(n_splits=cvs, random_state=self.random_state, **kwargs)
         split_pool = skf.split(self.x_matrix, self.y_vector)
 
-        model = RandomizedSearchCV(self.pipeline, **self.optim_params)
+        model = RandomizedSearchCV(self.pipeline, random_state=self.random_state, **self.optim_params)
         if nested_cv:
             self.estimator = model
         else:
@@ -619,9 +645,9 @@ class ASEP:
             file_path = os.path.join(save_path, "auc_fpr_tpr.pkl")
             save_file(file_path, self.area_under_curve_pool)
 
-        if self.ROC_curve:
+        if self.roc_curve_pool:
             file_path = os.path.join(save_path, "roc_curve.png")
-            save_file(file_path, self.ROC_curve[0])
+            save_file(file_path, self.roc_curve_pool[0])
 
         if self.training_report_pool:
             file_path = os.path.join(save_path, "training_report.pkl")
@@ -631,12 +657,12 @@ class ASEP:
             file_path = os.path.join(save_path, "learning_curve.png")
             save_file(file_path, self.learning_line[0])
 
-        file_path = os.path.join(save_path, time_stamp + "_object.pkl")
+        file_path = os.path.join(save_path, "model.pkl")
         with open(file_path, 'wb') as opfh:
             pickle.dump(self, opfh)
 
     # Predictor
-    def predictor(self, input_file, output_dir="./", nrows=None, models=None):
+    def predictor(self, input_file, output_prefix="./", nrows=None, models=None):
         """Predict ASE effects for raw dataset.
         """
         with open(input_file) as file_handle:
@@ -653,7 +679,7 @@ class ASEP:
         _, input_file_name = os.path.split(input_file)
         name, ext = os.path.splitext(input_file_name)
         output_file = "".join([name, "_pred", ext])
-        output_path = os.path.join(output_dir, output_file)
+        output_path = output_prefix + output_file
 
         dataframe.to_csv(output_path, sep="\t", index=False)
 
@@ -676,6 +702,20 @@ class ASEP:
         prob_mean = (prob0.mean(axis=0), prob0.var(axis=0), prob1.mean(axis=0), prob1.var(axis=0))
 
         return prob_mean, prob1, prob0
+
+    def get_predict_label(self, x_matrix, models=None):
+        """Get the predicted labels.
+        """
+        if models is None:
+            models = self.fetch_models()
+        else:
+            check_model_sanity(models)
+
+        _pre_label = []
+        for model in models:
+            _pre_label.append(model.predict(x_matrix))
+
+        return _pre_label
 
     def fetch_models(self):
         """Use specific model to predict new dataset.
@@ -705,7 +745,7 @@ class ASEP:
         return dataframe
 
     # Validate
-    def validate(self, input_file, output_dir="./", limit=None, response="bb_ASE", models=None):
+    def validate(self, input_file, output_prefix="./", limit=None, response="bb_ASE", models=None):
         """Validate the model using another dataset.
         """
         mask = self.mask_query
@@ -714,7 +754,22 @@ class ASEP:
         if response in drop_cols:
             drop_cols.remove(response)
 
-        _, dataframe, x_matrix, y_vector = self.preprocessing(input_file, limit, gs_mask, mask, drop_cols, response)
+        _, dataframe, x_matrix, y_true = self.preprocessing(input_file, limit, gs_mask, mask, drop_cols, response)
+
+        y_pred = self.get_predict_label(x_matrix, models)[0]
+        creport = classification_report(y_true, y_pred, labels=[1, 0], target_names=["ASE", "Non-ASE"])
+        clsf_report = output_prefix + "validation_classification_report.txt"
+        conf_matrix = confusion_matrix(y_true, y_pred, labels=[1, 0])
+        conf_matrix = pd.DataFrame(conf_matrix, index=["ASE", "Non-ASE"], columns=["ASE", "Non-ASE"])
+        conf_matrix.columns.name = "Pred"
+        conf_matrix.index.name = "True"
+
+        with open(clsf_report, "w") as fh:
+            fh.write("Classification report:\n")
+            fh.write(creport)
+            fh.write("\nConfusion matrix:\n")
+            fh.write(conf_matrix.to_string())
+            fh.write("\n")
 
         _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
         _new_vals, prob1, _ = self.get_predict_proba(x_matrix, models)
@@ -724,16 +779,18 @@ class ASEP:
         _, input_file_name = os.path.split(input_file)
         name, ext = os.path.splitext(input_file_name)
         output_file = "".join(["validation_", name, "_pred", ext])
-        output_path = os.path.join(output_dir, output_file)
+
+        output_path = output_prefix + output_file
         dataframe.to_csv(output_path, sep="\t", index=False)
 
-        auc = [[roc_auc_score(y_vector, _prob1), roc_curve(y_vector, _prob1)] for _prob1 in prob1]
-        auc_opt = os.path.join(output_dir, "validation_roc_auc.pkl")
+        auc = [[roc_auc_score(y_true, _prob1), roc_curve(y_true, _prob1)] for _prob1 in prob1]
+        auc_opt = output_prefix + "validation_roc_auc.pkl"
+
         with open(auc_opt, 'wb') as auc_opth:
             pickle.dump(auc, auc_opth)
 
         fig, _ = self.draw_roc_curve_cv(auc)
-        file_path = os.path.join(output_dir, "validation_roc_auc.png")
+        file_path = output_prefix + "validation_roc_auc.png"
         save_file(file_path, fig)
 
 
@@ -741,9 +798,11 @@ class Config:
     """Configs module for the ASEPredictor.
     """
 
-    def __init__(self):
+    def __init__(self, random_state=42):
         """Initializing configuration metrics.
         """
+        self.random_state = random_state
+
         self.estimators_list = None
         self.optim_params = dict()
 
@@ -780,15 +839,15 @@ class Config:
                 # rfc__bootstrap=[False, True],
                 # rfc__max_features=['sqrt', 'log2', None],
             )
-        elif classifier == 'brfc':  # For RandomForestClassifier
+        elif classifier == 'brfc':  # For BalancedRandomForestClassifier
             self.init_params = dict(
-                rfc__n_estimators=list(range(50, 500, 50)),
-                rfc__min_samples_split=list(range(2, 10, 2)),
-                rfc__min_samples_leaf=list(range(2, 10, 2)),
-                rfc__max_depth=list(range(10, 50, 10)),
-                rfc__class_weight=['balanced'],
-                # rfc__bootstrap=[False, True],
-                # rfc__max_features=['sqrt', 'log2', None],
+                brfc__n_estimators=list(range(50, 500, 50)),
+                brfc__min_samples_split=list(range(2, 10, 2)),
+                brfc__min_samples_leaf=list(range(2, 10, 2)),
+                brfc__max_depth=list(range(10, 50, 10)),
+                brfc__class_weight=['balanced'],
+                # brfc__bootstrap=[False, True],
+                # brfc__max_features=['sqrt', 'log2', None],
             )
         else:
             raise ValueError("Unknow classifier, choice: abc, gbc, rfc, brfc.")
@@ -800,13 +859,13 @@ class Config:
         self.set_init_params(classifier=classifier)
 
         if classifier == "abc":  # For AdaboostClassifier
-            self.classifier = ('abc', AdaBoostClassifier())
+            self.classifier = ('abc', AdaBoostClassifier(random_state=self.random_state))
         elif classifier == "gbc":  # For GradientBoostingClassifier
-            self.classifier = ('gbc', GradientBoostingClassifier())
+            self.classifier = ('gbc', GradientBoostingClassifier(random_state=self.random_state))
         elif classifier == 'rfc':  # For RandomForestClassifier
-            self.classifier = ('rfc', RandomForestClassifier())
+            self.classifier = ('rfc', RandomForestClassifier(random_state=self.random_state))
         elif classifier == 'brfc':  # For BalancedRandomForestClassifier
-            self.classifier = ('brfc', BalancedRandomForestClassifier())
+            self.classifier = ('brfc', BalancedRandomForestClassifier(random_state=self.random_state))
         else:
             raise ValueError("Unknow classifier, choice [abc, gbc, rfc, brfc]")
 
@@ -825,7 +884,7 @@ class Config:
         """Set params for the searcher.
         """
         if cvs is None:
-            cvs = StratifiedKFold(n_splits=ncvs, shuffle=True)
+            cvs = StratifiedKFold(n_splits=ncvs, shuffle=True, random_state=self.random_state)
 
         if refit is None:
             refit = 'accuracy'
@@ -900,7 +959,8 @@ def cli_parser():
 
     parser = argparse.ArgumentParser()
     _group = parser.add_argument_group("Global") # Global-wide configs
-    _group.add_argument("--run-flag", dest="run_flag", default="new_task", help="Flags for current run. The flag will be added to the name of the output dir. Default: new_task")
+    _group.add_argument("--run-flag", dest="run_flag", default="new_task", help="Flags for current run. The flag will be added to the name of the output dir. Default: %(default)s")
+    _group.add_argument("--random-state", dest="random_state", default=None, type=int, help="The random seed. Default: %(default)s")
 
     subparser = parser.add_subparsers(dest="subcmd") # Arguments parser for sub-command `train`
     train_argparser = subparser.add_parser("train", help="Train a model")
@@ -909,31 +969,31 @@ def cli_parser():
     _group.add_argument("-i", "--input-file", dest="input_file", default=None, help="The path to file of training dataset. [Required]")
 
     _group = train_argparser.add_argument_group("Filter") # Arguments for Filter
-    _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=None, type=int, help="Only read first k rows as input from input file. Default: None")
-    _group.add_argument("-m", "--mask-as", dest="mask_as", default=None, type=str, help="Pattern will be kept. Default: None")
-    _group.add_argument("-M", "--mask-out", dest="mask_out", default=None, type=str, help="Pattern will be masked. Default: None")
-    _group.add_argument("--min-group-size", dest="min_group_size", default=2, type=lambda x: int(x) > 1 and int(x) or parser.error("--min-group-size must be >= 2"), help="The minimum individuals bearing the same variant(>=2). Default: 2")
-    _group.add_argument("--max-group-size", dest="max_group_size", default=1.0E5, type=lambda x: int(x) <= 1e4 and int(x) or parser.error("--max-group-size must be <= 10,000"), help="The maximum number of individuals bearing the same variant (<= 10,000). Default: None")
+    _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=None, type=int, help="Only read first k rows as input from input file. Default: %(default)s")
+    _group.add_argument("-m", "--mask-as", dest="mask_as", default=None, type=str, help="Pattern will be kept. Default: %(default)s")
+    _group.add_argument("-M", "--mask-out", dest="mask_out", default=None, type=str, help="Pattern will be masked. Default: %(default)s")
+    _group.add_argument("--min-group-size", dest="min_group_size", default=2, type=lambda x: int(x) > 1 and int(x) or parser.error("--min-group-size must be >= 2"), help="The minimum individuals bearing the same variant(>=2). Default: %(default)s")
+    _group.add_argument("--max-group-size", dest="max_group_size", default=1.0E5, type=lambda x: int(x) <= 1e4 and int(x) or parser.error("--max-group-size must be <= 10,000"), help="The maximum number of individuals bearing the same variant (<= 10,000). Default: %(default)s")
     _group.add_argument("--max-na-ratio", dest="max_na_ratio", default=0.6, type=float, help="The maximum ratio of NA in each feature, otherwise, the feature will be abundant")
-    _group.add_argument("--drop-cols", dest="drop_cols", default=[], nargs='*', help="The columns will be dropped. Seperated by semi-colon and quote them by ','. if there are more than one columns. Default: None")
-    _group.add_argument("--response-col", dest="response_col", default='bb_ASE', help="The column name of response variable or target variable. Default: bb_ASE")
+    _group.add_argument("--drop-cols", dest="drop_cols", default=[], nargs='*', help="The columns will be dropped. Seperated by semi-colon and quote them by ','. if there are more than one columns. Default: %(default)s")
+    _group.add_argument("--response-col", dest="response_col", default='bb_ASE', help="The column name of response variable or target variable. Default: %(default)s")
 
     _group = train_argparser.add_argument_group("Configuration") # Arguments for configuration
-    _group.add_argument("--random-seed", dest="random_seed", default=31415, type=int, help="The random seed. Default: %(default)s")
-    _group.add_argument("--classifier", dest="classifier", default='gbc', type=str, choices=["abc", "gbc", "rfc", "brfc"], help="Algorithm. Choices: [abc, gbc, rfc, brfc]. Default: rfc")
-    _group.add_argument("--nested-cv", dest="nested_cv", default=False, action="store_true", help="Use nested cross validation or not. Default: False")
-    _group.add_argument("--inner-cvs", dest="inner_cvs", default=6, type=int, help="Fold of cross-validations for RandomizedSearchCV. Default: 6")
-    _group.add_argument("--inner-n-jobs", dest="inner_n_jobs", default=5, type=int, help="Number of jobs for RandomizedSearchCV. Default: 5")
-    _group.add_argument("--inner-n-iters", dest="inner_n_iters", default=50, type=int, help="Number of iters for RandomizedSearchCV. Default: 50")
-    _group.add_argument("--outer-cvs", dest="outer_cvs", default=6, type=int, help="Fold of cross-validation for outer_validation. Default: 6")
-    _group.add_argument("--with-learning-curve", dest="with_learning_curve", default=False, action='store_true', help="Whether draw learning curve. Default: False")
-    _group.add_argument("--learning-curve-cvs", dest="learning_curve_cvs", default=4, type=int, help="Number of folds to draw learning curve. Default: 4")
-    _group.add_argument("--learning-curve-n-jobs", dest="learning_curve_n_jobs", default=5, type=int, help="Number of jobs to draw learning curves. Default: 5")
-    _group.add_argument("--learning-curve-space-size", dest="learning_curve_space_size", default=10, type=int, help="Number of splits created in learning curve. Default: 10")
+    _group.add_argument("--classifier", dest="classifier", default='gbc', type=str, choices=["abc", "gbc", "rfc", "brfc"], help="Algorithm. Choices: [abc, gbc, rfc, brfc]. Default: %(default)s")
+    _group.add_argument("--nested-cv", dest="nested_cv", default=False, action="store_true", help="Use nested cross validation or not. Default: %(default)s")
+    _group.add_argument("--inner-cvs", dest="inner_cvs", default=6, type=int, help="Fold of cross-validations for RandomizedSearchCV. Default: %(default)s")
+    _group.add_argument("--inner-n-jobs", dest="inner_n_jobs", default=5, type=int, help="Number of jobs for RandomizedSearchCV. Default: %(default)s")
+    _group.add_argument("--inner-n-iters", dest="inner_n_iters", default=50, type=int, help="Number of iters for RandomizedSearchCV. Default: %(default)s")
+    _group.add_argument("--outer-cvs", dest="outer_cvs", default=6, type=int, help="Fold of cross-validation for outer_validation. Default: %(default)s")
+    _group.add_argument("--with-learning-curve", dest="with_learning_curve", default=False, action='store_true', help="Whether draw learning curve. Default: %(default)s")
+    _group.add_argument("--learning-curve-cvs", dest="learning_curve_cvs", default=4, type=int, help="Number of folds to draw learning curve. Default: %(default)s")
+    _group.add_argument("--learning-curve-n-jobs", dest="learning_curve_n_jobs", default=5, type=int, help="Number of jobs to draw learning curves. Default: %(default)s")
+    _group.add_argument("--learning-curve-space-size", dest="learning_curve_space_size", default=10, type=int, help="Number of splits created in learning curve. Default: %(default)s")
+    _group.add_argument("--test-propotion", dest="test_pp", default=0, type=float, help="Percentage of whole dataset will be used as test dataset.")
 
     _group = train_argparser.add_argument_group("Output") # Arguments for Output
-    _group.add_argument("-o", "--output-dir", dest="output_dir", default='./', type=str, help="The directory including output files. Default: ./")
-    _group.add_argument("--save-method", dest="save_method", default="pickle", choices=["pickle", "joblib"], help="The library used to save the model and other data set. Choices: pickle, joblib. Default: pickle")
+    _group.add_argument("-o", "--output-prefix", dest="output_prefix", default='./', type=str, help="The directory including output files. Default: ./")
+    _group.add_argument("--save-method", dest="save_method", default="pickle", choices=["pickle", "joblib"], help="The library used to save the model and other data set. Choices: pickle, joblib. Default: %(default)s")
 
     validate_argparser = subparser.add_parser("validate", help="Validate the model.") # Argument parser for subcommand `validate`
     _group = validate_argparser.add_argument_group("Input") # Arguments for Input
@@ -941,12 +1001,11 @@ def cli_parser():
     _group.add_argument("-m", "--model-file", dest="model_file", type=str, help="Model to be validated. [Required]")
 
     _group = validate_argparser.add_argument_group("Filter") # Arguments for Filter
-    _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=None, type=int, help="Only read first k rows as input from input file. Default: None")
-    _group.add_argument("--response-col", dest="response_col", default='bb_ASE', help="The column name of response variable or target variable. Default: bb_ASE")
-    _group.add_argument("--random-seed", dest="random_seed", default=31415, type=int, help="The random seed. Default: %(default)s")
+    _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=None, type=int, help="Only read first k rows as input from input file. Default: %(default)s")
+    _group.add_argument("--response-col", dest="response_col", default='bb_ASE', help="The column name of response variable or target variable. Default: %(default)s")
 
     _group = validate_argparser.add_argument_group("Output") # Arguments for Output
-    _group.add_argument("-o", "--output-dir", dest="output_dir", default="./", type=str, help="The directory including output files. Default: ./")
+    _group.add_argument("-o", "--output-prefix", dest="output_prefix", default="./", type=str, help="The directory including output files. Default: ./")
 
     predict_argparser = subparser.add_parser("predict", help="Apply the model on new data set") # Argument parser for subcommand `predict`
     _group = predict_argparser.add_argument_group("Input") # Arguments for Input
@@ -954,10 +1013,10 @@ def cli_parser():
     _group.add_argument("-m", "--model-file", dest="model_file", type=str, required=True, help="Model to be used. [Required]")
 
     _group = predict_argparser.add_argument_group("Filter") # Arguments for Filter
-    _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=None, type=int, help="Only read first k rows as input from input file. Default: None")
+    _group.add_argument("-f", "--first-k-rows", dest="first_k_rows", default=None, type=int, help="Only read first k rows as input from input file. Default: %(default)s")
 
     _group = predict_argparser.add_argument_group("Output") # Arguments for Output
-    _group.add_argument("-o", "--output-dir", dest="output_dir", type=str, help="Output directory for input file. [Reqired]")
+    _group.add_argument("-o", "--output-prefix", dest="output_prefix", type=str, help="Output directory for input file. [Reqired]")
 
     return parser
 
@@ -965,14 +1024,14 @@ def cli_parser():
 def train(args):
     """Wrapper entry for `train` subcommand.
     """
-    my_config = Config() \
+    my_config = Config(args.random_state) \
             .set_searcher_params(n_jobs=args.inner_n_jobs,
                                  n_iter=args.inner_n_iters,
                                  ncvs=args.inner_cvs) \
             .set_classifier(args.classifier) \
             .assembly()
 
-    ASEP(args.input_file, my_config) \
+    ASEP(args.input_file, my_config, args.random_state, args.test_pp) \
             .train(mask=args.mask_out,
                    mings=args.min_group_size,
                    maxgs=args.max_group_size,
@@ -986,7 +1045,8 @@ def train(args):
                    lc_n_jobs=args.learning_curve_n_jobs,
                    lc_cvs=args.learning_curve_cvs,
                    max_na_ratio=args.max_na_ratio) \
-            .save_to(args.output_dir,
+            .test(args.output_prefix) \
+            .save_to(args.output_prefix,
                      run_flag=args.run_flag,
                      save_method=args.save_method)
 
@@ -996,7 +1056,8 @@ def validate(args):
     """
     with open(args.model_file, 'rb') as model_file_handle:
         model_obj = pickle.load(model_file_handle)
-    model_obj.validate(args.input_file, args.output_dir, args.first_k_rows,
+
+    model_obj.validate(args.input_file, args.output_prefix, args.first_k_rows,
                        args.response_col)
 
 
@@ -1005,7 +1066,7 @@ def predict(args):
     """
     with open(args.model_file, 'rb') as model_file_handle:
         model_obj = pickle.load(model_file_handle)
-    model_obj.predictor(args.input_file, args.output_dir, args.first_k_rows)
+    model_obj.predictor(args.input_file, args.output_prefix, args.first_k_rows)
 
 
 def main():
@@ -1018,10 +1079,12 @@ def main():
     cli_args.run_flag = run_flag
     subcmd = cli_args.subcmd
 
+    random_state = cli_args.random_state
+    np.random.seed(random_state)
+
     if subcmd not in ["train", "validate", "predict"]:
         parser.print_help()
     else:
-        print_header()
         print_flag(subcmd, run_flag)
         print_args(cli_args)
 
