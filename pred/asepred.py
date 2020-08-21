@@ -8,6 +8,7 @@ TODO: 1. A module to parse configuration file, which could make life easier.
 """
 import os
 import sys
+import pdb
 import copy
 import time
 import pickle
@@ -111,6 +112,10 @@ class ASEP:
         self.x_test_matrix = None
         self.y_test_vector = None
 
+        self.conf_string = None
+        self.test_roc_auc = None
+        self.test_roc_auc_curve = None
+
         self.estimator = None
         self.pipeline = None
 
@@ -151,7 +156,7 @@ class ASEP:
                 = self.preprocessing(self.input_file_name, limit, gs_mask, mask,
                                      drop_cols, response, max_na_ratio)
         if 0 < self.test_pp < 1:
-            self.x_matrix, self.y_vector, self.x_test_matrix, self.y_test_vector \
+            self.x_matrix, self.x_test_matrix, self.y_vector, self.y_test_vector \
                     = train_test_split(self.x_matrix, self.y_vector, test_size=self.test_pp, random_state=self.random_state, shuffle=True)
 
         self.setup_pipeline(self.estimators_list, biclass=biclass_)
@@ -164,49 +169,34 @@ class ASEP:
 
         return self
 
-    def test(self, output_prefix):
+    def test(self):
         """Do test on n% left out samples."""
-
         if self.x_test_matrix is None or self.y_test_vector is None:
-            print("[E]: It looks you setted --test-propotion to 0, which means no test dataset will be setup from the whole input dataset.")
+            print("[E]: It looks you setted --test-proportion to 0, which means no test dataset will be setup from the whole input dataset.")
             return self
 
         y_true = self.y_test_vector
         y_pred = self.get_predict_label(self.x_test_matrix)[0]
 
+        # Confusion matrix
         creport = classification_report(y_true, y_pred, labels=[1, 0], target_names=["ASE", "Non-ASE"])
-        clsf_report = output_prefix + "test_classification_report.txt"
         conf_matrix = confusion_matrix(y_true, y_pred, labels=[1, 0])
-        conf_matrix = pd.DataFrame(conf_matrix, index=["ASE", "Non-ASE"], columns=["ASE", "Non-ASE"])
-        conf_matrix.columns.name = "Pred"
-        conf_matrix.index.name = "True"
-        with open(clsf_report, "w") as fh:
-            fh.write("Classification report:\n")
-            fh.write(creport)
-            fh.write("\nConfusion matrix:\n")
-            fh.write(conf_matrix.to_string())
-            fh.write("\n")
+        conf_matrix = pd.DataFrame(conf_matrix, index=pd.Index(["ASE", "Non-ASE"], name="True"), columns=pd.Index(["ASE", "Non-ASE"], name="Pred"))
+        conf_matrix_list = ["Classification report:", creport, "Confusion matrix:", conf_matrix.to_string()]
+        self.conf_string = "\n".join(conf_matrix_list) + "\n"  # output
 
-        # Output test results
-        output_path = output_prefix + "test_pred.tsv"
-        dataframe = self.x_test_matrix
-        dataframe["ASE_true"] = self.y_true
-        dataframe["ASE_pred"] = self.y_pred
-        dataframe.to_csv(output_path, sep="\t", index=False)
-
+        # Test results
         _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
         _new_vals, prob1, _ = self.get_predict_proba(self.x_test_matrix)
         for col_key, col_val in zip(_new_cols, _new_vals):
-            dataframe[col_key] = col_val
+            self.x_test_matrix[col_key] = col_val
+        self.x_test_matrix["ASE_true"] = y_true
+        self.x_test_matrix["ASE_pred"] = y_pred
 
-        auc = [[roc_auc_score(y_true, _prob1), roc_curve(y_true, _prob1)] for _prob1 in prob1]
-        auc_opt = output_prefix + "test_roc_auc.pkl"
-        with open(auc_opt, 'wb') as auc_opth:
-            pickle.dump(auc, auc_opth)
+        # Test RUC and ROC
+        self.test_roc_auc = [[roc_auc_score(y_true, _prob1), roc_curve(y_true, _prob1)] for _prob1 in prob1]
+        self.test_roc_auc_curve, _ = self.draw_roc_curve_cv(self.test_roc_auc)
 
-        fig, _ = self.draw_roc_curve_cv(auc)
-        file_path = output_prefix + "test_roc_auc.png"
-        save_file(file_path, fig)
         return self
 
     def preprocessing(self, file_name, limit=None, gs_mask=None, mask=None,
@@ -237,9 +227,12 @@ class ASEP:
                            nrows=nrows, low_memory=False, na_values=['NA', '.'])
 
     @staticmethod
-    def setup_work_dataframe(raw_dataframe):
+    def setup_work_dataframe(raw_dataframe, var_id=('Chrom', 'Pos', 'Ref', 'Alt')):
         """Deep copy the raw DataFrame into work DataFrame"""
         try:
+            raw_dataframe.index = (raw_dataframe
+                                   .loc[:, var_id]
+                                   .apply(lambda x: tuple(x.values), axis=1))
             return copy.deepcopy(raw_dataframe)
         except Exception('Failed to deepcopy raw_df to work_df') as exp:
             raise exp
@@ -622,10 +615,8 @@ class ASEP:
 
         return (fig, ax_features)
 
-    def save_to(self, save_path="./", run_flag='', save_method="pickle"):
+    def save_to(self, save_path="./", run_flag=''):
         """Save configs, results and model to the disk.
-
-        TODO: Finish the save_method parameters
         """
         time_stamp = self.time_stamp + "_" + run_flag
         save_path = os.path.join(save_path, time_stamp)
@@ -634,30 +625,47 @@ class ASEP:
             os.makedirs(save_path)
 
         if self.feature_importance_pool:
-            file_path = os.path.join(save_path, "feature_importances.pkl")
+            file_path = os.path.join(save_path, "train_feature_importances.pkl")
             save_file(file_path, self.feature_importance_pool)
 
         if self.feature_importance_hist:
-            file_path = os.path.join(save_path, "feature_importances_hist.png")
+            file_path = os.path.join(save_path, "train_feature_importances_hist.png")
             save_file(file_path, self.feature_importance_hist[0])
 
         if self.area_under_curve_pool:
-            file_path = os.path.join(save_path, "auc_fpr_tpr.pkl")
+            file_path = os.path.join(save_path, "train_auc_fpr_tpr.pkl")
             save_file(file_path, self.area_under_curve_pool)
 
         if self.roc_curve_pool:
-            file_path = os.path.join(save_path, "roc_curve.png")
+            file_path = os.path.join(save_path, "train_roc_curve.png")
             save_file(file_path, self.roc_curve_pool[0])
 
         if self.training_report_pool:
-            file_path = os.path.join(save_path, "training_report.pkl")
+            file_path = os.path.join(save_path, "train_report.pkl")
             save_file(file_path, self.training_report_pool)
 
         if self.learning_line:
-            file_path = os.path.join(save_path, "learning_curve.png")
+            file_path = os.path.join(save_path, "train_learning_curve.png")
             save_file(file_path, self.learning_line[0])
 
-        file_path = os.path.join(save_path, "model.pkl")
+        if self.conf_string:
+            file_path = os.path.join(save_path, "test_report.txt")
+            with open(file_path, "w") as opfh:
+                opfh.write(self.conf_string)
+
+        if self.x_test_matrix is not None:
+            file_path = os.path.join(save_path, "test_output.tsv")
+            self.x_test_matrix.to_csv(file_path)
+
+        if self.test_roc_auc:
+            file_path = os.path.join(save_path, "test_auc_roc.pkl")
+            save_file(file_path, self.test_roc_auc)
+
+        if self.test_roc_auc_curve:
+            file_path = os.path.join(save_path, "test_auc_roc.png")
+            save_file(file_path, self.test_roc_auc_curve)
+
+        file_path = os.path.join(save_path, "train_model.pkl")
         with open(file_path, 'wb') as opfh:
             pickle.dump(self, opfh)
 
@@ -754,15 +762,15 @@ class ASEP:
         if response in drop_cols:
             drop_cols.remove(response)
 
-        _, dataframe, x_matrix, y_true = self.preprocessing(input_file, limit, gs_mask, mask, drop_cols, response)
+        rawdtfm, dataframe, x_matrix, y_true = self.preprocessing(input_file, limit, gs_mask, mask, drop_cols, response)
 
         y_pred = self.get_predict_label(x_matrix, models)[0]
         creport = classification_report(y_true, y_pred, labels=[1, 0], target_names=["ASE", "Non-ASE"])
-        clsf_report = output_prefix + "validation_classification_report.txt"
+
+        creport = classification_report(y_true, y_pred, labels=[1, 0], target_names=["ASE", "Non-ASE"])
+        clsf_report = output_prefix + "validation_report.txt"
         conf_matrix = confusion_matrix(y_true, y_pred, labels=[1, 0])
-        conf_matrix = pd.DataFrame(conf_matrix, index=["ASE", "Non-ASE"], columns=["ASE", "Non-ASE"])
-        conf_matrix.columns.name = "Pred"
-        conf_matrix.index.name = "True"
+        conf_matrix = pd.DataFrame(conf_matrix, index=pd.Index(["ASE", "Non-ASE"], name="True"), columns=pd.Index(["ASE", "Non-ASE"], name="Pred"))
 
         with open(clsf_report, "w") as fh:
             fh.write("Classification report:\n")
@@ -773,15 +781,15 @@ class ASEP:
 
         _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
         _new_vals, prob1, _ = self.get_predict_proba(x_matrix, models)
+        output_dataframe = copy.deepcopy(rawdtfm.loc[dataframe.index, :])
         for col_key, col_val in zip(_new_cols, _new_vals):
-            dataframe[col_key] = col_val
+            output_dataframe[col_key] = col_val
 
         _, input_file_name = os.path.split(input_file)
         name, ext = os.path.splitext(input_file_name)
         output_file = "".join(["validation_", name, "_pred", ext])
-
         output_path = output_prefix + output_file
-        dataframe.to_csv(output_path, sep="\t", index=False)
+        output_dataframe.to_csv(output_path, sep="\t", index=False)
 
         auc = [[roc_auc_score(y_true, _prob1), roc_curve(y_true, _prob1)] for _prob1 in prob1]
         auc_opt = output_prefix + "validation_roc_auc.pkl"
@@ -989,7 +997,7 @@ def cli_parser():
     _group.add_argument("--learning-curve-cvs", dest="learning_curve_cvs", default=4, type=int, help="Number of folds to draw learning curve. Default: %(default)s")
     _group.add_argument("--learning-curve-n-jobs", dest="learning_curve_n_jobs", default=5, type=int, help="Number of jobs to draw learning curves. Default: %(default)s")
     _group.add_argument("--learning-curve-space-size", dest="learning_curve_space_size", default=10, type=int, help="Number of splits created in learning curve. Default: %(default)s")
-    _group.add_argument("--test-propotion", dest="test_pp", default=0, type=float, help="Percentage of whole dataset will be used as test dataset.")
+    _group.add_argument("--test-proportion", dest="test_pp", default=0, type=float, help="Percentage of whole dataset will be used as test dataset.")
 
     _group = train_argparser.add_argument_group("Output") # Arguments for Output
     _group.add_argument("-o", "--output-prefix", dest="output_prefix", default='./', type=str, help="The directory including output files. Default: ./")
@@ -1045,7 +1053,7 @@ def train(args):
                    lc_n_jobs=args.learning_curve_n_jobs,
                    lc_cvs=args.learning_curve_cvs,
                    max_na_ratio=args.max_na_ratio) \
-            .test(args.output_prefix) \
+            .test() \
             .save_to(args.output_prefix,
                      run_flag=args.run_flag,
                      save_method=args.save_method)
