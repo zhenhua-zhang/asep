@@ -12,10 +12,8 @@ Notes:
 Todo:
 '''
 
-import copy
 import argparse
 
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -111,27 +109,27 @@ def trans_func(row, shift_dict):
     else:
         color = '0.5'
 
-    if bb_p_adj_gtex < 0.05 and prob1_mean_gtex >= 0.5:
-        shape_gtex = 'D'
-    elif bb_p_adj_gtex < 0.05:
-        shape_gtex = 'x'
-    elif prob1_mean_gtex >= 0.5:
-        shape_gtex = 'v'
-    else:
-        shape_gtex = '.'
+    # if bb_p_adj_gtex < 0.05 and prob1_mean_gtex >= 0.5:
+    #     shape_gtex = 'D'
+    # elif bb_p_adj_gtex < 0.05:
+    #     shape_gtex = 'x'
+    # elif prob1_mean_gtex >= 0.5:
+    #     shape_gtex = 'v'
+    # else:
+    #     shape_gtex = '.'
 
-    if bb_p_adj_bios < 0.05 and prob1_mean_bios >= 0.5:
-        shape_bios = 'D'
-    elif bb_p_adj_bios < 0.05:
-        shape_bios = 'x'
-    elif prob1_mean_bios >= 0.5:
-        shape_bios = 'v'
-    else:
-        shape_bios = '.'
+    # if bb_p_adj_bios < 0.05 and prob1_mean_bios >= 0.5:
+    #     shape_bios = 'D'
+    # elif bb_p_adj_bios < 0.05:
+    #     shape_bios = 'x'
+    # elif prob1_mean_bios >= 0.5:
+    #     shape_bios = 'v'
+    # else:
+    #     shape_bios = '.'
 
     pos = row['Pos'] * 0.85 + shift_dict[row['Chrom']]
 
-    return [color, pos, shape_bios, shape_gtex]
+    return [color, pos] #, shape_bios, shape_gtex]
 
 
 def manhattan(pred_dtfm, x_col, y_col, output_path, chrom_col='Chrom', height=9,
@@ -143,7 +141,7 @@ def manhattan(pred_dtfm, x_col, y_col, output_path, chrom_col='Chrom', height=9,
         'green': 'BIOS', 'blue': 'GTEx', '0.5': 'None'}
 
     shift_dict = make_shift_dict(range(1, 23))
-    plot_cols = ['color', 'pos_shift', 'shape_bios', 'shape_gtex']
+    plot_cols = ['color', 'pos_shift'] #, 'shape_bios', 'shape_gtex']
     pred_dtfm[plot_cols] = pred_dtfm \
             .apply(trans, axis=1, result_type='expand', shift_dict=shift_dict)
 
@@ -155,16 +153,16 @@ def manhattan(pred_dtfm, x_col, y_col, output_path, chrom_col='Chrom', height=9,
     y_col_upper, y_col_lower = y_col
     fig, (axes_upper, axes_lower) = plt.subplots(nrows=2)
 
-    color_shape_pairs = pred_dtfm.loc[:, ['shape_bios', 'color']].drop_duplicates()
-    color_shape_pairs = zip(color_shape_pairs['shape_bios'], color_shape_pairs['color'])
-    for marker, color in color_shape_pairs:
-        subgroup_loc = ((pred_dtfm.loc[:, 'shape_bios'] == marker)
-                        & (pred_dtfm.loc[:, 'color'] == color))
+    #color_shape_pairs = pred_dtfm.loc[:, ['shape_bios', 'color']].drop_duplicates()
+    #color_shape_pairs = zip(color_shape_pairs['shape_bios'], color_shape_pairs['color'])
+    snv_colors = pred_dtfm.loc[:, "color"].drop_duplicates()
+    for color in snv_colors:
+        subgroup_loc = pred_dtfm.loc[:, 'color'] == color
         subgroup = pred_dtfm.loc[subgroup_loc, :]
-        label = '{};{}'.format(mark_color_dict[color], mark_color_dict[marker])
+        label = '{}'.format(mark_color_dict[color])
         x_val = subgroup.loc[:, 'pos_shift']
         y_val = subgroup.loc[:, y_col_upper].apply(lambda x: -scimath.log10(x))
-        axes_upper.scatter(x_val, y_val, c=color, marker=marker, label=label)
+        axes_upper.scatter(x_val, y_val, c=color, label=label)
 
     axes_upper.axhline(-scimath.log10(5e-2), ls='--')
     axes_upper.spines['top'].set_visible(False)
