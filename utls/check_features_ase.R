@@ -3,6 +3,7 @@ library(data.table)
 library(ggplot2)
 library(dplyr)
 library(stringr)
+library(svglite)
 
 setwd("/home/umcg-zzhang/Documents/projects/ws_ase_pred/")
 
@@ -20,7 +21,7 @@ setwd("/home/umcg-zzhang/Documents/projects/ws_ase_pred/")
 # A function to compare feautres between ASE and non-ASE.
 cmpf <- function(dtfm, feature_col, class_col="bb_ASE", dw_bp=TRUE,
                  pref=NULL, bp_title=NULL, bp_x_lab=NULL,
-                 bp_y_lab=NULL, log10_fc=FALSE, fmt="pdf") {
+                 bp_y_lab=NULL, log10_fc=FALSE, fmt="svg") {
   # Compare
   if (is.null(bp_title))
     bp_title = paste(feature_col, "difference between ASE and non-ASE")
@@ -47,7 +48,12 @@ cmpf <- function(dtfm, feature_col, class_col="bb_ASE", dw_bp=TRUE,
     g <- g + ggtitle(bp_title)
     g <- g + xlab(bp_x_lab) + ylab(bp_y_lab)
     g <- g + scale_x_discrete(limits = as.factor(c(0, 1)), labels = c("Non-ASE", "ASE"))
-    ggsave(paste0(pref, ".", fmt))
+    
+    if (is.character(fmt))
+      fmt <- c(fmt)
+    
+    for (.fmt in fmt)
+      ggsave(paste0(pref, ".", .fmt))
   }
   
   sumdtfm <- mean_per_class <- dtfm %>%
@@ -79,23 +85,23 @@ cohort <- "bios"
 class_col <- "bb_ASE"
 
 ftnm <- "gnomAD_AF"
-pref = str_glue("./publication/figures/suppl/{ftnm}-per_ASE_SNP-{cohort}")
+pref = str_glue("./integration/allele_frequency_in_bios_gtex/{ftnm}-per_ASE_SNP-{cohort}")
 smdtfm <- cmpf(bios_dtfm, feature_col = ftnm, pref = pref,
                class_col = "bb_ASE", bp_x_lab = "ASE",
-               bp_y_lab = "Reference allele frequency", log10_fc = TRUE)
+               bp_y_lab = "Reference allele frequency", log10_fc = TRUE,
+               fmt = c('png', 'pdf', 'svg'))
 
 ftpl <- c("GerpN", "bStatistic", "Dist2Mutation", "cDNApos", "cHmmReprPCWk",
           "cHmmQuies", "relcDNApos", "cHmmTx", "minDistTSE", "CDSpos")
 
 bios_ftdtfm <- list()
 for (ftnm in ftpl) {
-  pref = str_glue("./publication/figures/suppl/{ftnm}-per_ASE_SNP-{cohort}")
-  smdtfm <- cmpf(bios_dtfm, feature_col = ftnm, pref = pref, class_col = class_col, bp_x_lab = "ASE", dw_bp = FALSE)
+  pref = str_glue("./integration/feature_means_in_bios_gtex/{ftnm}-per_ASE_SNP-{cohort}")
+  smdtfm <- cmpf(bios_dtfm, feature_col = ftnm, pref = pref, class_col = class_col, bp_x_lab = "ASE")
   sumdtfm <- fmt_sumdtfm(smdtfm, ftnm)
   bios_ftdtfm[[ftnm]] <- sumdtfm
 }
 bios_ftdtfm <- as.data.frame(rbindlist(bios_ftdtfm, idcol = TRUE))
-fwrite(bios_ftdtfm, "./publication/bios_features_mean_stdev.tsv")
 
 
 
@@ -109,19 +115,22 @@ gtex_dtfm$gnomAD_AF <- as.numeric(gtex_dtfm$gnomAD_AF)
 
 cohort <- "gtex"
 ftnm <- "gnomAD_AF"
-pref <- str_glue("./publication/figures/suppl/{ftnm}-per_ASE_SNP-{cohort}")
-smdtfm <- cmpf(gtex_dtfm, feature_col = ftnm, pref = pref, class_col = "bb_ASE", bp_x_lab = "ASE", bp_y_lab = "Reference allele frequency", log10_fc = TRUE)
+pref <- str_glue("./integration/allele_frequency_in_bios_gtex/{ftnm}-per_ASE_SNP-{cohort}")
+smdtfm <- cmpf(gtex_dtfm, feature_col = ftnm, pref = pref,
+               class_col = "bb_ASE", bp_x_lab = "ASE", bp_y_lab = "Reference allele frequency",
+               log10_fc = TRUE, fmt = c('png', 'pdf', 'svg'))
 
 ftpl <- c("GerpN", "bStatistic", "cHmmReprPCWk", "GerpRS", "cHmmTxWk", 
           "minDistTSS", "cHmmTx", "cDNApos", "minDistTSE", "cHmmQuies" )
 gtex_ftdtfm <- list()
 for (ftnm in ftpl) {
-  pref = str_glue("./publication/figures/suppl/{ftnm}-per_ASE_SNP-{cohort}")
-  smdtfm <- cmpf(gtex_dtfm, feature_col = ftnm, pref = pref, class_col = class_col, bp_x_lab = "ASE", dw_bp = FALSE)
+  pref = str_glue("./integration/feature_means_in_bios_gtex/{ftnm}-per_ASE_SNP-{cohort}")
+  smdtfm <- cmpf(gtex_dtfm, feature_col = ftnm, pref = pref, class_col = class_col, bp_x_lab = "ASE")
   sumdtfm <- fmt_sumdtfm(smdtfm, ftnm)
   gtex_ftdtfm[[ftnm]] <- sumdtfm
 }
-
 gtex_ftdtfm <- as.data.frame(rbindlist(gtex_ftdtfm, idcol = TRUE))
 
-fwrite(gtex_ftdtfm, "./publication/gtex_features_mean_stdev.tsv")
+bios_gtex_ftdtfm <- full_join(bios_ftdtfm, gtex_ftdtfm, suffix = c('-bios', '-gtex'), by = '.id')
+fwrite(bios_gtex_ftdtfm, "./integration/feature_means_in_bios_gtex/bios_gtex_features_mean_stdev.csv")
+

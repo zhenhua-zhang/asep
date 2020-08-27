@@ -25,19 +25,22 @@ import argparse
 import numpy as np
 import pandas as pd
 import seaborn as sb
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import host_subplot
 
 def getargs():
     p = argparse.ArgumentParser()
-    p.add_argument("-f", "--input-files", dest="input_files", nargs="*",
+    p.add_argument("-i", "--input-files", dest="input_files", nargs="*",
                    help="Input files. Accept more than one files.")
-    p.add_argument("-F", "--input-sample-name", dest="input_sample_name", nargs="*",
+    p.add_argument("-s", "--input-sample-name", dest="input_sample_name", nargs="*",
                    help="Sample name for the input files. Accept more than one files, but the number should be the same to the one of --input-files")
     p.add_argument("-b", "--base-src", dest="base_src", default="bios",
                    help="The baseline source. Default: %(default)s")
     p.add_argument("-n", "--first-n", dest="first_n", default=30, type=int,
                    help="The first n most important features sorted by mean. Default: %(default)s")
+    p.add_argument("-F", "--output-fmt", dest="output_fmt", default="png", nargs='*', choices=['png', 'pdf', 'svg'],
+                   help="Output file. Path is acceptable, but require the path existancs")
     p.add_argument("-o", "--output-prefix", dest="output_prefix", default="feature_importance",
                    help="Output file. Path is acceptable, but require the path existancs")
     return p
@@ -71,7 +74,7 @@ def load_input_file(file_pool, sample_name_pool, base_src="bios", first_n=30):
 
 def prepare_for_pair_plot(fidtfm):
     fidtfm = fidtfm.stack().reset_index(level=(0, 1, 2))
-    fidtfm.columns = ["source", "cv", "feature", "value"]
+    fidtfm.columns = ["Source", "cv", "Feature", "value"]
 
     return fidtfm
 
@@ -79,20 +82,23 @@ def prepare_for_pair_plot(fidtfm):
 def draw_pairs(fidtfm, output_prefix, plot_type="box", fmt="png"):
     """Draw paired barplot."""
 
+    mpl.rcParams['legend.fontsize'] = 'large'
+    mpl.rcParams['legend.title_fontsize'] = 'large'
     if plot_type == "bar":
-        ax = sb.barplot(x="feature", y="value", hue="source", data=fidtfm)
+        ax = sb.barplot(x="Feature", y="value", hue="Source", data=fidtfm)
     elif plot_type == "box":
-        ax = sb.boxplot(x="feature", y="value", hue="source", data=fidtfm)
+        ax = sb.boxplot(x="Feature", y="value", hue="Source", data=fidtfm)
     else:
         raise TypeError("Unsupported type of plot {}".format(plot_type))
 
-    labels = fidtfm.feature.drop_duplicates()
+    labels = fidtfm.Feature.drop_duplicates()
     ax.set_xticklabels(labels, rotation=45, ha="right", rotation_mode="anchor")
+    ax.set_ylabel("Feature importance")
+    ax.set_xlabel('Feature')
 
     fig = ax.get_figure()
     fig.tight_layout()
-    n_fi = len(labels)
-    fig.set_figwidth(n_fi*0.25)
+    fig.set_figwidth(len(labels)*0.25)
     fig.set_figheight(5)
 
     fig.savefig("{}.paired_{}plot.{}".format(output_prefix, plot_type, fmt))
@@ -103,7 +109,7 @@ def draw_pairs(fidtfm, output_prefix, plot_type="box", fmt="png"):
 def prepare_for_slope_plot(fidtfm, sample_name_pool):
     _, n_fi = fidtfm.shape
     src1, src2 = sample_name_pool
-    src1_rank, src2_rank = src1 + "_rank", src2 + "_rank" 
+    src1_rank, src2_rank = src1 + "_rank", src2 + "_rank"
 
     fidtfm_mean = fidtfm.mean(level=0, axis=0)
     fidtfm_mean = fidtfm_mean.sort_values(by=src1, axis=1, ascending=False)
@@ -115,7 +121,7 @@ def prepare_for_slope_plot(fidtfm, sample_name_pool):
     return fidtfm_mean.sort_values(by=src1 + "_rank", axis=1).sort_index()
 
 
-def draw_shift(fidtfm, output_prefix, sample_name_pool, fmt="png"):
+def draw_shift(fidtfm, output_path, sample_name_pool, fmt="png"):
     _, n_fi = fidtfm.shape
     src1, src2 = sample_name_pool
     src1_rank, src2_rank = src1 + "_rank", src2 + "_rank" 
@@ -147,7 +153,12 @@ def draw_shift(fidtfm, output_prefix, sample_name_pool, fmt="png"):
     fig.set_figwidth(n_fi*0.25)
     fig.set_figheight(5)
     plt.tight_layout()
-    fig.savefig("{}.feature_shift.{}".format(output_prefix, fmt))
+
+    if isinstance(output_path, str):
+        output_path = [output_path]
+    for optpath in output_path:
+        fig.savefig(output_path)
+
     plt.close()
 
 
@@ -158,6 +169,7 @@ def main():
     input_sample_name = args.input_sample_name
     base_src = args.base_src
     first_n = args.first_n
+    output_fmt = args.output_fmt
     output_prefix = args.output_prefix
 
     if len(input_files) != len(input_sample_name):
@@ -174,10 +186,12 @@ def main():
     fidtfm = load_input_file(input_files, input_sample_name, base_src, first_n=first_n)
 
     pair_fidtfm = prepare_for_pair_plot(fidtfm)
-    draw_pairs(pair_fidtfm, output_prefix)
+    output_path = ['{}-paried_plot.{}'.format(output_prefix, fmt) for fmt in output_fmt]
+    draw_pairs(pair_fidtfm, output_path)
 
-    slope_fidtfm = prepare_for_slope_plot(fidtfm, input_sample_name)
-    draw_shift(slope_fidtfm, output_prefix, input_sample_name)
+    # XXX: Not yet implemented multiple output_fmt yet.
+    # slope_fidtfm = prepare_for_slope_plot(fidtfm, input_sample_name)
+    # draw_shift(slope_fidtfm, output_prefix, input_sample_name)
 
 
 if __name__ == "__main__":

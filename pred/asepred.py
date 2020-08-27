@@ -476,7 +476,6 @@ class ASEP:
         else:
             training_report = None
 
-        # XXX: need update if use more estimator
         first_k_name = x_train_matrix.columns
         first_k_importance = estimator.steps[-1][-1].feature_importances_
         feature_importance = {name: importance for name, importance in zip(first_k_name, first_k_importance)}
@@ -495,7 +494,6 @@ class ASEP:
             model.fit(self.x_matrix, self.y_vector)
             self.estimator = model.best_estimator_
 
-            # XXX: possible wrong logics
             if self.training_report_pool is None:
                 self.training_report_pool = [
                     dict(
@@ -629,7 +627,7 @@ class ASEP:
             save_file(file_path, self.feature_importance_pool)
 
         if self.feature_importance_hist:
-            file_path = os.path.join(save_path, "train_feature_importances_hist.png")
+            file_path = os.path.join(save_path, "train_feature_importances_hist.pdf")
             save_file(file_path, self.feature_importance_hist[0])
 
         if self.area_under_curve_pool:
@@ -637,7 +635,7 @@ class ASEP:
             save_file(file_path, self.area_under_curve_pool)
 
         if self.roc_curve_pool:
-            file_path = os.path.join(save_path, "train_roc_curve.png")
+            file_path = os.path.join(save_path, "train_roc_curve.pdf")
             save_file(file_path, self.roc_curve_pool[0])
 
         if self.training_report_pool:
@@ -645,7 +643,7 @@ class ASEP:
             save_file(file_path, self.training_report_pool)
 
         if self.learning_line:
-            file_path = os.path.join(save_path, "train_learning_curve.png")
+            file_path = os.path.join(save_path, "train_learning_curve.pdf")
             save_file(file_path, self.learning_line[0])
 
         if self.conf_string:
@@ -654,7 +652,7 @@ class ASEP:
                 opfh.write(self.conf_string)
 
         if self.x_test_matrix is not None:
-            file_path = os.path.join(save_path, "test_output.tsv")
+            file_path = os.path.join(save_path, "test_output.csv")
             self.x_test_matrix.to_csv(file_path)
 
         if self.test_roc_auc:
@@ -662,7 +660,7 @@ class ASEP:
             save_file(file_path, self.test_roc_auc)
 
         if self.test_roc_auc_curve:
-            file_path = os.path.join(save_path, "test_auc_roc.png")
+            file_path = os.path.join(save_path, "test_auc_roc.pdf")
             save_file(file_path, self.test_roc_auc_curve)
 
         file_path = os.path.join(save_path, "train_model.pkl")
@@ -772,12 +770,12 @@ class ASEP:
         conf_matrix = confusion_matrix(y_true, y_pred, labels=[1, 0])
         conf_matrix = pd.DataFrame(conf_matrix, index=pd.Index(["ASE", "Non-ASE"], name="True"), columns=pd.Index(["ASE", "Non-ASE"], name="Pred"))
 
-        with open(clsf_report, "w") as fh:
-            fh.write("Classification report:\n")
-            fh.write(creport)
-            fh.write("\nConfusion matrix:\n")
-            fh.write(conf_matrix.to_string())
-            fh.write("\n")
+        with open(clsf_report, "w") as optfh:
+            optfh.write("Classification report:\n")
+            optfh.write(creport)
+            optfh.write("\nConfusion matrix:\n")
+            optfh.write(conf_matrix.to_string())
+            optfh.write("\n")
 
         _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
         _new_vals, prob1, _ = self.get_predict_proba(x_matrix, models)
@@ -798,7 +796,7 @@ class ASEP:
             pickle.dump(auc, auc_opth)
 
         fig, _ = self.draw_roc_curve_cv(auc)
-        file_path = output_prefix + "validation_roc_auc.png"
+        file_path = output_prefix + "validation_roc_auc.pdf"
         save_file(file_path, fig)
 
 

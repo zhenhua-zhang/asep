@@ -46,7 +46,7 @@ def getargs():
 
     parser.add_argument('-e', '--extra-cols-to-save', dest='extra_cols', default=('GeneID', 'GeneName', 'Consequence'), nargs='*', help='Other columns will be saved together with --coord-cols and ASE quantification columns. Default: %(default)s')
     parser.add_argument('-o', '--output-fref', dest='output_pref', default='./bios.gtex.ase_quant_pred', help='Output prefix. Default: %(default)s')
-    parser.add_argument('-F', '--plot-fmt', dest='plot_fmt', default='png', help='The output format of plot. Default: %(default)s')
+    parser.add_argument('-F', '--plot-fmt', dest='plot_fmt', default='png', choices=['png', 'pdf', 'svg'], nargs="*", help='The output format of plot. Default: %(default)s')
 
     return parser
 
@@ -162,7 +162,7 @@ def manhattan(pred_dtfm, x_col, y_col, output_path, chrom_col='Chrom', height=9,
         label = '{}'.format(mark_color_dict[color])
         x_val = subgroup.loc[:, 'pos_shift']
         y_val = subgroup.loc[:, y_col_upper].apply(lambda x: -scimath.log10(x))
-        axes_upper.scatter(x_val, y_val, c=color, label=label)
+        axes_upper.scatter(x_val, y_val, c=color, label=label, alpha=0.5)
 
     axes_upper.axhline(-scimath.log10(5e-2), ls='--')
     axes_upper.spines['top'].set_visible(False)
@@ -176,19 +176,16 @@ def manhattan(pred_dtfm, x_col, y_col, output_path, chrom_col='Chrom', height=9,
     axes_upper.set_title('BIOS')
 
     handles, labels = axes_upper.get_legend_handles_labels()
-    labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0].split(';', 1)))
-    axes_upper.legend(handles, labels)
+    labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0]))
+    axes_upper.legend(handles, labels, loc='upper left')
 
-    color_shape_pairs = pred_dtfm.loc[:, ['shape_gtex', 'color']].drop_duplicates()
-    color_shape_pairs = zip(color_shape_pairs['shape_gtex'], color_shape_pairs['color'])
-    for marker, color in color_shape_pairs:
-        subgroup_loc = ((pred_dtfm.loc[:, 'shape_gtex'] == marker)
-                        & (pred_dtfm.loc[:, 'color'] == color))
+    for color in snv_colors:
+        subgroup_loc = pred_dtfm.loc[:, 'color'] == color
         subgroup = pred_dtfm.loc[subgroup_loc, :]
-        label = '{};{}'.format(mark_color_dict[color], mark_color_dict[marker])
+        label = '{}'.format(mark_color_dict[color])
         x_val = subgroup.loc[:, 'pos_shift']
         y_val = subgroup.loc[:, y_col_lower].apply(lambda x: -scimath.log10(x))
-        axes_lower.scatter(x_val, y_val, c=color, marker=marker, label=label)
+        axes_lower.scatter(x_val, y_val, c=color, label=label, alpha=0.5)
 
     axes_lower.axhline(-scimath.log10(5e-2), ls='--')
     axes_lower.invert_yaxis()
@@ -200,13 +197,19 @@ def manhattan(pred_dtfm, x_col, y_col, output_path, chrom_col='Chrom', height=9,
     axes_lower.set_title('GTEx')
 
     handles, labels = axes_lower.get_legend_handles_labels()
-    labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0].split(';', 1)))
-    axes_lower.legend(handles, labels)
+    labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0]))
+    axes_lower.legend(handles, labels, loc='lower left')
 
     fig.set_figheight(height)
     fig.set_figwidth(width)
     fig.tight_layout(h_pad=0)
-    fig.savefig(output_path)
+
+    if isinstance(output_path, str):
+        fig.savefig(output_path)
+
+    for optpath in output_path:
+        fig.savefig(optpath)
+
     plt.cla()
     plt.clf()
     plt.close()
@@ -263,7 +266,8 @@ def main():
                  + [x + dataset_suffix[1] for x in ASE_QUANT_COLS])
     pred_dtfm.loc[:, kept_cols].to_csv(output_path, index=False)
 
-    output_path = '.'.join([output_pref, 'manhattan_plot', plot_fmt])
+    output_path = ['{}-{}.{}'.format(output_pref, 'manhattan_plot', fmt)
+                   for fmt in plot_fmt]
     manhattan(pred_dtfm, x_col='Pos', y_col=['bb_p_adj_bios', 'bb_p_adj_gtex'],
               output_path=output_path, trans=trans_func)
 

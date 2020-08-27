@@ -42,7 +42,7 @@ def getargs():
     parser.add_argument('-F', '--features', dest='features', default=_features, nargs='*', help='Features will be used to draw the plots.')
 
     parser.add_argument('-o', '--output-prefix', dest='output_pref', default='./shap_plot', help='The prefix for output files.  Default: %(default)s')
-    parser.add_argument('-f', '--figure-save-fmt', dest='figure_save_fmt', default='png', help='The file format in which to save.  Default: %(default)s')
+    parser.add_argument('-f', '--figure-save-fmt', dest='figure_save_fmt', nargs="*", choices=["png", "pdf", "svg"], default='png', help='The file format in which to save.  Default: %(default)s')
 
     return parser
 
@@ -69,15 +69,22 @@ def shap_me(model, n_samples, features, output_pref, savefmt='pdf', cmap='spring
                    .values)
     my_x_matrix = my_x_matrix.loc[:, features]
 
+    if isinstance(savefmt, str):
+        savefmt = [savefmt]
+
     for fig_type in ['dot', 'violin', 'bar']:
-        output_path = '{}.summary_{}.{}'.format(output_pref, fig_type, savefmt)
         shap.summary_plot(shap_values, my_x_matrix, plot_type=fig_type,
                           cmap=plt.get_cmap(cmap), alpha=0.7, show=False)
         current_fig = plt.gcf()
         current_fig.set_figheight(plot_height)
         current_fig.set_figwidth(plot_width)
-        plt.savefig(output_path)
-        plt.clf()
+
+        output_path = ['{}.summary_{}.{}'.format(output_pref, fig_type, fmt)
+                       for fmt in savefmt]
+
+        for optpath in output_path:
+            plt.savefig(optpath)
+            plt.clf()
 
     with open(output_pref + ".shap_values.pkl", 'wb') as pkl_opt:
         pickle.dump(shap_values, pkl_opt)
