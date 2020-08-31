@@ -309,3 +309,6 @@ implementation is called `FactorAnalysis` in `decomposition` package.
    draw a ROC-AUC plot. However, th training report will be useless as it only
    records the report of the first fitting. (The code should be modified to fix
    this potential problem)
+
+# Possible questions from reviewers
+1. How to deal with SNPs located on more than one genes?

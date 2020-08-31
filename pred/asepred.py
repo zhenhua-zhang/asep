@@ -6,38 +6,32 @@
 TODO: 1. A module to parse configuration file, which could make life easier.
       2. The `mask` argument in predictor.train() func doesn't function at all.
 """
-import os
-import sys
-import pdb
-import copy
-import time
-import pickle
 import argparse
+import copy
+import os
+import pdb
+import pickle
+import sys
+import time
 
 import joblib
-import prince
-import numpy as np
-import scipy as sp
-import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import prince
 
-from sklearn.utils import shuffle
-from sklearn.metrics import roc_curve
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import classification_report
-from sklearn.pipeline import Pipeline
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.multiclass import OneVsOneClassifier
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import learning_curve
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import RandomizedSearchCV
-
+import scipy as sp
 from imblearn.ensemble import BalancedRandomForestClassifier
+from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier,
+                              RandomForestClassifier)
+from sklearn.metrics import (classification_report, confusion_matrix,
+                             roc_auc_score, roc_curve)
+from sklearn.model_selection import (RandomizedSearchCV, StratifiedKFold,
+                                     learning_curve, train_test_split)
+from sklearn.multiclass import OneVsOneClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder
+from sklearn.utils import shuffle
 
 
 def format_print(title, main_content, pipe=sys.stderr):
@@ -684,7 +678,7 @@ class ASEP:
 
         _, input_file_name = os.path.split(input_file)
         name, ext = os.path.splitext(input_file_name)
-        output_file = "".join([name, "_pred", ext])
+        output_file = "".join([name, "-pred", ext])
         output_path = output_prefix + output_file
 
         dataframe.to_csv(output_path, sep="\t", index=False)
