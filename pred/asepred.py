@@ -6,28 +6,26 @@
 TODO: 1. A module to parse configuration file, which could make life easier.
       2. The `mask` argument in predictor.train() func doesn't function at all.
 """
-import argparse
-import copy
 import os
-import pdb
-import pickle
 import sys
+import copy
 import time
+import pickle
+import argparse
 
 import joblib
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import prince
 
+import numpy as np
 import scipy as sp
+import pandas as pd
+import matplotlib.pyplot as plt
 from imblearn.ensemble import BalancedRandomForestClassifier
 from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier,
                               RandomForestClassifier)
 from sklearn.metrics import (classification_report, confusion_matrix,
                              roc_auc_score, roc_curve)
 from sklearn.model_selection import (RandomizedSearchCV, StratifiedKFold,
-                                     learning_curve, train_test_split)
+                                     train_test_split)
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
@@ -57,7 +55,6 @@ def print_flag(subc=None, flag=None):
         run_flag = "".join([" Run flag: ", flag, " "])
     else:
         run_flag = "-" * 80
-
     print("{:-^80}".format(run_flag), file=sys.stderr)
 
 
@@ -73,8 +70,7 @@ def print_args(args, fwd=-1):
     """
 
     print("Arguments for current run: ", file=sys.stderr)
-    args_pair = [(_d, _a) for _d, _a in vars(args).items()]
-    args_pair = sorted(args_pair, key=lambda x: len(x[0]))
+    args_pair = sorted(vars(args).items(), key=lambda x: len(x[0]))
 
     if fwd == -1:
         fwd = len(args_pair[-1][0]) + 1
@@ -85,8 +81,7 @@ def print_args(args, fwd=-1):
 
 class ASEP:
     """A class implementing prediction of ASE effect for a variant"""
-
-    def __init__(self, file_name, config, random_state=42, test_pp=0):
+    def __init__(self, file_name, config, random_state=42, test_pp=0.1):
         """Set up basic variables """
         self.time_stamp = None
         self.random_state = random_state
@@ -106,7 +101,6 @@ class ASEP:
         self.x_test_matrix = None
         self.y_test_vector = None
 
-        self.conf_string = None
         self.test_roc_auc = None
         self.test_roc_auc_curve = None
 
@@ -125,15 +119,14 @@ class ASEP:
         self.learning_report = None
         self.learning_line = None
 
-        self.label_rename_mtrx = None
+        self.label_rename_mtrx = {}
         self.dropped_cols = None
         self.mask_query = None
         self.gs_mask = None
 
     # train
     def train(self, limit=None, mask=None, response="bb_ASE", drop_cols=None,
-              biclass_=True, outer_cvs=6, mings=2, maxgs=None, with_lc=False,
-              lc_space_size=10, lc_n_jobs=5, lc_cvs=5, nested_cv=False,
+              biclass_=True, outer_cvs=6, mings=2, maxgs=None, nested_cv=False,
               max_na_ratio=0.6):
         """Execute a pre-designed construct pipeline"""
         self.time_stamp = time.strftime("%Y_%b_%d_%H_%M_%S", time.gmtime())
@@ -151,33 +144,26 @@ class ASEP:
                                      drop_cols, response, max_na_ratio)
         if 0 < self.test_pp < 1:
             self.x_matrix, self.x_test_matrix, self.y_vector, self.y_test_vector \
-                    = train_test_split(self.x_matrix, self.y_vector, test_size=self.test_pp, random_state=self.random_state, shuffle=True)
+                    = train_test_split(self.x_matrix, self.y_vector,
+                                       test_size=self.test_pp,
+                                       random_state=self.random_state,
+                                       shuffle=True)
 
         self.setup_pipeline(self.estimators_list, biclass=biclass_)
         self.outer_validation(cvs=outer_cvs, nested_cv=nested_cv)
         self.roc_curve_pool = self.draw_roc_curve_cv(self.area_under_curve_pool)
         self.feature_importance_hist = self.draw_k_main_features_cv(self.feature_importance_pool)
 
-        if with_lc:
-            self.draw_learning_curve(estimator=self.estimator, cvs=lc_cvs, n_jobs=lc_n_jobs, space_size=lc_space_size)
-
         return self
 
     def test(self):
         """Do test on n% left out samples."""
         if self.x_test_matrix is None or self.y_test_vector is None:
-            print("[E]: It looks you setted --test-proportion to 0, which means no test dataset will be setup from the whole input dataset.")
+            print("[W]: --test-proportion is 0, no test will be done.")
             return self
 
         y_true = self.y_test_vector
         y_pred = self.get_predict_label(self.x_test_matrix)[0]
-
-        # Confusion matrix
-        creport = classification_report(y_true, y_pred, labels=[1, 0], target_names=["ASE", "Non-ASE"])
-        conf_matrix = confusion_matrix(y_true, y_pred, labels=[1, 0])
-        conf_matrix = pd.DataFrame(conf_matrix, index=pd.Index(["ASE", "Non-ASE"], name="True"), columns=pd.Index(["ASE", "Non-ASE"], name="Pred"))
-        conf_matrix_list = ["Classification report:", creport, "Confusion matrix:", conf_matrix.to_string()]
-        self.conf_string = "\n".join(conf_matrix_list) + "\n"  # output
 
         # Test results
         _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
@@ -188,7 +174,8 @@ class ASEP:
         self.x_test_matrix["ASE_pred"] = y_pred
 
         # Test RUC and ROC
-        self.test_roc_auc = [[roc_auc_score(y_true, _prob1), roc_curve(y_true, _prob1)] for _prob1 in prob1]
+        self.test_roc_auc = [[roc_auc_score(y_true, _prob1),
+                              roc_curve(y_true, _prob1)] for _prob1 in prob1]
         self.test_roc_auc_curve, _ = self.draw_roc_curve_cv(self.test_roc_auc)
 
         return self
@@ -199,7 +186,7 @@ class ASEP:
         if mask:
             pass
         raw_dataframe = self.read_file(file_name, limit)
-        dataframe = self.setup_work_dataframe(raw_dataframe)
+        dataframe = self.setup_wkdf(raw_dataframe)
         dataframe = self.slice_dataframe(dataframe, mask=gs_mask, remove=False)
         dataframe = self.slice_dataframe(dataframe, cols=drop_cols)
 
@@ -217,15 +204,14 @@ class ASEP:
     @staticmethod
     def read_file(file_name, nrows=None):
         """Read input file into pandas DataFrame."""
-        return pd.read_csv(file_name, sep="\t", compression="infer",
-                           nrows=nrows, low_memory=False, na_values=['NA', '.'])
+        return pd.read_table(file_name, compression="infer", nrows=nrows,
+                             low_memory=False, na_values=['NA', '.'])
 
     @staticmethod
-    def setup_work_dataframe(raw_dataframe, var_id=('Chrom', 'Pos', 'Ref', 'Alt')):
+    def setup_wkdf(raw_dataframe, var_id=('Chrom', 'Pos', 'Ref', 'Alt')):
         """Deep copy the raw DataFrame into work DataFrame"""
         try:
-            raw_dataframe.index = (raw_dataframe
-                                   .loc[:, var_id]
+            raw_dataframe.index = (raw_dataframe.loc[:, var_id]
                                    .apply(lambda x: tuple(x.values), axis=1))
             return copy.deepcopy(raw_dataframe)
         except Exception('Failed to deepcopy raw_df to work_df') as exp:
@@ -285,7 +271,6 @@ class ASEP:
         dataframe = dataframe.loc[:, na_freq_table <= max_na_ratio]
         return dataframe
 
-
     @staticmethod
     def setup_xy(work_dataframe, x_cols=None, y_col=None, cg_features=None):
         """Set up predictor variables and target variables. """
@@ -342,9 +327,6 @@ class ASEP:
             format_print("Encoded columns", ", ".join(target_cols))
             target_cols_encoded = [n + '_encoded' for n in target_cols]
 
-            if self.label_rename_mtrx is None:
-                self.label_rename_mtrx = {}
-
             encoder = LabelEncoder()
             for _tag, _tag_enc in zip(target_cols, target_cols_encoded):
                 try:
@@ -353,7 +335,6 @@ class ASEP:
                     del work_dataframe[_tag]
                 except ValueError as err:
                     print(err, file=sys.stderr)
-
         return work_dataframe
 
     @staticmethod
@@ -400,49 +381,15 @@ class ASEP:
 
         return dataframe
 
-    def factor_analysis_decomp(self):
-        """Do a factor analysis to find latent variables.
-        """
-        famd = prince.FAMD(
-            n_components=2,
-            n_iter=3,
-            copy=True,
-            check_input=True,
-            engine="auto",
-        )
-        famd = famd.fit(self.x_matrix)
-        print(famd.row_coordinates)
-
     def setup_pipeline(self, estimator=None, biclass=True):
-        """Setup a training pipeline """
+        """Setup a training pipeline."""
         if biclass:
             self.pipeline = Pipeline(estimator)
         else:
             self.pipeline = OneVsOneClassifier(Pipeline(estimator))
 
-    def draw_learning_curve(self, estimator, cvs=5, n_jobs=5, space_size=10, **kwargs):
-        """Draw the learning curve of specific estimator or pipeline"""
-        train_sizes, train_scores, test_scores = learning_curve(estimator=estimator, X=self.x_matrix, y=self.y_vector, train_sizes=np.linspace(.1, 1., space_size), cv=cvs, n_jobs=n_jobs, **kwargs)
-
-        train_scores_mean = np.mean(train_scores, axis=1)
-        train_scores_std = np.std(train_scores, axis=1)
-        test_scores_mean = np.mean(test_scores, axis=1)
-        test_scores_std = np.std(test_scores, axis=1)
-
-        fig, ax_learning = plt.subplots(figsize=(10, 10))
-
-        ax_learning.fill_between(train_sizes, train_scores_mean + train_scores_std, train_scores_mean - train_scores_std, alpha=0.1)
-        ax_learning.plot(train_sizes, train_scores_mean, color='r', label='Training score')
-
-        ax_learning.fill_between(train_sizes, test_scores_mean + test_scores_std, test_scores_mean - test_scores_std, alpha=0.1)
-        ax_learning.plot(train_sizes, test_scores_mean, color='g', label='Cross-validation score')
-        ax_learning.set(title='Learning curve', xlabel='Training examples', ylabel='Score')
-        ax_learning.legend(loc='best')
-
-        self.learning_line = (fig, ax_learning)
-
     def randomized_search_cv(self, estimator, split):  # Nested cv
-        """Hyper-parameters optimization by RandomizedSearchCV """
+        """Hyper-parameters optimization by RandomizedSearchCV."""
         train_idx, test_idx = split
         x_train_matrix = copy.deepcopy(self.x_matrix.iloc[train_idx])
         y_train_vector = copy.deepcopy(self.y_vector.iloc[train_idx])
@@ -452,7 +399,8 @@ class ASEP:
         estimator.fit(x_train_matrix, y_train_vector)
 
         y_test_scores = estimator.predict_proba(x_test_matrix)[:, 1]
-        auc = [roc_auc_score(y_test_vector, y_test_scores), roc_curve(y_test_vector, y_test_scores)]
+        auc = [roc_auc_score(y_test_vector, y_test_scores),
+               roc_curve(y_test_vector, y_test_scores)]
 
         if isinstance(estimator, RandomizedSearchCV):
             training_report = dict(
@@ -463,8 +411,7 @@ class ASEP:
                 Best_index=estimator.best_index_,
                 Cross_validations=estimator.cv_results_,
                 Best_estimator=estimator.best_estimator_,
-                Estimator_score=estimator.score(x_test_matrix, y_test_vector)
-            )
+                Estimator_score=estimator.score(x_test_matrix, y_test_vector))
 
             estimator = estimator.best_estimator_
         else:
@@ -472,13 +419,14 @@ class ASEP:
 
         first_k_name = x_train_matrix.columns
         first_k_importance = estimator.steps[-1][-1].feature_importances_
-        feature_importance = {name: importance for name, importance in zip(first_k_name, first_k_importance)}
+        feature_importance = dict(zip(first_k_name, first_k_importance))
 
         return (training_report, auc, feature_importance, estimator)
 
     def outer_validation(self, cvs=6, nested_cv=False, **kwargs):
         """K-fold stratified validation by StratifiedKFold from scikit-learn"""
-        skf = StratifiedKFold(n_splits=cvs, random_state=self.random_state, **kwargs)
+        skf = StratifiedKFold(n_splits=cvs, shuffle=True,
+                              random_state=self.random_state, **kwargs)
         split_pool = skf.split(self.x_matrix, self.y_vector)
 
         model = RandomizedSearchCV(self.pipeline, random_state=self.random_state, **self.optim_params)
@@ -490,17 +438,14 @@ class ASEP:
 
             if self.training_report_pool is None:
                 self.training_report_pool = [
-                    dict(
-                        Scorer=model.scorer_,
-                        Params=model.get_params(),
-                        Best_params=model.best_params_,
-                        Best_score=model.best_score_,
-                        Best_index=model.best_index_,
-                        Cross_validations=model.cv_results_,
-                        Best_estimator=model.best_estimator_,
-                        Estimator_score=None
-                    )
-                ]
+                    dict(Scorer=model.scorer_,
+                         Params=model.get_params(),
+                         Best_params=model.best_params_,
+                         Best_score=model.best_score_,
+                         Best_index=model.best_index_,
+                         Cross_validations=model.cv_results_,
+                         Best_estimator=model.best_estimator_,
+                         Estimator_score=None)]
 
         if self.model_pool is None:
             self.model_pool = []
@@ -636,25 +581,16 @@ class ASEP:
             file_path = os.path.join(save_path, "train_report.pkl")
             save_file(file_path, self.training_report_pool)
 
-        if self.learning_line:
-            file_path = os.path.join(save_path, "train_learning_curve.pdf")
-            save_file(file_path, self.learning_line[0])
-
-        if self.conf_string:
-            file_path = os.path.join(save_path, "test_report.txt")
-            with open(file_path, "w") as opfh:
-                opfh.write(self.conf_string)
-
         if self.x_test_matrix is not None:
             file_path = os.path.join(save_path, "test_output.csv")
             self.x_test_matrix.to_csv(file_path)
 
         if self.test_roc_auc:
-            file_path = os.path.join(save_path, "test_auc_roc.pkl")
+            file_path = os.path.join(save_path, "test_auc_fpr_tpr.pkl")
             save_file(file_path, self.test_roc_auc)
 
         if self.test_roc_auc_curve:
-            file_path = os.path.join(save_path, "test_auc_roc.pdf")
+            file_path = os.path.join(save_path, "test_roc_curve.pdf")
             save_file(file_path, self.test_roc_auc_curve)
 
         file_path = os.path.join(save_path, "train_model.pkl")
@@ -739,7 +675,8 @@ class ASEP:
             else:
                 classes = _encoder.classes_
                 tmp_dict = dict(zip(classes, _encoder.transform(classes)))
-                dataframe[_tag_enc] = dataframe[_tag].apply(lambda x: tmp_dict[x] if x in tmp_dict else missing_val)
+                dataframe[_tag_enc] = dataframe[_tag] \
+                        .apply(lambda x: tmp_dict[x] if x in tmp_dict else missing_val)
                 del dataframe[_tag]
 
         return dataframe
@@ -818,8 +755,7 @@ class Config:
             self.init_params = dict(
                 abc__n_estimators=list(range(50, 1000, 50)),
                 abc__learning_rate=np.linspace(.01, 1., 50),
-                abc__algorithm=["SAMME", "SAMME.R"],
-            )
+                abc__algorithm=["SAMME", "SAMME.R"])
         elif classifier == "gbc":  # For GradientBoostingClassifier
             self.init_params = dict(
                 gbc__learning_rate=np.linspace(.01, 1., 50),
@@ -827,28 +763,21 @@ class Config:
                 gbc__min_samples_split=list(range(2, 12)),
                 gbc__min_samples_leaf=list(range(1, 11)),
                 gbc__max_depth=list(range(3, 11)),
-                gbc__max_features=['sqrt', 'log2', None],
-            )
+                gbc__max_features=['sqrt', 'log2', None])
         elif classifier == 'rfc':  # For RandomForestClassifier
             self.init_params = dict(
                 rfc__n_estimators=list(range(50, 500, 50)),
                 rfc__min_samples_split=list(range(2, 10, 2)),
                 rfc__min_samples_leaf=list(range(2, 10, 2)),
                 rfc__max_depth=list(range(10, 50, 10)),
-                rfc__class_weight=['balanced'],
-                # rfc__bootstrap=[False, True],
-                # rfc__max_features=['sqrt', 'log2', None],
-            )
+                rfc__class_weight=['balanced'])
         elif classifier == 'brfc':  # For BalancedRandomForestClassifier
             self.init_params = dict(
                 brfc__n_estimators=list(range(50, 500, 50)),
                 brfc__min_samples_split=list(range(2, 10, 2)),
                 brfc__min_samples_leaf=list(range(2, 10, 2)),
                 brfc__max_depth=list(range(10, 50, 10)),
-                brfc__class_weight=['balanced'],
-                # brfc__bootstrap=[False, True],
-                # brfc__max_features=['sqrt', 'log2', None],
-            )
+                brfc__class_weight=['balanced'])
         else:
             raise ValueError("Unknow classifier, choice: abc, gbc, rfc, brfc.")
 
@@ -960,7 +889,7 @@ def cli_parser():
     parser = argparse.ArgumentParser()
     _group = parser.add_argument_group("Global") # Global-wide configs
     _group.add_argument("--run-flag", dest="run_flag", default="new_task", help="Flags for current run. The flag will be added to the name of the output dir. Default: %(default)s")
-    _group.add_argument("--random-state", dest="random_state", default=None, type=int, help="The random seed. Default: %(default)s")
+    _group.add_argument("--random-state", dest="random_state", default=42, type=int, help="The random seed. Default: %(default)s")
 
     subparser = parser.add_subparsers(dest="subcmd") # Arguments parser for sub-command `train`
     train_argparser = subparser.add_parser("train", help="Train a model")
@@ -985,10 +914,6 @@ def cli_parser():
     _group.add_argument("--inner-n-jobs", dest="inner_n_jobs", default=5, type=int, help="Number of jobs for RandomizedSearchCV. Default: %(default)s")
     _group.add_argument("--inner-n-iters", dest="inner_n_iters", default=50, type=int, help="Number of iters for RandomizedSearchCV. Default: %(default)s")
     _group.add_argument("--outer-cvs", dest="outer_cvs", default=6, type=int, help="Fold of cross-validation for outer_validation. Default: %(default)s")
-    _group.add_argument("--with-learning-curve", dest="with_learning_curve", default=False, action='store_true', help="Whether draw learning curve. Default: %(default)s")
-    _group.add_argument("--learning-curve-cvs", dest="learning_curve_cvs", default=4, type=int, help="Number of folds to draw learning curve. Default: %(default)s")
-    _group.add_argument("--learning-curve-n-jobs", dest="learning_curve_n_jobs", default=5, type=int, help="Number of jobs to draw learning curves. Default: %(default)s")
-    _group.add_argument("--learning-curve-space-size", dest="learning_curve_space_size", default=10, type=int, help="Number of splits created in learning curve. Default: %(default)s")
     _group.add_argument("--test-proportion", dest="test_pp", default=0, type=float, help="Percentage of whole dataset will be used as test dataset.")
 
     _group = train_argparser.add_argument_group("Output") # Arguments for Output
@@ -1040,10 +965,6 @@ def train(args):
                    drop_cols=args.drop_cols,
                    outer_cvs=args.outer_cvs,
                    nested_cv=args.nested_cv,
-                   with_lc=args.with_learning_curve,
-                   lc_space_size=args.learning_curve_space_size,
-                   lc_n_jobs=args.learning_curve_n_jobs,
-                   lc_cvs=args.learning_curve_cvs,
                    max_na_ratio=args.max_na_ratio) \
             .test() \
             .save_to(args.output_prefix,
@@ -1087,7 +1008,6 @@ def main():
     else:
         print_flag(subcmd, run_flag)
         print_args(cli_args)
-
         if subcmd == "train":
             train(cli_args)
         elif subcmd == "validate":
