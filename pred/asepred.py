@@ -601,11 +601,11 @@ class ASEP:
     def predictor(self, input_file, output_prefix="./", nrows=None, models=None):
         """Predict ASE effects for raw dataset.
         """
-        with open(input_file) as file_handle:
-            dataframe = pd.read_table(file_handle, nrows=nrows,
-                                      low_memory=False, na_values=['NA', '.'])
+        dataframe = pd.read_table(input_file, nrows=nrows,
+                                  low_memory=False, na_values=['NA', '.'])
 
         x_matrix = self.setup_x_matrix(dataframe)
+        x_matrix = x_matrix.loc[:, self.x_matrix.columns] # Ensure the columns order the same as the training x_matrix
 
         _new_cols = ["prob0_mean", "prob0_var", "prob1_mean", "prob1_var"]
         _new_vals, *_ = self.get_predict_proba(x_matrix, models)
@@ -968,8 +968,7 @@ def train(args):
                    max_na_ratio=args.max_na_ratio) \
             .test() \
             .save_to(args.output_prefix,
-                     run_flag=args.run_flag,
-                     save_method=args.save_method)
+                     run_flag=args.run_flag)
 
 
 def validate(args):
