@@ -3,7 +3,7 @@
 
 """Merge CADD annotation and heplotyplic reads counts (from phASER) per individuals
 
-    Current input-dir: /home/umcg-zzhang/Documents/projects/ASEPrediction/training/inputs/haplotypicCountsPerChr
+    Current input-dir: ~/Documents/projects/ASEPrediction/training/inputs/haplotypicCountsPerChr
 
     NOTE:
         1. File name rules. A mixture of snake_case, chain.case and camlCase

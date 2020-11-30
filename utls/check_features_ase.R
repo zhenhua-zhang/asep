@@ -5,7 +5,7 @@ library(dplyr)
 library(stringr)
 library(svglite)
 
-setwd("/home/umcg-zzhang/Documents/projects/ws_ase_pred/")
+setwd("~/Documents/projects/ws_ase_pred/")
 
 # class_col <- "bb_ASE"
 # feature_col <- 'GerpN'
