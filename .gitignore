@@ -28,14 +28,8 @@ _syntax_test
 # Ignore rsyncMe
 .rbcsignore
 
-# Remove the .vscode
+# Remove the .vscode/.idea/.vim/pythonVirtualEnv
 .vscode
-
-# Remove the .idea
 .idea
-
-# Remove the .vim
 .vim
-
-# Virtualenv
 .env
