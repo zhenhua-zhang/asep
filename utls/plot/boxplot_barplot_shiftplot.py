@@ -47,7 +47,7 @@ def getargs():
 
 
 def load_input_file(file_pool, sample_name_pool, base_src="bios", first_n=30):
-    # base_src 目前暂定为bios，后续需要根据你命令行参数确定。
+    # TODO: base_src is "bios", add a CLI option to specify it.
     fidtfm = None
     for input_file, sample_name in zip(file_pool, sample_name_pool):
         with open(input_file, "rb") as infh:
@@ -66,7 +66,7 @@ def load_input_file(file_pool, sample_name_pool, base_src="bios", first_n=30):
             .loc[base_src] \
             .sort_values(ascending=False) \
             .index[:first_n]
-    
+
     fidtfm = fidtfm.loc[:, first_n_feature]
 
     return fidtfm
