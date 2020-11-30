@@ -14,3 +14,5 @@ imbalanced-learn == 0.4.0
 joblib == 0.12.5
 cycler == 0.10.0
 kiwisolver == 1.0.1
+PyYAML >= 4.2b1
+prince == 0.6.0

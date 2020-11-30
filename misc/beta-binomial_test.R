@@ -11,7 +11,7 @@ bb_pmf <-function(success, trials, alpha=2, beta=3){
   return(exp(numerator - denominator))
 }
 
-# beta-binomial cummulative distribution function
+# beta-binomial cumulative distribution function
 bb_cdf <- function(success, trials, alpha=2, beta=3, init=0){
   return(sum(sapply(init:success, bb_pmf, trials, alpha, beta)))
 }

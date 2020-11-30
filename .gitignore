@@ -19,16 +19,17 @@
 
 # Ignore all starting with _
 _archived
-_asep_env
 _notes
 _syntax_test
 
 # Ignore some hidden files or directories
 .pylintrc
-.vscode/
 
 # Ignore rsyncMe
 .rbcsignore
 
-# python virtual env
+# Remove the .vscode/.idea/.vim/pythonVirtualEnv
+.vscode
+.idea
+.vim
 .env

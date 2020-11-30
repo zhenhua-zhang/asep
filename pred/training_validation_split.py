@@ -2,12 +2,10 @@
 # -*- coding: utf-8 -*-
 """A tiny script to split dataset into training and validation"""
 
+import copy
 import os
 import sys
-import copy
-
-from optparse import OptionParser
-from optparse import OptionGroup
+from optparse import OptionGroup, OptionParser
 
 import numpy
 import pandas
@@ -70,7 +68,7 @@ def split_data_frame(ipdf, filter=None, cols=None, rows=None, keep=True,
         data_frame = data_frame.drop(index=rows, columns=cols)
 
     if random_seed is not None:
-        numpy.random.sed(random_seed)
+        np.random.sed(random_seed)
         data_frame = data_frame.sample()
 
     return 0
