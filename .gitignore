@@ -28,4 +28,7 @@ _syntax_test
 .vscode/
 
 # Ignore rsyncMe
-.rbcsIgnore
+.rbcsignore
+
+# python virtual env
+.env
