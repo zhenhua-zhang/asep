@@ -45,7 +45,7 @@ def getargs():
     parser.add_argument('-c', '--coord-cols', dest='coord_cols', metavar=('CHROM', 'POS', 'REF', "ALT"), nargs=4, default=('Chrom', 'Pos', 'Ref', 'Alt'), help='The  columns used to represent coordinations, including chromsome, postion, reference allele, and alternative allele. Default: %(default)s')
 
     parser.add_argument('-e', '--extra-cols-to-save', dest='extra_cols', default=('GeneID', 'GeneName', 'Consequence'), nargs='*', help='Other columns will be saved together with --coord-cols and ASE quantification columns. Default: %(default)s')
-    parser.add_argument('-o', '--output-fref', dest='output_pref', default='./bios.gtex.ase_quant_pred', help='Output prefix. Default: %(default)s')
+    parser.add_argument('-o', '--output-fref', dest='output_pref', default='./bios_gtex_ase-quant-pred', help='Output prefix. Default: %(default)s')
     parser.add_argument('-F', '--plot-fmt', dest='plot_fmt', default='png', choices=['png', 'pdf', 'svg'], nargs="*", help='The output format of plot. Default: %(default)s')
 
     return parser
@@ -136,6 +136,7 @@ def manhattan(pred_dtfm, x_col, y_col, output_path, chrom_col='Chrom', height=9,
               width=32, trans=None):
     '''Draw upper-lower Manhattan plot.
     '''
+    outlier = -scimath.log10(1e-16)
     mark_color_dict = {
         'D': 'Q,P', 'x': 'Q', 'v': 'P', '.': 'N', 'red': 'Both',
         'green': 'BIOS', 'blue': 'GTEx', '0.5': 'None'}
@@ -161,7 +162,9 @@ def manhattan(pred_dtfm, x_col, y_col, output_path, chrom_col='Chrom', height=9,
         subgroup = pred_dtfm.loc[subgroup_loc, :]
         label = '{}'.format(mark_color_dict[color])
         x_val = subgroup.loc[:, 'pos_shift']
-        y_val = subgroup.loc[:, y_col_upper].apply(lambda x: -scimath.log10(x))
+        y_val = (subgroup
+                 .loc[:, y_col_upper]
+                 .apply(lambda x: -scimath.log10(x) if x != 0 else outlier))
         axes_upper.scatter(x_val, y_val, c=color, label=label, alpha=0.5)
 
     axes_upper.axhline(-scimath.log10(5e-2), ls='--')
@@ -184,7 +187,9 @@ def manhattan(pred_dtfm, x_col, y_col, output_path, chrom_col='Chrom', height=9,
         subgroup = pred_dtfm.loc[subgroup_loc, :]
         label = '{}'.format(mark_color_dict[color])
         x_val = subgroup.loc[:, 'pos_shift']
-        y_val = subgroup.loc[:, y_col_lower].apply(lambda x: -scimath.log10(x))
+        y_val = (subgroup
+                 .loc[:, y_col_lower]
+                 .apply(lambda x: -scimath.log10(x) if x!=0 else outlier))
         axes_lower.scatter(x_val, y_val, c=color, label=label, alpha=0.5)
 
     axes_lower.axhline(-scimath.log10(5e-2), ls='--')
@@ -215,8 +220,7 @@ def manhattan(pred_dtfm, x_col, y_col, output_path, chrom_col='Chrom', height=9,
     plt.close()
 
 
-def scatter_plot(pred_dtfm, x_col, y_col, output_path,
-                 trans_func=lambda x: -scimath.log10(x)):
+def scatter_plot(pred_dtfm, x_col, y_col, output_path):
     '''Scatter plot.
     '''
     fig, axes = plt.subplots()

@@ -79,7 +79,7 @@ def prepare_for_pair_plot(fidtfm):
     return fidtfm
 
 
-def draw_pairs(fidtfm, output_prefix, plot_type="box", fmt="png"):
+def draw_pairs(fidtfm, output_path, plot_type="box", fmt="png"):
     """Draw paired barplot."""
 
     mpl.rcParams['legend.fontsize'] = 'large'
@@ -101,7 +101,10 @@ def draw_pairs(fidtfm, output_prefix, plot_type="box", fmt="png"):
     fig.set_figwidth(len(labels)*0.25)
     fig.set_figheight(5)
 
-    fig.savefig("{}.paired_{}plot.{}".format(output_prefix, plot_type, fmt))
+    if isinstance(output_path, str):
+        output_path = [output_path]
+    for optp in output_path:
+        fig.savefig(optp)
 
     plt.close()
 
