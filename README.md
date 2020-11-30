@@ -11,8 +11,13 @@ paternal alleles at heterozygous loci in diploid organisms.
 Genetic variants (e.g. `eQTL`), epigenetic markers (e.g. `eQTM`), non-sense
 mediated decay(i.e. `NMD`) and alternative splicing etc.
 
-### Applications
+### Measurements  
+- Allele-specific PCR
+- Fluorescence in situ hybridization (`FISH`)
+- Array-based method
+- RNA sequencing 
 
+### Applications
 - Cancer
 - Brain development
 - Heart diseases
@@ -74,8 +79,8 @@ $$
 Then, we use $\pi, \gamma$ as the variables of our likelihood function, where $\pi$ is the probability of success, and $\gamma$ is the over-dispersion parameter. Here is our null model: $\pi=0.5, \gamma=100$ which means the probability of success is 0.5 and less over-dispersion.
 
 ## Predicting ASE effects via Machine Learning Model
-
-One of goals in this studies is to connect the DNA annotations and ASE effects by machine learning.
+One of goals in this studies is to connect the DNA annotations and ASE effects
+by machine learning.
 
 ## Problems
 1. If the `--nested-cv` is not given, then the scripts picks up a model fitted by `RandomizedSearchCV` as a estimator for the cross validation. In this case, the validation is called outer validation, which enables the script to draw a ROC-AUC plot. However, th training report will be useless as it only records the report of the first fitting. (The code should be modified to fix this potential problem)
