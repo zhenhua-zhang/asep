@@ -27,30 +27,40 @@ In previous studies, there many different method to estimate the ASE effects at 
 ### Binomial model
 We assume the outcomes of each individual for each locus are independent and identical distributed(*i.i.d.*).
 Generally, for the observed locus, a simple distribution of allele-specific expression result is respected to Binomial distribution.
+
 ![formula-1.png](./figs/formula-1.png)
-where `k` is the amount of success and means the abundance of alternative alleles in our case.
+
+Where `k` is the amount of success and means the abundance of alternative alleles in our case.
 We use a maximum likelihood estimation (`MLE`) under a Binomial distribution to estimate the parameter **θ** at first.
 Then a log-likelihood ratio test (`LRT`) was done to determine the goodness of fit to the balanced model in which the expression of two are identical or gently different(i.e. **θ = 0.5**).
 
 ### Beta-Binomial model
 
 However, the **θ** could be various. And we assume **θ** is respect to a Beta distribution.
+
 ![formula-2.png](./figs/formula-2.png)
 
 Then the joint distribution is a Beta-Binomial distribution.
 
 In Beta-Binomial distribution, let **π=α/(α+β)** the mean is
+
 ![formula-3](./figs/formula-3.png)
-while let **ρ=1/(α+β+1)**, then the variance is
+
+While let **ρ=1/(α+β+1)**, then the variance is
+
 ![formula-4](./figs/formula-4.png)
+
 The π here is the mean probability of success in Bernoulli trials, while the **ρ** is the over-dispersion of the distribution.
 
 In our problem, we need to estimate π and ρ for null and alternative hypothesis.
 
 First, we need to know the relation among **π, ρ, α, β**.
 Let **λ=(1-ρ)/ρ**
+
 ![formula-5](./figs/formula-5.png)
+
 Correspondingly,
+
 ![formula-6](./figs/formula-6.png)
 
 Then, we use **π, λ** as the variables of our likelihood function, where **π** is the probability of success, and **λ** is the over-dispersion parameter.
