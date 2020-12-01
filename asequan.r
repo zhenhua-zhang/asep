@@ -1,24 +1,15 @@
 #!/usr/bin/env Rscript
 #
-# File Name  : transform_log2fc_into_binary_by_ttest.R
+# File Name  : asequan.r
 # Author     : Zhenhua Zhang
 # E-mail     : zhenhua.zhang217@gmail.com
 # Created on : Fri 25 Jan 2019 10:51:30 AM CET
-# Version    : v0.0.2
+# Version    : v0.1.0
 # License    : MIT
 #
 
-#SBATCH --time=0:3:0
-#SBATCH --output=%j-%u-transform_expression_abundance_into_binary_sbatch_v0.0.2.log
-#SBATCH --job-name=teaibs
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=10G
-# module load R/3.3.3-foss-2015b
-# Rscript  transform_expression_abundance_into_binary_v0.0.2.R chr1_training_set.tsv chr1.tsv
-
-# TODO: 1. Using fread() to speed up it read.csv()
-# TODO: 2. Add more comments to help the coming maintenances
+# Example
+# Rscript asequan.r input.tsv output.tsv
 
 rm(list = ls())
 

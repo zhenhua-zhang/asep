@@ -20,9 +20,12 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     install_requires=[
-        "scipy == 1.1.0", "PyYAML >= 4.2b1", "numpy == 1.15.3",
-        "prince == 0.6.0", "pandas == 0.23.4", "joblib == 0.12.5",
-        "matplotlib == 3.0.0", "scikit-learn == 0.20.0",
+        "scipy == 1.1.0",
+        "numpy == 1.15.3",
+        "pandas == 0.23.4",
+        "joblib == 0.12.5",
+        "matplotlib == 3.0.0",
+        "scikit-learn == 0.20.0",
         "imbalanced-learn == 0.4.0",
     ],
     python_requires=">=3.5"
