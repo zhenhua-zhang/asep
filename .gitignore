@@ -1,7 +1,7 @@
 # Ignore all python cache directories
 **/__pycache__/
 
-# Ignore all '.png', '.tsv', '.sam', '.bam', '.vcf', '.tbi', '.docx' files
+# Ignore all '.tsv', '.sam', '.bam', '.vcf', '.tbi', '.docx' files
 **/*.bai
 **/*.bam
 **/*.bed
@@ -9,13 +9,13 @@
 **/*.fa
 **/*.fai
 **/*.html
-**/*.png
 **/*.pyc
 **/*.sam
 **/*.tbi
 **/*.tsv
 **/*.vcf
 **/*.pdf
+# **/*.png
 
 # Ignore all starting with _
 _archived
