@@ -21,7 +21,7 @@ setuptools.setup(
     ],
     install_requires=[
         "scipy == 1.1.0",
-        "numpy == 1.15.3",
+        "numpy == 1.22.0",
         "pandas == 0.23.4",
         "joblib == 0.12.5",
         "matplotlib == 3.0.0",
