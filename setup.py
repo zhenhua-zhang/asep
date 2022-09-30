@@ -23,7 +23,7 @@ setuptools.setup(
         "scipy == 1.1.0",
         "numpy == 1.15.3",
         "pandas == 0.23.4",
-        "joblib == 0.12.5",
+        "joblib == 1.2.0",
         "matplotlib == 3.0.0",
         "scikit-learn == 0.20.0",
         "imbalanced-learn == 0.4.0",
